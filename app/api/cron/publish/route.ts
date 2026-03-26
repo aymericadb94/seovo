@@ -34,6 +34,14 @@ async function analyzeWordPressSite(siteUrl: string, username: string, appPasswo
 
 // ─── Génération Claude — Moteur SEO premium ───────────────────────────────────
 
+const formatsByLocale: Record<string, string[]> = {
+  fr: ["guide complet et exhaustif", "article comparatif avec tableau", "liste des meilleures pratiques (top 10)", "étude de cas avec exemples concrets", "article question/réponse (FAQ approfondie)", "tutoriel pas-à-pas", "analyse de tendances du secteur"],
+  en: ["comprehensive guide", "comparison article with table", "best practices list (top 10)", "case study with concrete examples", "Q&A article (in-depth FAQ)", "step-by-step tutorial", "industry trends analysis"],
+  es: ["guía completa y exhaustiva", "artículo comparativo con tabla", "lista de mejores prácticas (top 10)", "estudio de caso con ejemplos concretos", "artículo de preguntas y respuestas (FAQ en profundidad)", "tutorial paso a paso", "análisis de tendencias del sector"],
+  de: ["umfassender Leitfaden", "Vergleichsartikel mit Tabelle", "Liste der besten Praktiken (Top 10)", "Fallstudie mit konkreten Beispielen", "Q&A-Artikel (ausführliche FAQ)", "Schritt-für-Schritt-Tutorial", "Branchentrends-Analyse"],
+  it: ["guida completa ed esaustiva", "articolo comparativo con tabella", "lista delle migliori pratiche (top 10)", "studio di caso con esempi concreti", "articolo domande e risposte (FAQ approfondita)", "tutorial passo dopo passo", "analisi delle tendenze del settore"],
+};
+
 async function generateArticle(params: {
   keyword: string;
   allKeywords: string[];
@@ -41,77 +49,71 @@ async function generateArticle(params: {
   industry: string;
   existingTitles: string[];
   publicationsCount: number;
+  language?: string;
 }) {
-  const { keyword, allKeywords, businessName, industry, existingTitles, publicationsCount } = params;
+  const { keyword, allKeywords, businessName, industry, existingTitles, publicationsCount, language = "fr" } = params;
 
-  // Choisir un format d'article varié selon l'historique
-  const formats = [
-    "guide complet et exhaustif",
-    "article comparatif avec tableau",
-    "liste des meilleures pratiques (top 10)",
-    "étude de cas avec exemples concrets",
-    "article question/réponse (FAQ approfondie)",
-    "tutoriel pas-à-pas",
-    "analyse de tendances du secteur",
-  ];
+  const formats = formatsByLocale[language] ?? formatsByLocale.fr;
   const format = formats[publicationsCount % formats.length];
 
   const existingContext = existingTitles.length > 0
-    ? `\n\nArticles DÉJÀ PUBLIÉS sur ce site (ne pas répéter ces sujets) :\n${existingTitles.slice(0, 10).map(t => `- ${t}`).join("\n")}`
+    ? `\n\nAlready published articles on this site (do not repeat these topics):\n${existingTitles.slice(0, 10).map(t => `- ${t}`).join("\n")}`
     : "";
 
   const otherKeywords = allKeywords.filter(k => k !== keyword).slice(0, 5);
   const internalLinksContext = otherKeywords.length > 0
-    ? `\n\nMots-clés secondaires du site à mentionner naturellement pour le maillage interne : ${otherKeywords.join(", ")}`
+    ? `\n\nSecondary site keywords to mention naturally for internal linking: ${otherKeywords.join(", ")}`
     : "";
 
-  const prompt = `Tu es un rédacteur SEO expert de niveau mondial, spécialisé dans le secteur "${industry}". Tu travailles pour "${businessName}" depuis plusieurs mois — tu connais parfaitement leur audience, leur ton, et leurs objectifs commerciaux.
+  const prompt = `You are a world-class SEO content writer specializing in the "${industry}" sector. You work for "${businessName}" and know their audience, tone, and commercial goals perfectly.
 
-MISSION : Rédiger un article de blog SEO exceptionnel au format "${format}" sur le mot-clé principal : "${keyword}"
+MISSION: Write an exceptional SEO blog article in the format "${format}" on the main keyword: "${keyword}"
 
-CONTEXTE ÉDITORIAL :
-- Secteur : ${industry}
-- Entreprise : ${businessName}
-- Mots-clés de la stratégie globale : ${allKeywords.join(", ")}${existingContext}${internalLinksContext}
+LANGUAGE: Write the ENTIRE article in ${language}. Every word, title, heading, and sentence must be in ${language}.
 
-EXIGENCES DE QUALITÉ (niveau agence SEO premium) :
+EDITORIAL CONTEXT:
+- Industry: ${industry}
+- Company: ${businessName}
+- Full keyword strategy: ${allKeywords.join(", ")}${existingContext}${internalLinksContext}
 
-1. TITRE (H1) : Accrocheur, contient le mot-clé, donne envie de lire. Entre 50-60 caractères idéalement.
+QUALITY REQUIREMENTS (premium SEO agency level):
 
-2. MÉTA DESCRIPTION : 150-160 caractères, incitative, contient le mot-clé.
+1. TITLE (H1): Catchy, contains the keyword, makes you want to read. Ideally 50-60 characters.
 
-3. INTRODUCTION (150-200 mots) : Accroche forte qui parle directement au lecteur. Pose le problème ou l'opportunité. Annonce ce qu'il va apprendre.
+2. META DESCRIPTION: 150-160 characters, compelling, contains the keyword.
 
-4. CORPS DE L'ARTICLE (1200-1800 mots minimum) :
-   - 4 à 6 sections H2 bien structurées
-   - Sous-sections H3 quand nécessaire
-   - Paragraphes courts et aérés (3-4 lignes max)
-   - Exemples concrets liés au secteur ${industry}
-   - Données chiffrées et statistiques (même approximatives) pour crédibiliser
-   - Listes à puces pour améliorer la lisibilité
-   - Ton : expert mais accessible, jamais robotique
-   - Densité de mots-clés : naturelle, 1-2% maximum
+3. INTRODUCTION (150-200 words): Strong hook that speaks directly to the reader. States the problem or opportunity. Announces what they will learn.
 
-5. SECTION FAQ (3-4 questions) : Questions que se pose vraiment l'audience cible. Réponses concises (50-100 mots chacune).
+4. ARTICLE BODY (1200-1800 words minimum):
+   - 4 to 6 well-structured H2 sections
+   - H3 subsections when needed
+   - Short, airy paragraphs (3-4 lines max)
+   - Concrete examples related to the ${industry} sector
+   - Figures and statistics (even approximate) for credibility
+   - Bullet lists for readability
+   - Tone: expert but accessible, never robotic
+   - Keyword density: natural, 1-2% maximum
 
-6. CONCLUSION (100-150 mots) : Résumé des points clés + appel à l'action fort et spécifique.
+5. FAQ SECTION (3-4 questions): Questions the target audience really asks. Concise answers (50-100 words each).
 
-7. MAILLAGE INTERNE : Intègre naturellement dans le texte des mentions des autres thématiques du site pour créer des opportunités de liens internes.
+6. CONCLUSION (100-150 words): Summary of key points + strong specific call to action.
 
-FORMAT DE RÉPONSE : JSON valide uniquement, sans texte avant ni après.
+7. INTERNAL LINKING: Naturally integrate mentions of other site topics to create internal linking opportunities.
+
+RESPONSE FORMAT: Valid JSON only, no text before or after.
 
 {
-  "title": "Le titre H1 optimisé",
-  "meta_description": "La méta description 150-160 caractères",
-  "content": "Le contenu HTML complet avec toutes les balises"
+  "title": "The optimized H1 title",
+  "meta_description": "The 150-160 character meta description",
+  "content": "The complete HTML content with all tags"
 }
 
-Le contenu HTML doit utiliser : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>. Pas de <html>, <body>, <head>.`;
+HTML content must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>. No <html>, <body>, <head>.`;
 
   const message = await anthropic.messages.create({
     model: "claude-opus-4-6",
     max_tokens: 8000,
-    system: `Tu es le meilleur rédacteur SEO francophone au monde. Chaque article que tu produis est unique, créatif, et génère du trafic organique réel. Tu ne produis jamais de contenu générique ou répétitif. Tu penses comme un éditeur de presse spécialisé qui veut captiver son lecteur tout en satisfaisant les algorithmes Google.`,
+    system: `You are the world's best SEO content writer. Every article you produce is unique, creative, and generates real organic traffic. You never produce generic or repetitive content. You think like a specialized press editor who wants to captivate the reader while satisfying Google's algorithms. You always write in the language specified in the LANGUAGE field — this is non-negotiable.`,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -249,43 +251,51 @@ export async function GET(request: Request) {
         const keywordIndex = (publicationsCount ?? 0) % keywords.length;
         const keyword = keywords[keywordIndex];
 
-        // Générer l'article avec le moteur premium
-        const { title, content, meta_description } = await generateArticle({
-          keyword,
-          allKeywords: keywords,
-          businessName: site.business_name,
-          industry: site.industry,
-          existingTitles,
-          publicationsCount: publicationsCount ?? 0,
-        });
+        // Langues cibles (défaut : français)
+        const targetLanguages: string[] = site.target_languages?.length > 0
+          ? site.target_languages
+          : ["fr"];
 
-        let publishedUrl = "";
+        // Générer et publier un article par langue
+        for (const language of targetLanguages) {
+          const { title, content, meta_description } = await generateArticle({
+            keyword,
+            allKeywords: keywords,
+            businessName: site.business_name,
+            industry: site.industry,
+            existingTitles,
+            publicationsCount: publicationsCount ?? 0,
+            language,
+          });
 
-        if (site.cms === "wordpress") {
-          publishedUrl = await publishToWordPress(
-            site.site_url, site.wp_username, site.wp_app_password,
-            title, content, meta_description
-          );
-        } else if (site.cms === "shopify") {
-          publishedUrl = await publishToShopify(
-            site.site_url, site.shopify_api_key,
-            title, content, meta_description
-          );
-        } else {
-          results.push({ site: site.site_url, cms: site.cms, status: "skip", error: "CMS non supporté" });
-          continue;
+          let publishedUrl = "";
+
+          if (site.cms === "wordpress") {
+            publishedUrl = await publishToWordPress(
+              site.site_url, site.wp_username, site.wp_app_password,
+              title, content, meta_description
+            );
+          } else if (site.cms === "shopify") {
+            publishedUrl = await publishToShopify(
+              site.site_url, site.shopify_api_key,
+              title, content, meta_description
+            );
+          } else {
+            results.push({ site: site.site_url, cms: site.cms, status: "skip", error: "CMS non supporté" });
+            break;
+          }
+
+          await supabase.from("publications").insert({
+            site_id: site.id,
+            user_id: site.user_id,
+            title,
+            keyword,
+            wordpress_url: publishedUrl,
+          });
+
+          results.push({ site: site.site_url, cms: site.cms, status: "ok", title });
+          await new Promise((r) => setTimeout(r, 1000));
         }
-
-        await supabase.from("publications").insert({
-          site_id: site.id,
-          user_id: site.user_id,
-          title,
-          keyword,
-          wordpress_url: publishedUrl,
-        });
-
-        await new Promise((r) => setTimeout(r, 1000));
-        results.push({ site: site.site_url, cms: site.cms, status: "ok", title });
 
       } catch (err: unknown) {
         results.push({

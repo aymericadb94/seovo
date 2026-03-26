@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { LOCALES, localeFlags, localeNames, type Locale } from "@/lib/i18n/translations";
 
 type SiteConfig = {
   business_name: string;
@@ -13,9 +15,11 @@ type SiteConfig = {
   shopify_api_key: string;
   keywords: string[];
   frequency: number;
+  target_languages: Locale[];
 };
 
 export default function SettingsPage() {
+  const { t, locale } = useLanguage();
   const [config, setConfig] = useState<SiteConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -29,7 +33,13 @@ export default function SettingsPage() {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
-        if (!data.error) setConfig({ ...data, keywords: Array.isArray(data.keywords) ? data.keywords : [] });
+        if (!data.error) setConfig({
+          ...data,
+          keywords: Array.isArray(data.keywords) ? data.keywords : [],
+          target_languages: Array.isArray(data.target_languages) && data.target_languages.length > 0
+            ? data.target_languages
+            : ["fr"],
+        });
       })
       .finally(() => setLoading(false));
   }, []);
@@ -63,6 +73,17 @@ export default function SettingsPage() {
     setConfig((c) => c ? { ...c, keywords: c.keywords.filter((k) => k !== kw) } : c);
   }
 
+  function toggleLanguage(lang: Locale) {
+    if (!config) return;
+    const current = config.target_languages;
+    if (current.includes(lang)) {
+      if (current.length === 1) return; // au moins 1 langue obligatoire
+      setConfig((c) => c ? { ...c, target_languages: current.filter((l) => l !== lang) } : c);
+    } else {
+      setConfig((c) => c ? { ...c, target_languages: [...current, lang] } : c);
+    }
+  }
+
   async function handleSave(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
@@ -72,7 +93,11 @@ export default function SettingsPage() {
     const res = await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...config, keywords: config && Array.isArray(config.keywords) ? config.keywords : [] }),
+      body: JSON.stringify({
+        ...config,
+        keywords: config && Array.isArray(config.keywords) ? config.keywords : [],
+        target_languages: config?.target_languages ?? ["fr"],
+      }),
     });
 
     const data = await res.json();
@@ -92,7 +117,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-black text-white flex items-center justify-center">
-        <p className="text-gray-500">Chargement...</p>
+        <p className="text-gray-500">{t.settings.loading}</p>
       </main>
     );
   }
@@ -101,8 +126,8 @@ export default function SettingsPage() {
     return (
       <main className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
-          <p className="text-white font-bold mb-4">Aucune configuration trouvée.</p>
-          <Link href="/onboarding" className="text-orange-400 hover:underline">Configurer mon site →</Link>
+          <p className="text-white font-bold mb-4">{t.settings.noConfig}</p>
+          <Link href="/onboarding" className="text-orange-400 hover:underline">{t.settings.configureLink}</Link>
         </div>
       </main>
     );
@@ -118,13 +143,13 @@ export default function SettingsPage() {
             <Link href="/dashboard" className="text-2xl font-black tracking-tight">
               SEO<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">VO</span>
             </Link>
-            <p className="text-gray-500 text-sm mt-1">Paramètres</p>
+            <p className="text-gray-500 text-sm mt-1">{t.settings.title}</p>
           </div>
           <Link
             href="/dashboard"
             className="text-gray-500 hover:text-white text-sm px-4 py-2 rounded-lg border border-white/10 hover:border-white/20 transition-colors"
           >
-            ← Tableau de bord
+            {t.settings.backToDashboard}
           </Link>
         </div>
 
@@ -132,10 +157,10 @@ export default function SettingsPage() {
 
           {/* Informations générales */}
           <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-            <h2 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-5">Votre activité</h2>
+            <h2 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-5">{t.settings.activity}</h2>
             <div className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Nom de l&apos;entreprise</label>
+                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.settings.businessName}</label>
                 <input
                   type="text"
                   value={config.business_name}
@@ -144,7 +169,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Secteur d&apos;activité</label>
+                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.settings.industry}</label>
                 <input
                   type="text"
                   value={config.industry}
@@ -157,10 +182,10 @@ export default function SettingsPage() {
 
           {/* Connexion site */}
           <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-            <h2 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-5">Connexion au site</h2>
+            <h2 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-5">{t.settings.siteConnection}</h2>
             <div className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">URL du site</label>
+                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.settings.siteUrl}</label>
                 <input
                   type="url"
                   value={config.site_url}
@@ -171,7 +196,7 @@ export default function SettingsPage() {
               {config.cms === "wordpress" && (
                 <>
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Nom d&apos;utilisateur WordPress</label>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.settings.wpUsername}</label>
                     <input
                       type="text"
                       value={config.wp_username}
@@ -180,12 +205,12 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Mot de passe d&apos;application</label>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.settings.wpPassword}</label>
                     <input
                       type="password"
                       value={config.wp_app_password}
                       onChange={(e) => update("wp_app_password", e.target.value)}
-                      placeholder="Laisser vide pour ne pas modifier"
+                      placeholder={t.settings.wpPasswordPlaceholder}
                       className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
                     />
                   </div>
@@ -193,12 +218,12 @@ export default function SettingsPage() {
               )}
               {config.cms === "shopify" && (
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Clé API Admin Shopify</label>
+                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.settings.shopifyKey}</label>
                   <input
                     type="password"
                     value={config.shopify_api_key}
                     onChange={(e) => update("shopify_api_key", e.target.value)}
-                    placeholder="Laisser vide pour ne pas modifier"
+                    placeholder={t.settings.shopifyKeyPlaceholder}
                     className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
                   />
                 </div>
@@ -208,11 +233,11 @@ export default function SettingsPage() {
 
           {/* Mots-clés & fréquence */}
           <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-            <h2 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-5">Stratégie SEO</h2>
+            <h2 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-5">{t.settings.seoStrategy}</h2>
             <div className="flex flex-col gap-4">
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Mots-clés cibles</label>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t.settings.targetKeywords}</label>
                   <button
                     type="button"
                     onClick={discoverKeywords}
@@ -222,26 +247,24 @@ export default function SettingsPage() {
                     {discoveringKw ? (
                       <>
                         <span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" />
-                        Analyse en cours...
+                        {t.settings.analyzing}
                       </>
                     ) : (
-                      <>✦ Découvrir avec l&apos;IA</>
+                      <>{t.settings.discoverWithAi}</>
                     )}
                   </button>
                 </div>
 
-                {/* Raisonnement IA */}
                 {discoverReasoning && (
                   <div className="mb-3 bg-orange-500/5 border border-orange-500/20 rounded-xl px-4 py-3">
-                    <p className="text-orange-400 text-xs font-bold mb-1">Stratégie IA</p>
+                    <p className="text-orange-400 text-xs font-bold mb-1">{t.settings.aiStrategy}</p>
                     <p className="text-gray-400 text-xs">{discoverReasoning}</p>
                   </div>
                 )}
 
-                {/* Tags mots-clés */}
                 <div className="min-h-[60px] bg-white/[0.03] border border-white/[0.1] rounded-xl p-3 flex flex-wrap gap-2">
                   {config.keywords.length === 0 && (
-                    <p className="text-gray-600 text-sm">Aucun mot-clé — cliquez sur &quot;Découvrir avec l&apos;IA&quot;</p>
+                    <p className="text-gray-600 text-sm">{t.settings.noKeywords}</p>
                   )}
                   {config.keywords.map((kw) => (
                     <span key={kw} className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs font-medium px-3 py-1.5 rounded-full group">
@@ -257,14 +280,13 @@ export default function SettingsPage() {
                   ))}
                 </div>
 
-                {/* Ajouter manuellement */}
                 <div className="flex gap-2 mt-2">
                   <input
                     type="text"
                     value={newKeyword}
                     onChange={(e) => setNewKeyword(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addKeyword())}
-                    placeholder="Ajouter un mot-clé..."
+                    placeholder={t.settings.addKeyword}
                     className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500/40 transition-colors"
                   />
                   <button
@@ -272,16 +294,43 @@ export default function SettingsPage() {
                     onClick={addKeyword}
                     className="px-4 py-2.5 bg-white/[0.05] border border-white/[0.08] hover:border-orange-500/30 rounded-xl text-gray-400 hover:text-orange-400 text-sm font-bold transition-all"
                   >
-                    + Ajouter
+                    {t.settings.add}
                   </button>
                 </div>
               </div>
+
+              {/* Langues de génération */}
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">Fréquence de publication</label>
+                <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">{t.settings.targetLanguages}</label>
+                <p className="text-gray-600 text-xs mb-3">{t.settings.languageNote}</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {LOCALES.map((lang) => {
+                    const selected = config.target_languages.includes(lang);
+                    return (
+                      <button
+                        key={lang}
+                        type="button"
+                        onClick={() => toggleLanguage(lang)}
+                        className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all ${
+                          selected
+                            ? "bg-orange-500/10 border-orange-500/40 text-orange-400"
+                            : "bg-white/[0.03] border-white/[0.08] text-gray-500 hover:border-white/20 hover:text-gray-300"
+                        }`}
+                      >
+                        <span className="text-xl">{localeFlags[lang]}</span>
+                        <span>{localeNames[lang].slice(0, 3)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">{t.settings.frequency}</label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { value: 1, label: "1 article / jour" },
-                    { value: 2, label: "2 articles / jour" },
+                    { value: 1, label: { fr: "1 article / jour", en: "1 article / day", es: "1 artículo / día", de: "1 Artikel / Tag", it: "1 articolo / giorno" } },
+                    { value: 2, label: { fr: "2 articles / jour", en: "2 articles / day", es: "2 artículos / día", de: "2 Artikel / Tag", it: "2 articoli / giorno" } },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -293,7 +342,7 @@ export default function SettingsPage() {
                           : "bg-white/[0.03] border-white/[0.08] text-gray-400 hover:border-white/20"
                       }`}
                     >
-                      {opt.label}
+                      {opt.label[locale]}
                     </button>
                   ))}
                 </div>
@@ -309,7 +358,7 @@ export default function SettingsPage() {
 
           {success && (
             <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
-              <p className="text-orange-400 text-sm font-bold">✓ Paramètres sauvegardés</p>
+              <p className="text-orange-400 text-sm font-bold">{t.settings.saved}</p>
             </div>
           )}
 
@@ -318,7 +367,7 @@ export default function SettingsPage() {
             disabled={saving}
             className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-50 text-white font-black py-4 rounded-xl transition-all uppercase tracking-wide shadow-lg shadow-orange-500/20"
           >
-            {saving ? "Sauvegarde..." : "Sauvegarder les modifications"}
+            {saving ? t.settings.saving : t.settings.save}
           </button>
         </form>
       </div>

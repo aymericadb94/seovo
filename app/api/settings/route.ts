@@ -31,6 +31,10 @@ export async function PATCH(request: Request) {
       ? body.keywords.split(",").map((k: string) => k.trim()).filter(Boolean)
       : body.keywords;
 
+    const target_languages = Array.isArray(body.target_languages) && body.target_languages.length > 0
+      ? body.target_languages
+      : ["fr"];
+
     const { error } = await supabase
       .from("sites")
       .update({
@@ -42,6 +46,7 @@ export async function PATCH(request: Request) {
         shopify_api_key: body.shopify_api_key || null,
         keywords,
         frequency: body.frequency,
+        target_languages,
       })
       .eq("user_id", user.id);
 
