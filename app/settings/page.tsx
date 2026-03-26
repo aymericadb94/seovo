@@ -21,15 +21,47 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [discoveringKw, setDiscoveringKw] = useState(false);
+  const [discoverReasoning, setDiscoverReasoning] = useState("");
+  const [newKeyword, setNewKeyword] = useState("");
 
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
-        if (!data.error) setConfig({ ...data, keywords: data.keywords?.join(", ") ?? "" });
+        if (!data.error) setConfig({ ...data, keywords: Array.isArray(data.keywords) ? data.keywords : [] });
       })
       .finally(() => setLoading(false));
   }, []);
+
+  async function discoverKeywords() {
+    setDiscoveringKw(true);
+    setDiscoverReasoning("");
+    try {
+      const res = await fetch("/api/keywords/discover", { method: "POST" });
+      const data = await res.json();
+      if (data.keywords?.length > 0) {
+        setConfig((c) => c ? { ...c, keywords: data.keywords } : c);
+        setDiscoverReasoning(data.reasoning ?? "");
+      }
+    } catch {
+      // silencieux
+    }
+    setDiscoveringKw(false);
+  }
+
+  function addKeyword() {
+    const kw = newKeyword.trim();
+    if (!kw || !config) return;
+    if (!config.keywords.includes(kw)) {
+      setConfig((c) => c ? { ...c, keywords: [...c.keywords, kw] } : c);
+    }
+    setNewKeyword("");
+  }
+
+  function removeKeyword(kw: string) {
+    setConfig((c) => c ? { ...c, keywords: c.keywords.filter((k) => k !== kw) } : c);
+  }
 
   async function handleSave(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -40,7 +72,7 @@ export default function SettingsPage() {
     const res = await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(config),
+      body: JSON.stringify({ ...config, keywords: config && Array.isArray(config.keywords) ? config.keywords : [] }),
     });
 
     const data = await res.json();
@@ -179,14 +211,70 @@ export default function SettingsPage() {
             <h2 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-5">Stratégie SEO</h2>
             <div className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Mots-clés cibles</label>
-                <textarea
-                  value={Array.isArray(config.keywords) ? config.keywords.join(", ") : config.keywords}
-                  onChange={(e) => update("keywords", e.target.value)}
-                  rows={3}
-                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500/50 transition-colors resize-none"
-                />
-                <p className="text-gray-600 text-xs mt-1.5">Séparés par des virgules</p>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Mots-clés cibles</label>
+                  <button
+                    type="button"
+                    onClick={discoverKeywords}
+                    disabled={discoveringKw}
+                    className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/30 text-orange-400 hover:border-orange-500/60 transition-all disabled:opacity-50"
+                  >
+                    {discoveringKw ? (
+                      <>
+                        <span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" />
+                        Analyse en cours...
+                      </>
+                    ) : (
+                      <>✦ Découvrir avec l&apos;IA</>
+                    )}
+                  </button>
+                </div>
+
+                {/* Raisonnement IA */}
+                {discoverReasoning && (
+                  <div className="mb-3 bg-orange-500/5 border border-orange-500/20 rounded-xl px-4 py-3">
+                    <p className="text-orange-400 text-xs font-bold mb-1">Stratégie IA</p>
+                    <p className="text-gray-400 text-xs">{discoverReasoning}</p>
+                  </div>
+                )}
+
+                {/* Tags mots-clés */}
+                <div className="min-h-[60px] bg-white/[0.03] border border-white/[0.1] rounded-xl p-3 flex flex-wrap gap-2">
+                  {config.keywords.length === 0 && (
+                    <p className="text-gray-600 text-sm">Aucun mot-clé — cliquez sur &quot;Découvrir avec l&apos;IA&quot;</p>
+                  )}
+                  {config.keywords.map((kw) => (
+                    <span key={kw} className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs font-medium px-3 py-1.5 rounded-full group">
+                      {kw}
+                      <button
+                        type="button"
+                        onClick={() => removeKeyword(kw)}
+                        className="text-orange-500/50 hover:text-red-400 transition-colors font-black leading-none"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                {/* Ajouter manuellement */}
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="text"
+                    value={newKeyword}
+                    onChange={(e) => setNewKeyword(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addKeyword())}
+                    placeholder="Ajouter un mot-clé..."
+                    className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500/40 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={addKeyword}
+                    className="px-4 py-2.5 bg-white/[0.05] border border-white/[0.08] hover:border-orange-500/30 rounded-xl text-gray-400 hover:text-orange-400 text-sm font-bold transition-all"
+                  >
+                    + Ajouter
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">Fréquence de publication</label>
