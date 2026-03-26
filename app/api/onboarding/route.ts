@@ -16,6 +16,7 @@ export async function POST(request: Request) {
         const testRes = await fetch(`${body.site_url}/wp-json/wp/v2/posts?per_page=1`, {
           headers: {
             Authorization: `Basic ${Buffer.from(`${body.wp_username}:${body.wp_app_password}`).toString("base64")}`,
+            "ngrok-skip-browser-warning": "true",
           },
         });
         if (!testRes.ok) {
