@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
     const message = await client.messages.create({
       model: "claude-opus-4-6",
-      max_tokens: 4000,
+      max_tokens: 8000,
       system: `Tu es le meilleur rédacteur SEO francophone au monde. Chaque article que tu produis est unique, créatif, et génère du trafic organique réel. Tu ne produis jamais de contenu générique ou répétitif. Tu penses comme un éditeur de presse spécialisé qui veut captiver son lecteur tout en satisfaisant les algorithmes Google.`,
       messages: [
         {
