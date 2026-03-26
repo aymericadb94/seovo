@@ -142,6 +142,44 @@ export const translations = {
       noConfig: "Aucune configuration trouvée.",
       configureLink: "Configurer mon site →",
     },
+    faq: {
+      title: "Questions fréquentes",
+      subtitle: "Tout ce que vous devez savoir avant de commencer.",
+      items: [
+        {
+          q: "🔒 Est-ce sécurisé de donner l'accès à mon site ?",
+          a: "Totalement. SEOVO utilise les \"Mots de passe d'application\" de WordPress — un système officiel conçu exactement pour ça. Ce token est différent de votre vrai mot de passe. Il donne uniquement la permission de créer des articles. Vous pouvez le révoquer en un clic depuis votre profil WordPress à n'importe quel moment, sans affecter votre site.",
+        },
+        {
+          q: "Que peut faire SEOVO avec mes identifiants ?",
+          a: "Une seule chose : créer des articles de blog. SEOVO ne peut pas supprimer vos pages, modifier votre thème, accéder à vos commandes ou données clients, changer vos paramètres, ni toucher à quoi que ce soit d'autre. L'API WordPress est cloisonnée par permission — nous n'avons accès qu'à la publication de contenus.",
+        },
+        {
+          q: "Comment mes identifiants sont-ils stockés ?",
+          a: "Vos credentials sont stockés de manière chiffrée dans notre base de données sécurisée (Supabase). Ils ne sont jamais affichés en clair, jamais partagés avec des tiers, et ne transitent que par une connexion HTTPS chiffrée. Vous pouvez les supprimer à tout moment depuis vos Paramètres.",
+        },
+        {
+          q: "Google pénalise-t-il le contenu généré par IA ?",
+          a: "Non — Google pénalise le contenu de mauvaise qualité, peu importe son origine. SEOVO génère des articles de 1500+ mots, contextualisés à votre secteur, structurés avec H2/H3/FAQ, et uniques à chaque publication. Ce type de contenu est parfaitement conforme aux guidelines Google et contribue positivement à votre référencement.",
+        },
+        {
+          q: "Quand vais-je voir des résultats SEO ?",
+          a: "Le SEO prend du temps — c'est une réalité. En général : 2-4 semaines pour que Google indexe les nouveaux articles, 2-3 mois pour les premiers positionnements sur des mots-clés longue traîne, 4-6 mois pour un trafic organique significatif. Plus vous publiez régulièrement, plus l'effet s'accélère.",
+        },
+        {
+          q: "SEOVO modifie-t-il mes pages existantes ?",
+          a: "Jamais. SEOVO crée uniquement de nouveaux articles de blog. Il ne touche pas à vos pages, à votre page d'accueil, à votre menu, ni à aucun contenu existant. Votre site reste exactement comme il est — SEOVO y ajoute seulement du contenu frais chaque jour.",
+        },
+        {
+          q: "Puis-je modifier ou supprimer les articles publiés ?",
+          a: "Oui, absolument. Les articles sont publiés comme n'importe quel contenu WordPress ou Shopify. Vous pouvez les modifier, les compléter, les supprimer, ou les dépublier directement depuis votre interface d'administration habituelle. SEOVO n'a aucun contrôle sur le contenu une fois publié.",
+        },
+        {
+          q: "Que se passe-t-il si je résilie mon abonnement ?",
+          a: "Tous les articles déjà publiés restent sur votre site — ils vous appartiennent à 100%. SEOVO cesse simplement de publier de nouveaux contenus. Vous ne perdez rien de ce qui a déjà été créé.",
+        },
+      ],
+    },
   },
 
   en: {
@@ -248,6 +286,44 @@ export const translations = {
       loading: "Loading...",
       noConfig: "No configuration found.",
       configureLink: "Configure my site →",
+    },
+    faq: {
+      title: "Frequently asked questions",
+      subtitle: "Everything you need to know before getting started.",
+      items: [
+        {
+          q: "🔒 Is it safe to give access to my site?",
+          a: "Absolutely. SEOVO uses WordPress \"Application Passwords\" — an official system designed exactly for this. This token is different from your real password. It only grants permission to create articles. You can revoke it in one click from your WordPress profile at any time, without affecting your site.",
+        },
+        {
+          q: "What can SEOVO do with my credentials?",
+          a: "One thing only: create blog articles. SEOVO cannot delete your pages, modify your theme, access your orders or customer data, change your settings, or touch anything else. The WordPress API is permission-scoped — we only have access to content publishing.",
+        },
+        {
+          q: "How are my credentials stored?",
+          a: "Your credentials are stored in encrypted form in our secure database (Supabase). They are never displayed in plain text, never shared with third parties, and only transit over an encrypted HTTPS connection. You can delete them at any time from your Settings.",
+        },
+        {
+          q: "Does Google penalize AI-generated content?",
+          a: "No — Google penalizes low-quality content, regardless of its origin. SEOVO generates 1500+ word articles, contextualized to your industry, structured with H2/H3/FAQ, and unique with each publication. This type of content fully complies with Google guidelines and positively contributes to your rankings.",
+        },
+        {
+          q: "When will I see SEO results?",
+          a: "SEO takes time — that's a reality. Generally: 2-4 weeks for Google to index new articles, 2-3 months for first rankings on long-tail keywords, 4-6 months for significant organic traffic. The more regularly you publish, the faster the effect accelerates.",
+        },
+        {
+          q: "Does SEOVO modify my existing pages?",
+          a: "Never. SEOVO only creates new blog articles. It does not touch your pages, homepage, menu, or any existing content. Your site stays exactly as it is — SEOVO simply adds fresh content every day.",
+        },
+        {
+          q: "Can I edit or delete published articles?",
+          a: "Yes, absolutely. Articles are published like any standard WordPress or Shopify content. You can edit, supplement, delete, or unpublish them directly from your usual admin interface. SEOVO has no control over content once published.",
+        },
+        {
+          q: "What happens if I cancel my subscription?",
+          a: "All already-published articles remain on your site — they are 100% yours. SEOVO simply stops publishing new content. You lose nothing of what has already been created.",
+        },
+      ],
     },
   },
 
@@ -356,6 +432,44 @@ export const translations = {
       noConfig: "No se encontró configuración.",
       configureLink: "Configurar mi sitio →",
     },
+    faq: {
+      title: "Preguntas frecuentes",
+      subtitle: "Todo lo que necesitas saber antes de empezar.",
+      items: [
+        {
+          q: "🔒 ¿Es seguro dar acceso a mi sitio?",
+          a: "Totalmente. SEOVO utiliza las \"Contraseñas de aplicación\" de WordPress — un sistema oficial diseñado exactamente para esto. Este token es diferente de tu contraseña real. Solo otorga permiso para crear artículos. Puedes revocarlo con un clic desde tu perfil WordPress en cualquier momento, sin afectar tu sitio.",
+        },
+        {
+          q: "¿Qué puede hacer SEOVO con mis credenciales?",
+          a: "Solo una cosa: crear artículos de blog. SEOVO no puede eliminar tus páginas, modificar tu tema, acceder a tus pedidos o datos de clientes, cambiar tu configuración, ni tocar nada más. La API de WordPress está delimitada por permisos — solo tenemos acceso a la publicación de contenido.",
+        },
+        {
+          q: "¿Cómo se almacenan mis credenciales?",
+          a: "Tus credenciales se almacenan de forma cifrada en nuestra base de datos segura (Supabase). Nunca se muestran en texto plano, nunca se comparten con terceros, y solo transitan por una conexión HTTPS cifrada. Puedes eliminarlas en cualquier momento desde tu Configuración.",
+        },
+        {
+          q: "¿Google penaliza el contenido generado por IA?",
+          a: "No — Google penaliza el contenido de baja calidad, independientemente de su origen. SEOVO genera artículos de 1500+ palabras, contextualizados a tu sector, estructurados con H2/H3/FAQ, y únicos en cada publicación. Este tipo de contenido cumple plenamente con las directrices de Google.",
+        },
+        {
+          q: "¿Cuándo veré resultados SEO?",
+          a: "El SEO lleva tiempo — es una realidad. En general: 2-4 semanas para que Google indexe los nuevos artículos, 2-3 meses para las primeras posiciones en palabras clave de cola larga, 4-6 meses para tráfico orgánico significativo.",
+        },
+        {
+          q: "¿SEOVO modifica mis páginas existentes?",
+          a: "Nunca. SEOVO solo crea nuevos artículos de blog. No toca tus páginas, página de inicio, menú, ni ningún contenido existente. Tu sitio permanece exactamente como está — SEOVO simplemente añade contenido fresco cada día.",
+        },
+        {
+          q: "¿Puedo editar o eliminar los artículos publicados?",
+          a: "Sí, absolutamente. Los artículos se publican como cualquier contenido estándar de WordPress o Shopify. Puedes editarlos, complementarlos, eliminarlos o despublicarlos directamente desde tu interfaz de administración habitual.",
+        },
+        {
+          q: "¿Qué pasa si cancelo mi suscripción?",
+          a: "Todos los artículos ya publicados permanecen en tu sitio — son 100% tuyos. SEOVO simplemente deja de publicar nuevo contenido. No pierdes nada de lo que ya se ha creado.",
+        },
+      ],
+    },
   },
 
   de: {
@@ -463,6 +577,44 @@ export const translations = {
       noConfig: "Keine Konfiguration gefunden.",
       configureLink: "Meine Website konfigurieren →",
     },
+    faq: {
+      title: "Häufig gestellte Fragen",
+      subtitle: "Alles was Sie wissen müssen, bevor Sie beginnen.",
+      items: [
+        {
+          q: "🔒 Ist es sicher, meiner Website Zugang zu geben?",
+          a: "Absolut. SEOVO verwendet WordPress \"Anwendungspasswörter\" — ein offizielles System, das genau dafür entwickelt wurde. Dieses Token unterscheidet sich von Ihrem echten Passwort. Es gewährt nur die Berechtigung, Artikel zu erstellen. Sie können es mit einem Klick aus Ihrem WordPress-Profil jederzeit widerrufen, ohne Ihre Website zu beeinträchtigen.",
+        },
+        {
+          q: "Was kann SEOVO mit meinen Zugangsdaten tun?",
+          a: "Nur eine Sache: Blog-Artikel erstellen. SEOVO kann Ihre Seiten nicht löschen, Ihr Theme nicht ändern, auf Ihre Bestellungen oder Kundendaten nicht zugreifen, Ihre Einstellungen nicht ändern oder sonst etwas berühren. Die WordPress-API ist berechtigungsbasiert — wir haben nur Zugang zur Inhaltsveröffentlichung.",
+        },
+        {
+          q: "Wie werden meine Zugangsdaten gespeichert?",
+          a: "Ihre Zugangsdaten werden verschlüsselt in unserer sicheren Datenbank (Supabase) gespeichert. Sie werden nie im Klartext angezeigt, nie mit Dritten geteilt und transiten nur über eine verschlüsselte HTTPS-Verbindung. Sie können sie jederzeit in Ihren Einstellungen löschen.",
+        },
+        {
+          q: "Bestraft Google KI-generierten Inhalt?",
+          a: "Nein — Google bestraft qualitativ schlechten Inhalt, unabhängig von seiner Herkunft. SEOVO generiert Artikel mit 1500+ Wörtern, auf Ihre Branche zugeschnitten, strukturiert mit H2/H3/FAQ und bei jeder Veröffentlichung einzigartig. Diese Art von Inhalt entspricht vollständig den Google-Richtlinien.",
+        },
+        {
+          q: "Wann werde ich SEO-Ergebnisse sehen?",
+          a: "SEO braucht Zeit — das ist eine Realität. Im Allgemeinen: 2-4 Wochen damit Google neue Artikel indexiert, 2-3 Monate für erste Rankings bei Long-Tail-Keywords, 4-6 Monate für signifikanten organischen Traffic.",
+        },
+        {
+          q: "Ändert SEOVO meine bestehenden Seiten?",
+          a: "Niemals. SEOVO erstellt nur neue Blog-Artikel. Es berührt nicht Ihre Seiten, Startseite, Menü oder bestehende Inhalte. Ihre Website bleibt genau so wie sie ist — SEOVO fügt täglich nur frischen Inhalt hinzu.",
+        },
+        {
+          q: "Kann ich veröffentlichte Artikel bearbeiten oder löschen?",
+          a: "Ja, absolut. Artikel werden wie alle Standard-WordPress- oder Shopify-Inhalte veröffentlicht. Sie können sie direkt über Ihre übliche Verwaltungsoberfläche bearbeiten, ergänzen, löschen oder depublizieren.",
+        },
+        {
+          q: "Was passiert, wenn ich mein Abonnement kündige?",
+          a: "Alle bereits veröffentlichten Artikel bleiben auf Ihrer Website — sie gehören zu 100% Ihnen. SEOVO veröffentlicht einfach keine neuen Inhalte mehr. Sie verlieren nichts von dem, was bereits erstellt wurde.",
+        },
+      ],
+    },
   },
 
   it: {
@@ -569,6 +721,44 @@ export const translations = {
       loading: "Caricamento...",
       noConfig: "Nessuna configurazione trovata.",
       configureLink: "Configura il mio sito →",
+    },
+    faq: {
+      title: "Domande frequenti",
+      subtitle: "Tutto quello che devi sapere prima di iniziare.",
+      items: [
+        {
+          q: "🔒 È sicuro dare accesso al mio sito?",
+          a: "Assolutamente. SEOVO utilizza le \"Password applicazione\" di WordPress — un sistema ufficiale progettato esattamente per questo. Questo token è diverso dalla tua vera password. Concede solo il permesso di creare articoli. Puoi revocarlo con un clic dal tuo profilo WordPress in qualsiasi momento, senza influire sul tuo sito.",
+        },
+        {
+          q: "Cosa può fare SEOVO con le mie credenziali?",
+          a: "Solo una cosa: creare articoli di blog. SEOVO non può eliminare le tue pagine, modificare il tuo tema, accedere ai tuoi ordini o dati clienti, modificare le tue impostazioni o toccare qualsiasi altra cosa. L'API WordPress è delimitata da permessi — abbiamo accesso solo alla pubblicazione di contenuti.",
+        },
+        {
+          q: "Come vengono memorizzate le mie credenziali?",
+          a: "Le tue credenziali sono memorizzate in forma crittografata nel nostro database sicuro (Supabase). Non vengono mai mostrate in chiaro, mai condivise con terzi e transitano solo su una connessione HTTPS crittografata. Puoi eliminarle in qualsiasi momento dalle tue Impostazioni.",
+        },
+        {
+          q: "Google penalizza i contenuti generati dall'IA?",
+          a: "No — Google penalizza i contenuti di bassa qualità, indipendentemente dalla loro origine. SEOVO genera articoli di 1500+ parole, contestualizzati al tuo settore, strutturati con H2/H3/FAQ e unici ad ogni pubblicazione. Questo tipo di contenuto è pienamente conforme alle linee guida di Google.",
+        },
+        {
+          q: "Quando vedrò risultati SEO?",
+          a: "Il SEO richiede tempo — è una realtà. In generale: 2-4 settimane perché Google indicizzi i nuovi articoli, 2-3 mesi per i primi posizionamenti su parole chiave a coda lunga, 4-6 mesi per traffico organico significativo.",
+        },
+        {
+          q: "SEOVO modifica le mie pagine esistenti?",
+          a: "Mai. SEOVO crea solo nuovi articoli di blog. Non tocca le tue pagine, la tua homepage, il menu o nessun contenuto esistente. Il tuo sito rimane esattamente com'è — SEOVO aggiunge semplicemente contenuto fresco ogni giorno.",
+        },
+        {
+          q: "Posso modificare o eliminare gli articoli pubblicati?",
+          a: "Sì, assolutamente. Gli articoli vengono pubblicati come qualsiasi contenuto standard di WordPress o Shopify. Puoi modificarli, integrarli, eliminarli o depubblicarli direttamente dalla tua solita interfaccia di amministrazione.",
+        },
+        {
+          q: "Cosa succede se cancello il mio abbonamento?",
+          a: "Tutti gli articoli già pubblicati rimangono sul tuo sito — sono al 100% tuoi. SEOVO smette semplicemente di pubblicare nuovi contenuti. Non perdi nulla di ciò che è già stato creato.",
+        },
+      ],
     },
   },
 };

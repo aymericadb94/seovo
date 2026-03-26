@@ -90,6 +90,66 @@ const plans = [
   },
 ];
 
+function FaqSection() {
+  const { t } = useLanguage();
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  return (
+    <section id="faq" className="py-28 px-6">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl md:text-5xl font-black mb-4 tracking-tight">{t.faq.title}</h2>
+          <p className="text-gray-400 text-lg">{t.faq.subtitle}</p>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {t.faq.items.map((item, i) => {
+            const isOpen = openIndex === i;
+            return (
+              <div
+                key={i}
+                className={`border rounded-2xl overflow-hidden transition-all duration-300 ${
+                  isOpen
+                    ? "bg-white/[0.04] border-orange-500/30"
+                    : "bg-white/[0.02] border-white/[0.07] hover:border-white/[0.15]"
+                }`}
+              >
+                <button
+                  onClick={() => setOpenIndex(isOpen ? null : i)}
+                  className="w-full flex items-center justify-between px-6 py-5 text-left gap-4"
+                >
+                  <span className={`font-bold text-sm md:text-base transition-colors ${isOpen ? "text-white" : "text-gray-300"}`}>
+                    {item.q}
+                  </span>
+                  <span className={`text-xl flex-shrink-0 transition-transform duration-300 ${isOpen ? "rotate-45 text-orange-400" : "text-gray-600"}`}>
+                    +
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="px-6 pb-5">
+                    <p className="text-gray-400 text-sm leading-relaxed border-t border-white/[0.06] pt-4">
+                      {item.a}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Reassurance badge */}
+        <div className="mt-10 flex items-center justify-center gap-3 bg-orange-500/5 border border-orange-500/15 rounded-2xl p-5">
+          <span className="text-2xl">🔒</span>
+          <p className="text-gray-400 text-sm">
+            <span className="text-white font-bold">Vos identifiants restent sous votre contrôle total.</span>{" "}
+            Révoquez l&apos;accès à tout moment depuis votre WordPress. Aucune donnée partagée avec des tiers.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function LandingPage() {
   const { t, locale } = useLanguage();
 
@@ -261,6 +321,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* FAQ */}
+      <FaqSection />
 
       {/* Tarifs */}
       <section id="tarifs" className="py-28 px-6 bg-white/[0.02]">
