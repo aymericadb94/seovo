@@ -181,7 +181,10 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET ?? "seovo_cron_secret_2025"}` },
       });
       const json = await res.json();
-      setCronResult(json.message ?? json.error ?? "Terminé");
+      const detail = json.results?.map((r: {status: string; title?: string; error?: string}) =>
+        r.status === "error" ? `❌ ${r.error}` : `✓ ${r.title}`
+      ).join(" | ") ?? "";
+      setCronResult((json.message ?? json.error ?? "Terminé") + (detail ? ` — ${detail}` : ""));
       await loadData();
     } catch {
       setCronResult("Erreur lors du déclenchement");
