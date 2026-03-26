@@ -571,4 +571,4 @@ export const translations = {
       configureLink: "Configura il mio sito →",
     },
   },
-} as const;
+};
