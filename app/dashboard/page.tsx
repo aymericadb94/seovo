@@ -239,9 +239,18 @@ export default function Dashboard() {
             <button
               onClick={handleManualPublish}
               disabled={cronRunning}
-              className="text-orange-400 hover:text-white disabled:opacity-40 text-xs px-3 py-2 rounded-lg border border-orange-500/30 hover:border-orange-500/60 transition-all font-bold"
+              className={`text-xs px-3 py-2 rounded-lg border transition-all font-bold flex items-center gap-2 ${
+                cronRunning
+                  ? "text-orange-400 border-orange-500/60 bg-orange-500/10 animate-pulse cursor-not-allowed"
+                  : "text-orange-400 hover:text-white border-orange-500/30 hover:border-orange-500/60"
+              }`}
             >
-              {cronRunning ? "⏳ En cours..." : "▶ Lancer l'IA"}
+              {cronRunning ? (
+                <>
+                  <span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" />
+                  IA en cours...
+                </>
+              ) : "▶ Lancer l'IA"}
             </button>
             <Link href="/generate" className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-4 py-2 rounded-lg text-xs uppercase tracking-wide shadow-lg shadow-orange-500/20">
               + Générer
