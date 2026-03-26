@@ -55,26 +55,52 @@ const plans = [
   {
     name: "Starter",
     price: "49",
-    description: "Pour les indépendants et petites entreprises",
-    features: ["1 site connecté", "30 articles / mois", "WordPress ou Shopify", "Tableau de bord"],
-    cta: "Commencer",
+    description: "Pour les indépendants et petites boutiques",
+    features: [
+      "1 site connecté",
+      "1 article / jour",
+      "10 mots-clés max",
+      "WordPress ou Shopify",
+      "Dashboard basique",
+      "Support email",
+    ],
+    cta: "Démarrer en Beta",
     highlighted: false,
+    badge: null,
   },
   {
-    name: "Pro",
-    price: "99",
-    description: "Pour les entreprises en croissance",
-    features: ["3 sites connectés", "90 articles / mois", "WordPress + Shopify", "Tableau de bord", "Rapport mensuel", "Support prioritaire"],
-    cta: "Commencer",
+    name: "Premium",
+    price: "149",
+    description: "Pour les PME et e-commerçants actifs",
+    features: [
+      "5 sites connectés",
+      "2 articles / jour par site",
+      "30 mots-clés max",
+      "WordPress + Shopify",
+      "Découverte IA des mots-clés",
+      "Dashboard complet",
+      "Support prioritaire",
+    ],
+    cta: "Démarrer en Beta",
     highlighted: true,
+    badge: "Le plus populaire",
   },
   {
-    name: "Agence",
-    price: "299",
+    name: "Elite",
+    price: "399",
     description: "Pour les agences et grands comptes",
-    features: ["Sites illimités", "Articles illimités", "WordPress + Shopify", "Tableau de bord avancé", "Rapports personnalisés", "Account manager dédié"],
+    features: [
+      "20 sites connectés",
+      "5 articles / jour par site",
+      "Mots-clés illimités",
+      "WordPress + Shopify",
+      "Découverte IA avancée",
+      "Dashboard complet + analytics",
+      "Account manager dédié",
+    ],
     cta: "Nous contacter",
     highlighted: false,
+    badge: null,
   },
 ];
 
@@ -103,12 +129,20 @@ export default function LandingPage() {
   return (
     <div className="bg-black text-white min-h-screen">
 
+      {/* Bannière Beta */}
+      <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-orange-500/90 to-red-500/90 backdrop-blur-sm text-white text-xs font-bold text-center py-2 px-4 tracking-wide">
+        🚀 SEOVO est en accès Beta — Tarifs réduits pour les premiers testeurs · <Link href="/signup" className="underline underline-offset-2 hover:text-orange-100 transition-colors">Rejoindre maintenant →</Link>
+      </div>
+
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5">
+      <nav className="fixed top-8 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="text-xl font-bold tracking-tight">
-            SEO<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">VO</span>
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold tracking-tight">
+              SEO<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">VO</span>
+            </span>
+            <span className="text-[10px] font-black uppercase tracking-widest bg-orange-500/15 border border-orange-500/30 text-orange-400 px-2 py-0.5 rounded-full">Beta</span>
+          </div>
           <div className="hidden md:flex items-center gap-8 text-sm text-gray-400">
             <a href="#comment" className="hover:text-white transition-colors">Comment ça marche</a>
             <a href="#fonctionnalites" className="hover:text-white transition-colors">Fonctionnalités</a>
@@ -268,9 +302,9 @@ export default function LandingPage() {
                     : "bg-white/[0.03] border border-white/[0.07]"
                 }`}
               >
-                {plan.highlighted && (
+                {plan.badge && (
                   <span className="text-xs font-black bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-full w-fit mb-4 uppercase tracking-wider">
-                    Le plus populaire
+                    {plan.badge}
                   </span>
                 )}
                 <h3 className="text-xl font-black mb-1">{plan.name}</h3>
