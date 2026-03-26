@@ -201,14 +201,20 @@ export default function Dashboard() {
   const maxKeywordCount = Math.max(...(data?.keywordStats.map(k => k.count) ?? [1]), 1);
 
   return (
-    <main className="min-h-screen bg-[#080808] text-white">
+    <main className="min-h-screen bg-[#080808] text-white overflow-x-hidden">
+      {/* Orbes de fond animées */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="animate-orb absolute top-[-200px] left-[-100px] w-[600px] h-[600px] rounded-full bg-orange-500/5 blur-[120px]" />
+        <div className="animate-orb delay-400 absolute bottom-[-200px] right-[-100px] w-[500px] h-[500px] rounded-full bg-red-500/5 blur-[100px]" style={{animationDirection:"reverse"}} />
+        <div className="animate-orb delay-200 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-orange-400/3 blur-[80px]" />
+      </div>
 
       {/* ── Nav ─────────────────────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-50 bg-[#080808]/95 backdrop-blur-md border-b border-white/[0.06] px-6 py-3">
+      <nav className="sticky top-0 z-50 bg-[#080808]/95 backdrop-blur-md border-b border-white/[0.06] px-6 py-3 animate-fade-in">
         <div className="max-w-screen-xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <span className="text-xl font-black tracking-tight">
-              SEO<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">VO</span>
+            <span className="text-xl font-black tracking-tight logo-glow cursor-default">
+              SEO<span className="text-shimmer">VO</span>
             </span>
             {data?.site && (
               <div className="hidden md:flex items-center gap-2 text-xs text-gray-500">
@@ -293,7 +299,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-12 gap-4">
 
                   {/* Score SEO */}
-                  <div className="col-span-12 lg:col-span-4 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
+                  <div className="col-span-12 lg:col-span-4 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up">
                     <ScoreRing score={animScore} />
                     <div className="mt-5 grid grid-cols-2 gap-3">
                       <div className="bg-white/[0.03] rounded-xl p-3">
@@ -310,7 +316,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* KPIs */}
-                  <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-2 gap-4">
+                  <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-2 gap-4 animate-fade-in-up delay-100">
                     {[
                       {
                         label: "Total articles publiés",
@@ -345,7 +351,7 @@ export default function Dashboard() {
                         color: "#fca5a5",
                       },
                     ].map((kpi) => (
-                      <div key={kpi.label} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 flex flex-col justify-between min-h-[130px]">
+                      <div key={kpi.label} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 flex flex-col justify-between min-h-[130px] card-hover">
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">{kpi.label}</p>
                           <span className="text-xl">{kpi.icon}</span>
@@ -360,7 +366,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* ── Row 2 : Graphique publications ───────────────────── */}
-                <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
+                <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up delay-200">
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Publications IA</p>
@@ -397,7 +403,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-12 gap-4">
 
                   {/* Couverture mots-clés */}
-                  <div className="col-span-12 lg:col-span-7 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
+                  <div className="col-span-12 lg:col-span-7 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up delay-300">
                     <div className="flex items-center justify-between mb-5">
                       <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Couverture des mots-clés</p>
                       <span className="text-xs text-orange-400 font-bold">{kpis?.coveredKeywords}/{kpis?.totalKeywords} couverts</span>
@@ -426,10 +432,10 @@ export default function Dashboard() {
                   </div>
 
                   {/* Infos site */}
-                  <div className="col-span-12 lg:col-span-5 space-y-4">
+                  <div className="col-span-12 lg:col-span-5 space-y-4 animate-fade-in-up delay-400">
 
                     {/* Statut connexion */}
-                    <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5">
+                    <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 card-hover">
                       <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4">Statut de la connexion</p>
                       <div className="flex flex-col gap-3">
                         {[
@@ -541,7 +547,7 @@ export default function Dashboard() {
                         </thead>
                         <tbody>
                           {data.recentPublications.map((pub, i) => (
-                            <tr key={pub.id} className={`border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors ${i === data.recentPublications.length - 1 ? "border-b-0" : ""}`}>
+                            <tr key={pub.id} className={`border-b border-white/[0.04] hover:bg-white/[0.03] transition-all animate-fade-in-up ${i === data.recentPublications.length - 1 ? "border-b-0" : ""}`} style={{animationDelay: `${i * 60}ms`}}>
                               <td className="px-6 py-4 text-white font-medium max-w-xs truncate text-sm">{pub.title}</td>
                               <td className="px-6 py-4">
                                 <span className="bg-orange-500/10 text-orange-400 text-xs font-bold px-2.5 py-1 rounded-full">
@@ -603,8 +609,8 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {data.keywordStats.map(kw => (
-                        <div key={kw.keyword} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
+                      {data.keywordStats.map((kw, i) => (
+                        <div key={kw.keyword} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 card-hover animate-fade-in-up" style={{animationDelay: `${i * 80}ms`}}>
                           <div className="flex items-start justify-between mb-3">
                             <p className="text-white font-bold">{kw.keyword}</p>
                             <span className={`text-xs font-black px-2 py-1 rounded-full ${kw.count > 0 ? "bg-orange-500/10 text-orange-400" : "bg-white/[0.05] text-gray-500"}`}>
