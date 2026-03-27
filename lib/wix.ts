@@ -171,7 +171,7 @@ export async function publishToWix(
 
 export async function analyzeWixSite(apiKey: string, siteId: string) {
   try {
-    const res = await fetch(`${WIX_API}?limit=5`, {
+    const res = await fetch(WIX_API, {
       headers: wixHeaders(apiKey, siteId),
     });
     if (!res.ok) return { existingTitles: [], styleGuide: "" };
@@ -190,7 +190,7 @@ export async function analyzeWixSite(apiKey: string, siteId: string) {
 
 export async function testWixConnection(apiKey: string, siteId: string): Promise<{ ok: boolean; reason?: string }> {
   try {
-    const res = await fetch(`${WIX_API}?limit=1`, {
+    const res = await fetch(WIX_API, {
       headers: wixHeaders(apiKey, siteId),
     });
     if (res.ok) return { ok: true };
