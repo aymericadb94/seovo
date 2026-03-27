@@ -130,7 +130,8 @@ export function htmlToRicos(html: string): object {
 
 // ─── Publication Wix ──────────────────────────────────────────────────────────
 
-const WIX_API = "https://www.wixapis.com/blog/v3/posts";
+const WIX_POSTS_API = "https://www.wixapis.com/blog/v3/posts";
+const WIX_DRAFTS_API = "https://www.wixapis.com/blog/v3/drafts";
 
 function wixHeaders(apiKey: string, siteId: string) {
   return {
@@ -150,12 +151,12 @@ export async function publishToWix(
   const richContent = htmlToRicos(content);
   const headers = wixHeaders(apiKey, siteId);
 
-  // Étape 1 : créer le brouillon
-  const createRes = await fetch(WIX_API, {
+  // Étape 1 : créer le brouillon via l'API drafts
+  const createRes = await fetch(WIX_DRAFTS_API, {
     method: "POST",
     headers,
     body: JSON.stringify({
-      post: {
+      draft: {
         title,
         richContent,
         excerpt: metaDescription,
@@ -168,12 +169,12 @@ export async function publishToWix(
     throw new Error(`Wix création (${createRes.status}): ${body || "réponse vide"}`);
   }
 
-  const createData = await createRes.json() as { post: { id: string; slug: string } };
-  const postId = createData.post?.id;
-  if (!postId) throw new Error("Wix: ID du post introuvable dans la réponse");
+  const createData = await createRes.json() as { draft: { id: string; slug: string } };
+  const draftId = createData.draft?.id;
+  if (!draftId) throw new Error("Wix: ID du brouillon introuvable dans la réponse");
 
   // Étape 2 : publier le brouillon
-  const publishRes = await fetch(`${WIX_API}/${postId}/_publish`, {
+  const publishRes = await fetch(`${WIX_DRAFTS_API}/${draftId}/publish`, {
     method: "POST",
     headers,
   });
@@ -183,14 +184,16 @@ export async function publishToWix(
     throw new Error(`Wix publication (${publishRes.status}): ${body || "réponse vide"}`);
   }
 
-  return `https://www.wix.com/blog/${createData.post?.slug ?? postId}`;
+  const publishData = await publishRes.json() as { post?: { id: string; slug: string } };
+  const slug = publishData.post?.slug ?? createData.draft?.slug ?? draftId;
+  return `https://www.wix.com/blog/${slug}`;
 }
 
 // ─── Analyse DA Wix ───────────────────────────────────────────────────────────
 
 export async function analyzeWixSite(apiKey: string, siteId: string) {
   try {
-    const res = await fetch(WIX_API, {
+    const res = await fetch(WIX_POSTS_API, {
       headers: wixHeaders(apiKey, siteId),
     });
     if (!res.ok) return { existingTitles: [], styleGuide: "" };
