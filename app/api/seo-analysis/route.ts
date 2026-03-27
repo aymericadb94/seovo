@@ -7,7 +7,7 @@ async function scrapeHomepage(siteUrl: string): Promise<string> {
   try {
     const url = siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`;
     const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; SEOVO/1.0)" },
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; SeoCorp/1.0)" },
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return "";

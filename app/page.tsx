@@ -7,7 +7,7 @@ import { useState } from "react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const testimonials = [
-  { name: "Sophie M.", role: "Fondatrice, Boutique Léonie", content: "En 3 mois, mon trafic organique a augmenté de 340%. Je n'ai rien eu à faire — SEOVO s'est occupé de tout.", avatar: "S" },
+  { name: "Sophie M.", role: "Fondatrice, Boutique Léonie", content: "En 3 mois, mon trafic organique a augmenté de 340%. Je n'ai rien eu à faire — SeoCorp s'est occupé de tout.", avatar: "S" },
   { name: "Thomas R.", role: "Directeur Marketing, TechFlow", content: "On économise 15h par semaine sur la création de contenu. Le ROI est évident dès le premier mois.", avatar: "T" },
   { name: "Camille D.", role: "CEO, Studio Créatif", content: "La qualité des articles générés est bluffante. Nos clients pensent qu'on a une équipe de rédacteurs SEO.", avatar: "C" },
 ];

@@ -26,7 +26,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("fr");
 
   useEffect(() => {
-    const stored = localStorage.getItem("seovo_locale") as Locale | null;
+    const stored = localStorage.getItem("seocorp_locale") as Locale | null;
     if (stored && LOCALES.includes(stored)) {
       setLocaleState(stored);
     } else {
@@ -36,7 +36,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   function setLocale(l: Locale) {
     setLocaleState(l);
-    localStorage.setItem("seovo_locale", l);
+    localStorage.setItem("seocorp_locale", l);
   }
 
   return (

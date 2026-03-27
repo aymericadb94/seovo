@@ -49,7 +49,7 @@ export default function OnboardingSuccess() {
 
         {/* Titre */}
         <h1 className="text-4xl font-black mb-3 tracking-tight">
-          SEOVO est{" "}
+          SeoCorp est{" "}
           <span className="bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
             opérationnel
           </span>
