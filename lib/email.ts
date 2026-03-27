@@ -1,6 +1,5 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.RESEND_FROM ?? "SEOVO <onboarding@resend.dev>";
 
 export async function sendArticlePublishedEmail(params: {
@@ -11,6 +10,7 @@ export async function sendArticlePublishedEmail(params: {
   businessName: string;
 }) {
   const { to, title, keyword, url, businessName } = params;
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
   await resend.emails.send({
     from: FROM,
