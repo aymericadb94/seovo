@@ -339,7 +339,7 @@ export default function OnboardingPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="text-3xl font-black tracking-tight">
-            SEO<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">VO</span>
+            Seo<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Corp</span>
           </Link>
           <p className="text-gray-500 mt-2 text-sm">{t.onboarding.subtitle}</p>
         </div>

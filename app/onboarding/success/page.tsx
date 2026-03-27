@@ -36,7 +36,7 @@ export default function OnboardingSuccess() {
 
         {/* Logo */}
         <div className="text-2xl font-black tracking-tight mb-12">
-          SEO<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">VO</span>
+          Seo<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Corp</span>
         </div>
 
         {/* Icône centrale */}

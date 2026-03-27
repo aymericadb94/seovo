@@ -228,7 +228,7 @@ export default function Dashboard() {
         <div className="max-w-screen-xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-6">
             <span className="text-xl font-black tracking-tight logo-glow cursor-default">
-              SEO<span className="text-shimmer">VO</span>
+              Seo<span className="text-shimmer">Corp</span>
             </span>
             {data?.site && (
               <div className="hidden md:flex items-center gap-2 text-xs text-gray-500">

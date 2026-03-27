@@ -86,7 +86,7 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-xl font-black tracking-tight">
-              SEO<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">VO</span>
+              Seo<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Corp</span>
             </Link>
             <span className="bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
               Admin

@@ -186,7 +186,7 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between mb-10">
           <div>
             <Link href="/dashboard" className="text-2xl font-black tracking-tight">
-              SEO<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">VO</span>
+              Seo<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Corp</span>
             </Link>
             <p className="text-gray-500 text-sm mt-1">{t.settings.title}</p>
           </div>
