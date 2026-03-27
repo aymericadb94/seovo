@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [error, setError] = useState("");
   const [discoveringKw, setDiscoveringKw] = useState(false);
   const [discoverReasoning, setDiscoverReasoning] = useState("");
+  const [discoverError, setDiscoverError] = useState("");
   const [newKeyword, setNewKeyword] = useState("");
 
   useEffect(() => {
@@ -48,15 +49,20 @@ export default function SettingsPage() {
   async function discoverKeywords() {
     setDiscoveringKw(true);
     setDiscoverReasoning("");
+    setDiscoverError("");
     try {
       const res = await fetch("/api/keywords/discover", { method: "POST" });
       const data = await res.json();
-      if (data.keywords?.length > 0) {
+      if (!res.ok) {
+        setDiscoverError(data.error || "Erreur lors de la génération des mots-clés");
+      } else if (data.keywords?.length > 0) {
         setConfig((c) => c ? { ...c, keywords: data.keywords } : c);
         setDiscoverReasoning(data.reasoning ?? "");
+      } else {
+        setDiscoverError("Aucun mot-clé généré, réessayez.");
       }
     } catch {
-      // silencieux
+      setDiscoverError("Impossible de contacter l'IA. Vérifiez votre connexion.");
     }
     setDiscoveringKw(false);
   }
@@ -263,6 +269,11 @@ export default function SettingsPage() {
                   <div className="mb-3 bg-orange-500/5 border border-orange-500/20 rounded-xl px-4 py-3">
                     <p className="text-orange-400 text-xs font-bold mb-1">{t.settings.aiStrategy}</p>
                     <p className="text-gray-400 text-xs">{discoverReasoning}</p>
+                  </div>
+                )}
+                {discoverError && (
+                  <div className="mb-3 bg-red-500/5 border border-red-500/20 rounded-xl px-4 py-3">
+                    <p className="text-red-400 text-xs">{discoverError}</p>
                   </div>
                 )}
 

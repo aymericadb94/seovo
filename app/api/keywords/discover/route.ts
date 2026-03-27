@@ -56,32 +56,37 @@ export async function POST() {
       }
     }
 
+    // Langue principale du site (première langue configurée, défaut fr)
+    const targetLanguages: string[] = site.target_languages ?? ["fr"];
+    const primaryLanguage = targetLanguages[0] ?? "fr";
+
     // ── Demander à Claude les meilleurs mots-clés ────────────────────────────
     const message = await anthropic.messages.create({
       model: "claude-opus-4-6",
       max_tokens: 1000,
-      system: `Tu es un expert SEO spécialisé en recherche de mots-clés. Tu analyses des sites web et identifies les mots-clés les plus stratégiques pour maximiser le trafic organique.`,
+      system: `You are an SEO expert specialized in keyword research. You analyze websites and identify the most strategic keywords to maximize organic traffic. Always respond in valid JSON only.`,
       messages: [{
         role: "user",
-        content: `Analyse ce site web et propose les 12 meilleurs mots-clés SEO à cibler pour maximiser le trafic organique.
+        content: `Analyze this website and suggest the 12 best SEO keywords to target for maximum organic traffic.
 
-SITE :
-- Nom : ${site.business_name}
-- Secteur : ${site.industry}
-- CMS : ${site.cms}
-${siteContent ? `\nCONTENU EXISTANT DU SITE :${siteContent}` : ""}
+SITE:
+- Name: ${site.business_name}
+- Industry: ${site.industry}
+- CMS: ${site.cms}
+${siteContent ? `\nEXISTING SITE CONTENT:${siteContent}` : ""}
 
-CRITÈRES DE SÉLECTION :
-- Mots-clés avec un bon volume de recherche potentiel
-- Correspondant exactement au secteur "${site.industry}"
-- Mélange de mots-clés génériques (haut volume) et de longue traîne (plus faciles à ranker)
-- En français, adaptés au marché francophone
-- Éviter les mots-clés trop compétitifs pour un site qui commence
+SELECTION CRITERIA:
+- Keywords with good potential search volume
+- Matching exactly the "${site.industry}" industry
+- Mix of generic keywords (high volume) and long-tail (easier to rank)
+- IMPORTANT: Write all keywords in ${primaryLanguage} language
+- Avoid overly competitive keywords for a new site
+- Keywords must be realistic search queries that users actually type
 
-Réponds UNIQUEMENT avec un JSON valide, sans texte avant ni après :
+Respond ONLY with valid JSON, no text before or after:
 {
-  "keywords": ["mot-clé 1", "mot-clé 2", ...],
-  "reasoning": "Explication courte de la stratégie en 1-2 phrases"
+  "keywords": ["keyword 1", "keyword 2", ...],
+  "reasoning": "Short explanation of the strategy in 1-2 sentences (write in ${primaryLanguage})"
 }`,
       }],
     });
