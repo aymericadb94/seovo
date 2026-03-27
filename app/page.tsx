@@ -186,6 +186,7 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-8 text-sm text-gray-400">
             <a href="#comment" className="hover:text-white transition-colors">{t.nav.howItWorks}</a>
             <a href="#fonctionnalites" className="hover:text-white transition-colors">{t.nav.features}</a>
+            <a href="#faq" className="hover:text-white transition-colors">{t.nav.faq}</a>
             <a href="#tarifs" className="hover:text-white transition-colors">{t.nav.pricing}</a>
           </div>
           <div className="flex items-center gap-3">

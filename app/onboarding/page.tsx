@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type FormData = {
   business_name: string;
@@ -22,8 +24,6 @@ const industries = [
   "Voyage & Tourisme", "Éducation & Formation", "Finance & Assurance",
   "Décoration & Maison", "Automobile", "Autre",
 ];
-
-const STEPS = ["Votre activité", "Votre site", "Mots-clés"];
 
 // ─── Tutoriels ────────────────────────────────────────────────────────────────
 
@@ -80,44 +80,50 @@ const SHOPIFY_TUTORIAL = {
       num: "01",
       title: "Ouvrez votre admin Shopify",
       detail: "Connectez-vous à votre boutique Shopify et accédez à :",
-      path: ["Paramètres", "Applications et canaux de vente"],
+      path: ["Paramètres", "Applications"],
     },
     {
       num: "02",
-      title: "Accédez au développement d'apps",
-      detail: "En bas de la page, cliquez sur :",
-      code: "Développer des apps",
+      title: "Accédez au Dev Dashboard",
+      detail: "Cliquez sur le bouton :",
+      code: "Développer des applications dans le Dev Dashboard",
     },
     {
       num: "03",
-      title: "Activez le développement d'apps",
-      detail: "Si c'est la première fois, Shopify vous demande de confirmer. Cliquez sur \"Autoriser le développement d'apps personnalisées\".",
-    },
-    {
-      num: "04",
       title: "Créez une nouvelle app",
-      detail: "Cliquez sur \"Créer une app\". Donnez-lui le nom :",
+      detail: "Sur dev.shopify.com, cliquez sur \"Create app\". Donnez-lui le nom :",
       code: "SEOVO",
     },
     {
-      num: "05",
-      title: "Configurez les autorisations API",
-      detail: "Cliquez sur \"Configurer les étendues de l'API Admin\". Activez ces deux autorisations :",
+      num: "04",
+      title: "Configurez les accès API",
+      detail: "Dans l'app, allez dans \"Configuration\" → \"Admin API integration\". Activez ces deux autorisations :",
       permissions: true,
     },
     {
+      num: "05",
+      title: "Créez une version et publiez",
+      detail: "Allez dans \"Versions\" → \"Créer une version\". Entrez l'URL de l'app :",
+      code: "https://seovo-vbo3.vercel.app",
+    },
+    {
       num: "06",
-      title: "Installez l'app et copiez le token",
-      detail: "Cliquez sur \"Enregistrer\", puis \"Installer l'app\". Dans l'onglet \"API credentials\", copiez le :",
-      code: "Jeton d'accès à l'API Admin (shpat_...)",
+      title: "Installez l'app sur votre boutique",
+      detail: "Cliquez sur \"Publier\", puis installez l'app sur votre boutique TAGZ depuis le lien d'installation.",
     },
     {
       num: "07",
+      title: "Copiez le token d'accès",
+      detail: "Dans \"Configuration\" → \"API credentials\", copiez le :",
+      code: "Jeton d'accès à l'API Admin (shpat_...)",
+    },
+    {
+      num: "08",
       title: "Collez le token dans le champ",
       detail: "Revenez ici et collez le token dans le champ \"Clé API Admin Shopify\" à gauche.",
     },
   ],
-  warning: "Le token Shopify ne s'affiche qu'une seule fois. Si vous l'avez manqué, vous devrez désinstaller et réinstaller l'app pour en générer un nouveau.",
+  warning: "Le token Shopify ne s'affiche qu'une seule fois. Si vous l'avez manqué, supprimez et recréez l'app pour en générer un nouveau.",
 };
 
 // ─── Composant tutoriel ───────────────────────────────────────────────────────
@@ -131,7 +137,12 @@ type TutorialStep = {
   permissions?: boolean;
 };
 
-function Tutorial({ cms, shopifyPermissions }: { cms: "wordpress" | "shopify"; shopifyPermissions?: string[] }) {
+function Tutorial({ cms, shopifyPermissions, requiredPermissionsLabel, attentionLabel }: {
+  cms: "wordpress" | "shopify";
+  shopifyPermissions?: string[];
+  requiredPermissionsLabel: string;
+  attentionLabel: string;
+}) {
   const tuto = cms === "wordpress" ? WP_TUTORIAL : SHOPIFY_TUTORIAL;
 
   return (
@@ -145,7 +156,7 @@ function Tutorial({ cms, shopifyPermissions }: { cms: "wordpress" | "shopify"; s
 
       {/* Autorisations requises */}
       <div className="bg-orange-500/5 border border-orange-500/15 rounded-xl p-3 mb-5">
-        <p className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-2">Autorisations requises</p>
+        <p className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-2">{requiredPermissionsLabel}</p>
         <ul className="flex flex-col gap-1">
           {tuto.permissions.map((p) => (
             <li key={p} className="flex items-start gap-2 text-xs text-gray-400">
@@ -203,7 +214,7 @@ function Tutorial({ cms, shopifyPermissions }: { cms: "wordpress" | "shopify"; s
       {/* Avertissement */}
       <div className="mt-5 bg-red-500/5 border border-red-500/15 rounded-xl p-3">
         <p className="text-xs text-red-400/80 leading-relaxed">
-          <span className="font-bold">⚠️ Attention : </span>
+          <span className="font-bold">⚠️ {attentionLabel} : </span>
           {tuto.warning}
         </p>
       </div>
@@ -215,6 +226,7 @@ function Tutorial({ cms, shopifyPermissions }: { cms: "wordpress" | "shopify"; s
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -249,17 +261,28 @@ export default function OnboardingPage() {
       body: JSON.stringify({ ...form, keywords }),
     });
     const data = await res.json();
-    if (!res.ok) { setError(data.error || "Une erreur est survenue"); setLoading(false); }
+    if (!res.ok) { setError(data.error || t.onboarding.error); setLoading(false); }
     else router.push("/onboarding/success");
   }
 
+  const STEPS = t.onboarding.steps;
+
   // Largeur dynamique : plus large à l'étape "site" si un CMS est sélectionné
   const isWide = step === 1 && form.cms !== "";
+
+  const freqOptions = [
+    { value: 1, label: t.onboarding.freq1Label, sub: t.onboarding.freq1Sub },
+    { value: 2, label: t.onboarding.freq2Label, sub: t.onboarding.freq2Sub },
+  ];
 
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 relative overflow-hidden">
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-[600px] h-[600px] bg-orange-600/5 rounded-full blur-3xl" />
+      </div>
+
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
       </div>
 
       <div className={`relative w-full transition-all duration-500 ${isWide ? "max-w-5xl" : "max-w-xl"}`}>
@@ -269,7 +292,7 @@ export default function OnboardingPage() {
           <Link href="/" className="text-3xl font-black tracking-tight">
             SEO<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">VO</span>
           </Link>
-          <p className="text-gray-500 mt-2 text-sm">Configuration de votre espace</p>
+          <p className="text-gray-500 mt-2 text-sm">{t.onboarding.subtitle}</p>
         </div>
 
         {/* Stepper */}
@@ -305,21 +328,21 @@ export default function OnboardingPage() {
             {step === 0 && (
               <>
                 <div>
-                  <h2 className="text-xl font-black mb-1">Parlez-nous de votre activité</h2>
-                  <p className="text-gray-500 text-sm">Ces informations permettront à l&apos;IA de générer du contenu pertinent.</p>
+                  <h2 className="text-xl font-black mb-1">{t.onboarding.step0Title}</h2>
+                  <p className="text-gray-500 text-sm">{t.onboarding.step0Subtitle}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Nom de l&apos;entreprise</label>
+                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.businessName}</label>
                   <input
                     type="text"
                     value={form.business_name}
                     onChange={(e) => update("business_name", e.target.value)}
-                    placeholder="Ex: Tagz Vintage"
+                    placeholder={t.onboarding.businessNamePlaceholder}
                     className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Secteur d&apos;activité</label>
+                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.industry}</label>
                   <div className="grid grid-cols-2 gap-2">
                     {industries.map((ind) => (
                       <button key={ind} type="button" onClick={() => update("industry", ind)}
@@ -338,12 +361,12 @@ export default function OnboardingPage() {
             {step === 1 && (
               <>
                 <div>
-                  <h2 className="text-xl font-black mb-1">Connectez votre site</h2>
-                  <p className="text-gray-500 text-sm">L&apos;IA publiera directement sur votre site chaque jour.</p>
+                  <h2 className="text-xl font-black mb-1">{t.onboarding.step1Title}</h2>
+                  <p className="text-gray-500 text-sm">{t.onboarding.step1Subtitle}</p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Votre CMS</label>
+                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.cms}</label>
                   <div className="grid grid-cols-2 gap-3">
                     {(["wordpress", "shopify"] as const).map((cms) => (
                       <button key={cms} type="button" onClick={() => update("cms", cms)}
@@ -359,7 +382,7 @@ export default function OnboardingPage() {
                 {form.cms && (
                   <>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">URL du site</label>
+                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.siteUrl}</label>
                       <input
                         type="url"
                         value={form.site_url}
@@ -372,40 +395,40 @@ export default function OnboardingPage() {
                     {form.cms === "wordpress" && (
                       <>
                         <div>
-                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Nom d&apos;utilisateur WordPress</label>
+                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.wpUsername}</label>
                           <input
                             type="text"
                             value={form.wp_username}
                             onChange={(e) => update("wp_username", e.target.value)}
-                            placeholder="admin"
+                            placeholder={t.onboarding.wpUsernamePlaceholder}
                             className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Mot de passe d&apos;application</label>
+                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.wpPassword}</label>
                           <input
                             type="password"
                             value={form.wp_app_password}
                             onChange={(e) => update("wp_app_password", e.target.value)}
-                            placeholder="xxxx xxxx xxxx xxxx"
+                            placeholder={t.onboarding.wpPasswordPlaceholder}
                             className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
                           />
-                          <p className="text-gray-600 text-xs mt-1.5">Suivez le tutoriel à droite →</p>
+                          <p className="text-gray-600 text-xs mt-1.5">{t.onboarding.tutorialHint}</p>
                         </div>
                       </>
                     )}
 
                     {form.cms === "shopify" && (
                       <div>
-                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Clé API Admin Shopify</label>
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.shopifyKey}</label>
                         <input
                           type="password"
                           value={form.shopify_api_key}
                           onChange={(e) => update("shopify_api_key", e.target.value)}
-                          placeholder="shpat_xxxxxxxxxxxx"
+                          placeholder={t.onboarding.shopifyKeyPlaceholder}
                           className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
                         />
-                        <p className="text-gray-600 text-xs mt-1.5">Suivez le tutoriel à droite →</p>
+                        <p className="text-gray-600 text-xs mt-1.5">{t.onboarding.tutorialHint}</p>
                       </div>
                     )}
                   </>
@@ -417,24 +440,24 @@ export default function OnboardingPage() {
             {step === 2 && (
               <>
                 <div>
-                  <h2 className="text-xl font-black mb-1">Définissez vos cibles SEO</h2>
-                  <p className="text-gray-500 text-sm">L&apos;IA utilisera ces mots-clés pour générer du contenu stratégique.</p>
+                  <h2 className="text-xl font-black mb-1">{t.onboarding.step2Title}</h2>
+                  <p className="text-gray-500 text-sm">{t.onboarding.step2Subtitle}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Mots-clés cibles</label>
+                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.keywords}</label>
                   <textarea
                     value={form.keywords}
                     onChange={(e) => update("keywords", e.target.value)}
-                    placeholder="grossiste vêtements seconde main, mode vintage Paris, friperie en gros..."
+                    placeholder={t.onboarding.keywordsPlaceholder}
                     rows={4}
                     className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors resize-none"
                   />
-                  <p className="text-gray-600 text-xs mt-1.5">Séparez les mots-clés par des virgules</p>
+                  <p className="text-gray-600 text-xs mt-1.5">{t.onboarding.keywordsHint}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">Fréquence de publication</label>
+                  <label className="block text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">{t.onboarding.frequency}</label>
                   <div className="grid grid-cols-2 gap-3">
-                    {[{ value: 1, label: "1 article / jour", sub: "Recommandé" }, { value: 2, label: "2 articles / jour", sub: "Croissance rapide" }].map((opt) => (
+                    {freqOptions.map((opt) => (
                       <button key={opt.value} type="button" onClick={() => update("frequency", opt.value)}
                         className={`p-4 rounded-xl border text-left transition-all ${
                           form.frequency === opt.value ? "bg-orange-500/10 border-orange-500/40" : "bg-white/[0.03] border-white/[0.08] hover:border-white/20"
@@ -459,7 +482,7 @@ export default function OnboardingPage() {
             <div className="flex items-center justify-between mt-2">
               {step > 0 ? (
                 <button onClick={() => { setStep(step - 1); setError(""); }} className="text-gray-500 hover:text-white text-sm font-bold transition-colors">
-                  ← Retour
+                  {t.onboarding.back}
                 </button>
               ) : <div />}
               {step < STEPS.length - 1 ? (
@@ -468,7 +491,7 @@ export default function OnboardingPage() {
                   disabled={!canProceed()}
                   className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg shadow-orange-500/20"
                 >
-                  Continuer →
+                  {t.onboarding.next}
                 </button>
               ) : (
                 <button
@@ -476,7 +499,7 @@ export default function OnboardingPage() {
                   disabled={!canProceed() || loading}
                   className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg shadow-orange-500/20"
                 >
-                  {loading ? "Vérification..." : "Lancer SEOVO →"}
+                  {loading ? t.onboarding.saving : t.onboarding.finish}
                 </button>
               )}
             </div>
@@ -488,6 +511,8 @@ export default function OnboardingPage() {
               <Tutorial
                 cms={form.cms as "wordpress" | "shopify"}
                 shopifyPermissions={["write_content — Publier des articles de blog", "read_content — Lire les blogs existants"]}
+                requiredPermissionsLabel={t.onboarding.requiredPermissions}
+                attentionLabel={t.onboarding.attention}
               />
             </div>
           )}

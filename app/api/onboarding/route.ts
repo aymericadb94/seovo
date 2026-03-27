@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Vérifier que l'URL WordPress est accessible avant de sauvegarder
+    // Vérifier la connexion avant de sauvegarder
     if (body.cms === "wordpress") {
       try {
         const testRes = await fetch(`${body.site_url}/wp-json/wp/v2/posts?per_page=1`, {
@@ -24,6 +24,23 @@ export async function POST(request: Request) {
         }
       } catch {
         return Response.json({ error: "Impossible de joindre le site WordPress. Vérifiez l'URL." }, { status: 400 });
+      }
+    }
+
+    if (body.cms === "shopify") {
+      try {
+        const baseUrl = (body.site_url as string).replace(/\/$/, "");
+        const testRes = await fetch(`${baseUrl}/admin/api/2024-01/shop.json`, {
+          headers: {
+            "X-Shopify-Access-Token": body.shopify_api_key,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!testRes.ok) {
+          return Response.json({ error: "Connexion Shopify échouée. Vérifiez l'URL et la clé API." }, { status: 400 });
+        }
+      } catch {
+        return Response.json({ error: "Impossible de joindre la boutique Shopify. Vérifiez l'URL." }, { status: 400 });
       }
     }
 

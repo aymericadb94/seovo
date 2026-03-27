@@ -11,6 +11,12 @@ type SiteConfig = {
   target_languages: Locale[];
 };
 
+type GeneratedArticle = {
+  title: string;
+  content: string;
+  meta_description: string;
+};
+
 const STEPS = [
   { id: "analyze", label: "Analyse du secteur et des mots-clés", icon: "🔍" },
   { id: "write", label: "Rédaction de l'article (1500+ mots)", icon: "✍️" },
@@ -23,8 +29,10 @@ export default function GeneratePage() {
   const [keyword, setKeyword] = useState("");
   const [customKeyword, setCustomKeyword] = useState("");
   const [language, setLanguage] = useState<Locale>("fr");
-  const [status, setStatus] = useState<"idle" | "generating" | "publishing" | "done" | "error">("idle");
+  const [previewMode, setPreviewMode] = useState(false);
+  const [status, setStatus] = useState<"idle" | "generating" | "preview" | "publishing" | "done" | "error">("idle");
   const [currentStep, setCurrentStep] = useState(0);
+  const [generated, setGenerated] = useState<GeneratedArticle | null>(null);
   const [result, setResult] = useState<{ title: string; url: string; meta?: string } | null>(null);
   const [error, setError] = useState("");
 
@@ -61,8 +69,8 @@ export default function GeneratePage() {
     setCurrentStep(0);
     setError("");
     setResult(null);
+    setGenerated(null);
 
-    // Simulate step progression
     const stepTimer = setInterval(() => {
       setCurrentStep((s) => {
         if (s < 2) return s + 1;
@@ -78,6 +86,8 @@ export default function GeneratePage() {
         body: JSON.stringify({
           keyword: activeKeyword,
           businessName: site?.business_name ?? "",
+          industry: site?.industry ?? "",
+          allKeywords: site?.keywords ?? [],
           language,
         }),
       });
@@ -90,13 +100,34 @@ export default function GeneratePage() {
       }
 
       const { title, content, meta_description } = await genRes.json();
-      setCurrentStep(3);
-      setStatus("publishing");
+      setGenerated({ title, content, meta_description });
 
+      if (previewMode) {
+        setCurrentStep(2);
+        setStatus("preview");
+      } else {
+        await publishArticle({ title, content, meta_description });
+      }
+    } catch (err: unknown) {
+      clearInterval(stepTimer);
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
+      setStatus("error");
+    }
+  }
+
+  async function publishArticle(article: GeneratedArticle) {
+    setCurrentStep(3);
+    setStatus("publishing");
+
+    try {
       const pubRes = await fetch("/api/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({
+          title: article.title,
+          content: article.content,
+          meta_description: article.meta_description,
+        }),
       });
 
       if (!pubRes.ok) {
@@ -105,10 +136,9 @@ export default function GeneratePage() {
       }
 
       const { url } = await pubRes.json();
-      setResult({ title, url, meta: meta_description });
+      setResult({ title: article.title, url, meta: article.meta_description });
       setStatus("done");
     } catch (err: unknown) {
-      clearInterval(stepTimer);
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
       setStatus("error");
     }
@@ -123,7 +153,7 @@ export default function GeneratePage() {
         <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-red-600/8 rounded-full blur-3xl animate-orb delay-400" />
       </div>
 
-      <div className="relative max-w-2xl mx-auto px-6 py-12">
+      <div className={`relative mx-auto px-6 py-12 transition-all duration-500 ${status === "preview" ? "max-w-4xl" : "max-w-2xl"}`}>
 
         {/* Header */}
         <div className="mb-10">
@@ -148,6 +178,7 @@ export default function GeneratePage() {
           </p>
         </div>
 
+        {/* ── Formulaire ── */}
         {status === "idle" || status === "error" ? (
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
@@ -156,7 +187,6 @@ export default function GeneratePage() {
               <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-4">
                 1. Mot-clé cible
               </label>
-
               {site && site.keywords.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-4">
                   {site.keywords.map((kw) => (
@@ -175,7 +205,6 @@ export default function GeneratePage() {
                   ))}
                 </div>
               )}
-
               <div className="relative">
                 <input
                   type="text"
@@ -194,7 +223,6 @@ export default function GeneratePage() {
                   </button>
                 )}
               </div>
-
               {activeKeyword && (
                 <p className="mt-3 text-xs text-gray-500">
                   Mot-clé sélectionné : <span className="text-orange-400 font-bold">{activeKeyword}</span>
@@ -231,6 +259,30 @@ export default function GeneratePage() {
               </div>
             </div>
 
+            {/* Preview checkbox */}
+            <label
+              className={`flex items-center gap-4 cursor-pointer select-none p-4 rounded-xl border transition-all ${
+                previewMode
+                  ? "bg-orange-500/10 border-orange-500/40"
+                  : "bg-white/[0.03] border-white/[0.07] hover:border-white/20"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={previewMode}
+                onChange={(e) => setPreviewMode(e.target.checked)}
+                className="w-5 h-5 accent-orange-500 cursor-pointer flex-shrink-0"
+              />
+              <div>
+                <p className={`text-sm font-bold transition-colors ${previewMode ? "text-orange-400" : "text-gray-300"}`}>
+                  Prévisualiser avant publication
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Relisez et validez l&apos;article avant qu&apos;il soit publié sur votre site
+                </p>
+              </div>
+            </label>
+
             {status === "error" && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                 <p className="text-red-400 text-sm font-bold">Erreur</p>
@@ -243,17 +295,19 @@ export default function GeneratePage() {
               disabled={!activeKeyword}
               className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl transition-all uppercase tracking-wide shadow-lg shadow-orange-500/20 text-sm"
             >
-              ✦ Générer et publier l&apos;article
+              {previewMode ? "✦ Générer et prévisualiser" : "✦ Générer et publier l'article"}
             </button>
           </form>
 
         ) : status === "generating" || status === "publishing" ? (
-          /* Generating state */
+          /* ── Chargement ── */
           <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-8">
             <div className="text-center mb-8">
               <div className="inline-flex items-center gap-3 bg-orange-500/10 border border-orange-500/20 rounded-full px-5 py-2.5 mb-4">
                 <span className="w-2.5 h-2.5 bg-orange-400 rounded-full animate-pulse" />
-                <span className="text-orange-400 font-bold text-sm">IA en cours de rédaction</span>
+                <span className="text-orange-400 font-bold text-sm">
+                  {status === "publishing" ? "Publication en cours..." : "IA en cours de rédaction"}
+                </span>
               </div>
               <p className="text-gray-500 text-sm">
                 Article sur <span className="text-white font-bold">&quot;{activeKeyword}&quot;</span> en {localeNames[language]}
@@ -299,9 +353,74 @@ export default function GeneratePage() {
             </p>
           </div>
 
+        ) : status === "preview" && generated ? (
+          /* ── Preview ── */
+          <div className="flex flex-col gap-5">
+            {/* Bandeau */}
+            <div className="flex items-center justify-between bg-orange-500/10 border border-orange-500/30 rounded-2xl px-6 py-4">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">👁</span>
+                <div>
+                  <p className="font-black text-orange-400 text-sm uppercase tracking-wide">Prévisualisation</p>
+                  <p className="text-gray-500 text-xs">{localeFlags[language]} {localeNames[language]} · &quot;{activeKeyword}&quot;</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setStatus("idle"); setGenerated(null); }}
+                  className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-gray-300 font-bold text-sm transition-all"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => generated && publishArticle(generated)}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-black text-sm uppercase tracking-wide shadow-lg shadow-orange-500/20 transition-all"
+                >
+                  Publier →
+                </button>
+              </div>
+            </div>
+
+            {/* Article rendu */}
+            <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-8 md:p-12">
+              {/* Meta description */}
+              <div className="bg-blue-500/5 border border-blue-500/15 rounded-xl px-4 py-3 mb-8">
+                <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">Meta description</p>
+                <p className="text-gray-400 text-sm leading-relaxed">{generated.meta_description}</p>
+              </div>
+
+              {/* Titre */}
+              <h1 className="text-3xl font-black text-white leading-tight mb-8">
+                {generated.title}
+              </h1>
+
+              {/* Contenu HTML */}
+              <div
+                className="prose-article"
+                dangerouslySetInnerHTML={{ __html: generated.content }}
+              />
+            </div>
+
+            {/* Boutons bas de page */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setStatus("idle"); setGenerated(null); }}
+                className="flex-1 px-5 py-3 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-gray-300 font-bold text-sm transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => generated && publishArticle(generated)}
+                className="flex-1 px-5 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-black text-sm uppercase tracking-wide shadow-lg shadow-orange-500/20 transition-all"
+              >
+                Publier l&apos;article →
+              </button>
+            </div>
+          </div>
+
         ) : status === "done" && result ? (
-          /* Done state */
-          <div className="flex flex-col gap-4 animate-fade-in-up">
+          /* ── Succès ── */
+          <div className="flex flex-col gap-4">
             <div className="bg-gradient-to-b from-orange-500/10 to-transparent border border-orange-500/30 rounded-2xl p-8">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center text-xl">✓</div>
@@ -329,7 +448,7 @@ export default function GeneratePage() {
                   Voir l&apos;article →
                 </a>
                 <button
-                  onClick={() => { setStatus("idle"); setResult(null); setCustomKeyword(""); }}
+                  onClick={() => { setStatus("idle"); setResult(null); setCustomKeyword(""); setGenerated(null); }}
                   className="flex-1 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.1] text-gray-300 font-bold py-3 rounded-xl transition-all text-sm"
                 >
                   Générer un autre

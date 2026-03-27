@@ -3,8 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 export default function SignupPage() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [done, setDone] = useState(false);
@@ -35,14 +38,14 @@ export default function SignupPage() {
         </div>
         <div className="relative w-full max-w-md text-center">
           <div className="text-6xl mb-6">📬</div>
-          <h2 className="text-3xl font-black mb-3">Vérifiez votre email</h2>
+          <h2 className="text-3xl font-black mb-3">{t.auth.signup.confirmTitle}</h2>
           <p className="text-gray-400 leading-relaxed">
-            Un lien de confirmation a été envoyé à{" "}
+            {t.auth.signup.confirmText}{" "}
             <span className="text-orange-400 font-bold">{email}</span>.
-            <br />Cliquez dessus pour activer votre compte.
+            <br />{t.auth.signup.confirmText2}
           </p>
           <Link href="/login" className="text-orange-400 hover:text-orange-300 font-bold text-sm mt-8 inline-block transition-colors">
-            Retour à la connexion →
+            {t.auth.signup.backToLogin}
           </Link>
         </div>
       </main>
@@ -54,12 +57,17 @@ export default function SignupPage() {
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-[500px] h-[500px] bg-orange-600/5 rounded-full blur-3xl" />
       </div>
+
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
+
       <div className="relative w-full max-w-md">
         <div className="text-center mb-10">
           <Link href="/" className="text-3xl font-black tracking-tight">
             SEO<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">VO</span>
           </Link>
-          <p className="text-gray-500 mt-2">Créez votre compte gratuitement</p>
+          <p className="text-gray-500 mt-2">{t.auth.signup.subtitle}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-8 flex flex-col gap-5">
@@ -69,18 +77,18 @@ export default function SignupPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="vous@exemple.com"
+              placeholder={t.auth.login.placeholder}
               required
               className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider">Mot de passe</label>
+            <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider">{t.auth.signup.password}</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimum 6 caractères"
+              placeholder={t.auth.signup.passwordPlaceholder}
               minLength={6}
               required
               className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
@@ -94,14 +102,14 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-3 rounded-lg transition-all uppercase tracking-wide shadow-lg shadow-orange-500/20"
           >
-            {loading ? "Création..." : "Créer mon compte"}
+            {loading ? t.auth.signup.loading : t.auth.signup.submit}
           </button>
         </form>
 
         <p className="text-center text-gray-500 text-sm mt-6">
-          Déjà un compte ?{" "}
+          {t.auth.signup.hasAccount}{" "}
           <Link href="/login" className="text-orange-400 hover:text-orange-300 font-bold transition-colors">
-            Se connecter
+            {t.auth.signup.login}
           </Link>
         </p>
       </div>
