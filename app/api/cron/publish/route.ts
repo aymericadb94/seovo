@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
+import { sendArticlePublishedEmail } from "@/lib/email";
+import { publishToWix, analyzeWixSite } from "@/lib/wix";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -12,23 +14,96 @@ function createAdminClient() {
 
 // ─── Analyse du site WordPress ────────────────────────────────────────────────
 // Récupère les derniers articles publiés pour éviter les répétitions
-// et comprendre le style éditorial du site
+// et analyser la Direction Artistique (DA) du site
 
 async function analyzeWordPressSite(siteUrl: string, username: string, appPassword: string) {
   try {
     const credentials = Buffer.from(`${username}:${appPassword}`).toString("base64");
-    const res = await fetch(`${siteUrl}/wp-json/wp/v2/posts?per_page=20&_fields=title,excerpt,tags,categories`, {
+    const res = await fetch(`${siteUrl}/wp-json/wp/v2/posts?per_page=5&_fields=title,content`, {
       headers: {
         Authorization: `Basic ${credentials}`,
         "ngrok-skip-browser-warning": "true",
       },
     });
-    if (!res.ok) return { existingTitles: [] };
-    const posts = await res.json();
-    const existingTitles = posts.map((p: { title: { rendered: string } }) => p.title.rendered);
-    return { existingTitles };
+    if (!res.ok) return { existingTitles: [], styleGuide: "" };
+    const posts = await res.json() as { title: { rendered: string }; content: { rendered: string } }[];
+    const existingTitles = posts.map((p) => p.title.rendered);
+
+    const articleSamples = posts.slice(0, 3).map((p) => ({
+      title: p.title.rendered,
+      excerpt: p.content.rendered.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 800),
+    }));
+
+    const styleGuide = articleSamples.length > 0 ? await extractStyleGuide(articleSamples) : "";
+
+    return { existingTitles, styleGuide };
   } catch {
-    return { existingTitles: [] };
+    return { existingTitles: [], styleGuide: "" };
+  }
+}
+
+// ─── Extraction de la Direction Artistique ────────────────────────────────────
+
+async function extractStyleGuide(articles: { title: string; excerpt: string }[]): Promise<string> {
+  try {
+    const samplesText = articles
+      .map((a, i) => `Article ${i + 1} — "${a.title}":\n${a.excerpt}`)
+      .join("\n\n---\n\n");
+
+    const message = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 600,
+      messages: [{
+        role: "user",
+        content: `Analyze these blog article excerpts and extract the editorial style guide in 6-8 concise bullet points. Cover: tone (formal/casual/friendly), use of "vous" or "tu", sentence length and rhythm, introduction style, how H2/H3 titles are phrased, use of lists vs paragraphs, vocabulary register, and any recurring stylistic patterns.
+
+${samplesText}
+
+Respond ONLY with bullet points, no intro or conclusion:
+- [style observation]
+- [style observation]
+...`,
+      }],
+    });
+
+    const text = message.content[0].type === "text" ? message.content[0].text : "";
+    return text.trim();
+  } catch {
+    return "";
+  }
+}
+
+// ─── Analyse du site Shopify ──────────────────────────────────────────────────
+
+async function analyzeShopifySite(storeUrl: string, apiKey: string) {
+  try {
+    const baseUrl = storeUrl.replace(/\/$/, "");
+    const headers = { "X-Shopify-Access-Token": apiKey };
+
+    const blogsRes = await fetch(`${baseUrl}/admin/api/2024-01/blogs.json`, { headers });
+    if (!blogsRes.ok) return { existingTitles: [], styleGuide: "" };
+    const blogsData = await blogsRes.json() as { blogs: { id: number }[] };
+    if (!blogsData.blogs?.length) return { existingTitles: [], styleGuide: "" };
+
+    const blogId = blogsData.blogs[0].id;
+    const articlesRes = await fetch(
+      `${baseUrl}/admin/api/2024-01/blogs/${blogId}/articles.json?limit=5&fields=title,body_html`,
+      { headers }
+    );
+    if (!articlesRes.ok) return { existingTitles: [], styleGuide: "" };
+    const articlesData = await articlesRes.json() as { articles: { title: string; body_html: string }[] };
+    const articles = articlesData.articles ?? [];
+
+    const existingTitles = articles.map((a) => a.title);
+    const articleSamples = articles.slice(0, 3).map((a) => ({
+      title: a.title,
+      excerpt: a.body_html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 800),
+    }));
+
+    const styleGuide = articleSamples.length > 0 ? await extractStyleGuide(articleSamples) : "";
+    return { existingTitles, styleGuide };
+  } catch {
+    return { existingTitles: [], styleGuide: "" };
   }
 }
 
@@ -50,8 +125,9 @@ async function generateArticle(params: {
   existingTitles: string[];
   publicationsCount: number;
   language?: string;
+  styleGuide?: string;
 }) {
-  const { keyword, allKeywords, businessName, industry, existingTitles, publicationsCount, language = "fr" } = params;
+  const { keyword, allKeywords, businessName, industry, existingTitles, publicationsCount, language = "fr", styleGuide } = params;
 
   const formats = formatsByLocale[language] ?? formatsByLocale.fr;
   const format = formats[publicationsCount % formats.length];
@@ -74,7 +150,7 @@ LANGUAGE: Write the ENTIRE article in ${language}. Every word, title, heading, a
 EDITORIAL CONTEXT:
 - Industry: ${industry}
 - Company: ${businessName}
-- Full keyword strategy: ${allKeywords.join(", ")}${existingContext}${internalLinksContext}
+- Full keyword strategy: ${allKeywords.join(", ")}${existingContext}${internalLinksContext}${styleGuide ? `\n\nDIRECTION ARTISTIQUE — REPRODUCE THIS STYLE EXACTLY (extracted from the site's existing articles):\n${styleGuide}` : ""}
 
 QUALITY REQUIREMENTS (premium SEO agency level):
 
@@ -240,12 +316,22 @@ export async function GET(request: Request) {
           .select("*", { count: "exact", head: true })
           .eq("site_id", site.id);
 
-        // Analyser le site pour éviter les répétitions
+        // Analyser le site pour éviter les répétitions et extraire la DA
         let existingTitles: string[] = [];
+        let styleGuide = "";
 
         if (site.cms === "wordpress") {
           const analysis = await analyzeWordPressSite(site.site_url, site.wp_username, site.wp_app_password);
           existingTitles = analysis.existingTitles;
+          styleGuide = analysis.styleGuide;
+        } else if (site.cms === "shopify") {
+          const analysis = await analyzeShopifySite(site.site_url, site.shopify_api_key);
+          existingTitles = analysis.existingTitles;
+          styleGuide = analysis.styleGuide;
+        } else if (site.cms === "wix") {
+          const analysis = await analyzeWixSite(site.wix_api_key, site.wix_site_id);
+          existingTitles = analysis.existingTitles;
+          styleGuide = analysis.styleGuide;
         }
 
         // Langues cibles (défaut : français)
@@ -270,6 +356,7 @@ export async function GET(request: Request) {
             existingTitles,
             publicationsCount: publicationsCount ?? 0,
             language,
+            styleGuide,
           });
 
           let publishedUrl = "";
@@ -284,6 +371,11 @@ export async function GET(request: Request) {
               site.site_url, site.shopify_api_key,
               title, content, meta_description
             );
+          } else if (site.cms === "wix") {
+            publishedUrl = await publishToWix(
+              site.wix_api_key, site.wix_site_id,
+              title, content, meta_description
+            );
           } else {
             results.push({ site: site.site_url, cms: site.cms, status: "skip", error: "CMS non supporté" });
             break;
@@ -296,6 +388,23 @@ export async function GET(request: Request) {
             keyword,
             wordpress_url: publishedUrl,
           });
+
+          // Notification email à l'utilisateur
+          try {
+            const { data: userData } = await supabase.auth.admin.getUserById(site.user_id);
+            const userEmail = userData?.user?.email;
+            if (userEmail) {
+              await sendArticlePublishedEmail({
+                to: userEmail,
+                title,
+                keyword,
+                url: publishedUrl,
+                businessName: site.business_name,
+              });
+            }
+          } catch {
+            // Email optionnel, on ne bloque pas la publication
+          }
 
           results.push({ site: site.site_url, cms: site.cms, status: "ok", title });
           await new Promise((r) => setTimeout(r, 1000));

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { testWixConnection } from "@/lib/wix";
 
 export async function POST(request: Request) {
   try {
@@ -44,6 +45,13 @@ export async function POST(request: Request) {
       }
     }
 
+    if (body.cms === "wix") {
+      const result = await testWixConnection(body.wix_api_key, body.wix_site_id);
+      if (!result.ok) {
+        return Response.json({ error: `Connexion Wix échouée : ${result.reason}` }, { status: 400 });
+      }
+    }
+
     const { error } = await supabase.from("sites").insert({
       user_id: user.id,
       business_name: body.business_name,
@@ -53,6 +61,8 @@ export async function POST(request: Request) {
       wp_username: body.wp_username || null,
       wp_app_password: body.wp_app_password || null,
       shopify_api_key: body.shopify_api_key || null,
+      wix_api_key: body.wix_api_key || null,
+      wix_site_id: body.wix_site_id || null,
       keywords: body.keywords,
       frequency: body.frequency,
     });

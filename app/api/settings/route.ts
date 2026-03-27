@@ -44,6 +44,8 @@ export async function PATCH(request: Request) {
         wp_username: body.wp_username || null,
         wp_app_password: body.wp_app_password || null,
         shopify_api_key: body.shopify_api_key || null,
+        wix_api_key: body.wix_api_key || null,
+        wix_site_id: body.wix_site_id || null,
         keywords,
         frequency: body.frequency,
         target_languages,

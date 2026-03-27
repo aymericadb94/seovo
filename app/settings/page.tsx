@@ -9,11 +9,13 @@ import { LOCALES, localeFlags, localeNames, type Locale } from "@/lib/i18n/trans
 type SiteConfig = {
   business_name: string;
   industry: string;
-  cms: "wordpress" | "shopify";
+  cms: "wordpress" | "shopify" | "wix";
   site_url: string;
   wp_username: string;
   wp_app_password: string;
   shopify_api_key: string;
+  wix_api_key: string;
+  wix_site_id: string;
   keywords: string[];
   frequency: number;
   target_languages: Locale[];
@@ -26,6 +28,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [connectionError, setConnectionError] = useState("");
   const [discoveringKw, setDiscoveringKw] = useState(false);
   const [discoverReasoning, setDiscoverReasoning] = useState("");
   const [discoverError, setDiscoverError] = useState("");
@@ -45,6 +50,39 @@ export default function SettingsPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  async function testConnection() {
+    if (!config) return;
+    setTestingConnection(true);
+    setConnectionStatus("idle");
+    setConnectionError("");
+    try {
+      const res = await fetch("/api/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cms: config.cms,
+          siteUrl: config.site_url,
+          wpUsername: config.wp_username,
+          wpAppPassword: config.wp_app_password,
+          shopifyApiKey: config.shopify_api_key,
+          wixApiKey: config.wix_api_key,
+          wixSiteId: config.wix_site_id,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setConnectionStatus("ok");
+      } else {
+        setConnectionStatus("error");
+        setConnectionError(data.reason ?? "Erreur inconnue");
+      }
+    } catch {
+      setConnectionStatus("error");
+      setConnectionError("Impossible de joindre le serveur");
+    }
+    setTestingConnection(false);
+  }
 
   async function discoverKeywords() {
     setDiscoveringKw(true);
@@ -238,6 +276,56 @@ export default function SettingsPage() {
                   />
                 </div>
               )}
+              {config.cms === "wix" && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.settings.wixApiKey}</label>
+                    <input
+                      type="password"
+                      value={config.wix_api_key}
+                      onChange={(e) => update("wix_api_key", e.target.value)}
+                      placeholder={t.settings.wixApiKeyPlaceholder}
+                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.settings.wixSiteId}</label>
+                    <input
+                      type="text"
+                      value={config.wix_site_id}
+                      onChange={(e) => update("wix_site_id", e.target.value)}
+                      placeholder={t.settings.wixSiteIdPlaceholder}
+                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Bouton test de connexion */}
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={testConnection}
+                  disabled={testingConnection}
+                  className="flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.1] text-gray-300 hover:border-white/30 hover:text-white transition-all disabled:opacity-50"
+                >
+                  {testingConnection ? (
+                    <>
+                      <span className="w-3 h-3 rounded-full border-2 border-gray-400 border-t-transparent animate-spin" />
+                      {t.settings.testing}
+                    </>
+                  ) : (
+                    <>{t.settings.testConnection}</>
+                  )}
+                </button>
+
+                {connectionStatus === "ok" && (
+                  <span className="text-xs font-bold text-green-400">{t.settings.connectionOk}</span>
+                )}
+                {connectionStatus === "error" && (
+                  <span className="text-xs font-bold text-red-400">{t.settings.connectionFailed} — {connectionError}</span>
+                )}
+              </div>
             </div>
           </div>
 

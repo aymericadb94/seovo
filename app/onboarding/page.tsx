@@ -9,11 +9,13 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 type FormData = {
   business_name: string;
   industry: string;
-  cms: "wordpress" | "shopify" | "";
+  cms: "wordpress" | "shopify" | "wix" | "";
   site_url: string;
   wp_username: string;
   wp_app_password: string;
   shopify_api_key: string;
+  wix_api_key: string;
+  wix_site_id: string;
   keywords: string;
   frequency: number;
 };
@@ -126,6 +128,50 @@ const SHOPIFY_TUTORIAL = {
   warning: "Le token Shopify ne s'affiche qu'une seule fois. Si vous l'avez manqué, supprimez et recréez l'app pour en générer un nouveau.",
 };
 
+const WIX_TUTORIAL = {
+  title: "Comment connecter Wix",
+  permissions: [
+    "Blog — Lire et créer des articles",
+    "Site — Lire les informations du site",
+  ],
+  steps: [
+    {
+      num: "01",
+      title: "Ouvrez votre dashboard Wix",
+      detail: "Connectez-vous sur manage.wix.com et sélectionnez votre site.",
+    },
+    {
+      num: "02",
+      title: "Allez dans les paramètres avancés",
+      detail: "Dans le menu gauche, cliquez sur :",
+      path: ["Paramètres", "Avancé", "Clés API"],
+    },
+    {
+      num: "03",
+      title: "Créez une nouvelle clé API",
+      detail: "Cliquez sur \"Générer une clé API\". Donnez-lui le nom :",
+      code: "SEOVO",
+    },
+    {
+      num: "04",
+      title: "Accordez les permissions Blog",
+      detail: "Activez les permissions : Blog (lecture + écriture). Puis cliquez sur \"Générer\".",
+    },
+    {
+      num: "05",
+      title: "Copiez la clé API",
+      detail: "⚠️ La clé ne s'affiche qu'une seule fois. Copiez-la immédiatement et collez-la dans le champ à gauche.",
+    },
+    {
+      num: "06",
+      title: "Trouvez votre Site ID",
+      detail: "Dans l'URL de votre dashboard Wix, repérez le UUID après /dashboard/ :",
+      code: "manage.wix.com/dashboard/XXXXXXXX-XXXX-XXXX-XXXX/...",
+    },
+  ],
+  warning: "La clé API Wix ne s'affiche qu'une seule fois à la création. Si vous l'avez manquée, supprimez-la et générez-en une nouvelle.",
+};
+
 // ─── Composant tutoriel ───────────────────────────────────────────────────────
 
 type TutorialStep = {
@@ -138,18 +184,18 @@ type TutorialStep = {
 };
 
 function Tutorial({ cms, shopifyPermissions, requiredPermissionsLabel, attentionLabel }: {
-  cms: "wordpress" | "shopify";
+  cms: "wordpress" | "shopify" | "wix";
   shopifyPermissions?: string[];
   requiredPermissionsLabel: string;
   attentionLabel: string;
 }) {
-  const tuto = cms === "wordpress" ? WP_TUTORIAL : SHOPIFY_TUTORIAL;
+  const tuto = cms === "wordpress" ? WP_TUTORIAL : cms === "shopify" ? SHOPIFY_TUTORIAL : WIX_TUTORIAL;
 
   return (
     <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 h-full">
       <div className="flex items-center gap-3 mb-5">
         <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-base">
-          {cms === "wordpress" ? "🔧" : "🛍️"}
+          {cms === "wordpress" ? "🔧" : cms === "shopify" ? "🛍️" : "🌐"}
         </div>
         <h3 className="text-sm font-black text-white uppercase tracking-wide">{tuto.title}</h3>
       </div>
@@ -233,6 +279,7 @@ export default function OnboardingPage() {
   const [form, setForm] = useState<FormData>({
     business_name: "", industry: "", cms: "", site_url: "",
     wp_username: "", wp_app_password: "", shopify_api_key: "",
+    wix_api_key: "", wix_site_id: "",
     keywords: "", frequency: 1,
   });
 
@@ -246,6 +293,7 @@ export default function OnboardingPage() {
       if (!form.cms || !form.site_url.trim()) return false;
       if (form.cms === "wordpress") return form.wp_username.trim() && form.wp_app_password.trim();
       if (form.cms === "shopify") return form.shopify_api_key.trim();
+      if (form.cms === "wix") return form.wix_api_key.trim() && form.wix_site_id.trim();
     }
     if (step === 2) return form.keywords.trim().length > 0;
     return false;
@@ -368,13 +416,13 @@ export default function OnboardingPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.cms}</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(["wordpress", "shopify"] as const).map((cms) => (
+                  <div className="grid grid-cols-3 gap-3">
+                    {(["wordpress", "shopify", "wix"] as const).map((cms) => (
                       <button key={cms} type="button" onClick={() => update("cms", cms)}
                         className={`py-4 rounded-xl border font-bold text-sm uppercase tracking-wide transition-all ${
                           form.cms === cms ? "bg-orange-500/10 border-orange-500/40 text-orange-400" : "bg-white/[0.03] border-white/[0.08] text-gray-400 hover:border-white/20"
                         }`}>
-                        {cms === "wordpress" ? "WordPress" : "Shopify"}
+                        {cms === "wordpress" ? "WordPress" : cms === "shopify" ? "Shopify" : "Wix"}
                       </button>
                     ))}
                   </div>
@@ -431,6 +479,32 @@ export default function OnboardingPage() {
                         />
                         <p className="text-gray-600 text-xs mt-1.5">{t.onboarding.tutorialHint}</p>
                       </div>
+                    )}
+
+                    {form.cms === "wix" && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.wixApiKey}</label>
+                          <input
+                            type="password"
+                            value={form.wix_api_key}
+                            onChange={(e) => update("wix_api_key", e.target.value)}
+                            placeholder={t.onboarding.wixApiKeyPlaceholder}
+                            className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.wixSiteId}</label>
+                          <input
+                            type="text"
+                            value={form.wix_site_id}
+                            onChange={(e) => update("wix_site_id", e.target.value)}
+                            placeholder={t.onboarding.wixSiteIdPlaceholder}
+                            className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
+                          />
+                          <p className="text-gray-600 text-xs mt-1.5">{t.onboarding.tutorialHint}</p>
+                        </div>
+                      </>
                     )}
                   </>
                 )}
@@ -510,7 +584,7 @@ export default function OnboardingPage() {
           {isWide && form.cms && (
             <div className="flex-1">
               <Tutorial
-                cms={form.cms as "wordpress" | "shopify"}
+                cms={form.cms as "wordpress" | "shopify" | "wix"}
                 shopifyPermissions={["write_content — Publier des articles de blog", "read_content — Lire les blogs existants"]}
                 requiredPermissionsLabel={t.onboarding.requiredPermissions}
                 attentionLabel={t.onboarding.attention}

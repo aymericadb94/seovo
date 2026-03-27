@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { publishToWix } from "@/lib/wix";
 
 async function publishToWordPress(
   siteUrl: string, username: string, appPassword: string,
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
     // Lire la config du site de l'utilisateur
     const { data: site, error: siteError } = await supabase
       .from("sites")
-      .select("id, cms, site_url, wp_username, wp_app_password, shopify_api_key")
+      .select("id, cms, site_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id")
       .eq("user_id", user.id)
       .limit(1)
       .single();
@@ -107,6 +108,11 @@ export async function POST(request: Request) {
         return Response.json({ error: "Clé API Shopify manquante dans la configuration." }, { status: 400 });
       }
       url = await publishToShopify(site.site_url, site.shopify_api_key, title, content, meta_description);
+    } else if (site.cms === "wix") {
+      if (!site.wix_api_key || !site.wix_site_id) {
+        return Response.json({ error: "Clé API ou Site ID Wix manquants dans la configuration." }, { status: 400 });
+      }
+      url = await publishToWix(site.wix_api_key, site.wix_site_id, title, content, meta_description);
     } else {
       return Response.json({ error: `CMS non supporté : ${site.cms}` }, { status: 400 });
     }
