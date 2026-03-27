@@ -127,6 +127,7 @@ export default function GeneratePage() {
           title: article.title,
           content: article.content,
           meta_description: article.meta_description,
+          keyword: activeKeyword,
         }),
       });
 

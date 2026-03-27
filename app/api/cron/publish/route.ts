@@ -118,10 +118,11 @@ HTML content must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>. No <ht
   });
 
   const raw = message.content[0].type === "text" ? message.content[0].text : "";
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Format de réponse Claude invalide");
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) throw new Error("Format de réponse Claude invalide");
 
-  const parsed = JSON.parse(jsonMatch[0]) as {
+  const parsed = JSON.parse(raw.slice(start, end + 1)) as {
     title: string;
     meta_description: string;
     content: string;

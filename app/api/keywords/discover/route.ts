@@ -92,10 +92,17 @@ Respond ONLY with valid JSON, no text before or after:
     });
 
     const raw = message.content[0].type === "text" ? message.content[0].text : "";
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return Response.json({ error: "Réponse IA invalide" }, { status: 500 });
-
-    const parsed = JSON.parse(jsonMatch[0]);
+    let parsed: { keywords?: string[]; reasoning?: string };
+    try {
+      const start = raw.indexOf("{");
+      const end = raw.lastIndexOf("}");
+      if (start === -1 || end === -1 || end <= start) {
+        return Response.json({ error: "Réponse IA invalide" }, { status: 500 });
+      }
+      parsed = JSON.parse(raw.slice(start, end + 1));
+    } catch {
+      return Response.json({ error: "Impossible de lire la réponse de l'IA" }, { status: 500 });
+    }
     return Response.json({
       keywords: parsed.keywords ?? [],
       reasoning: parsed.reasoning ?? "",

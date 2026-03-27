@@ -178,9 +178,7 @@ export default function Dashboard() {
     setCronRunning(true);
     setCronResult(null);
     try {
-      const res = await fetch("/api/cron/publish", {
-        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET ?? "seovo_cron_secret_2025"}` },
-      });
+      const res = await fetch("/api/cron/trigger", { method: "POST" });
       const json = await res.json();
       const detail = json.results?.map((r: {status: string; title?: string; error?: string}) =>
         r.status === "error" ? `❌ ${r.error}` : `✓ ${r.title}`

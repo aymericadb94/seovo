@@ -81,12 +81,12 @@ export async function POST(request: Request) {
       return Response.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const { title, content, meta_description = "" } = await request.json();
+    const { title, content, meta_description = "", keyword = "" } = await request.json();
 
     // Lire la config du site de l'utilisateur
     const { data: site, error: siteError } = await supabase
       .from("sites")
-      .select("cms, site_url, wp_username, wp_app_password, shopify_api_key")
+      .select("id, cms, site_url, wp_username, wp_app_password, shopify_api_key")
       .eq("user_id", user.id)
       .limit(1)
       .single();
@@ -113,10 +113,10 @@ export async function POST(request: Request) {
 
     // Enregistrer la publication en base
     await supabase.from("publications").insert({
-      site_id: null,
+      site_id: site.id,
       user_id: user.id,
       title,
-      keyword: "",
+      keyword,
       wordpress_url: url,
     });
 
