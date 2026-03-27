@@ -148,23 +148,42 @@ export async function publishToWix(
   metaDescription: string
 ): Promise<string> {
   const richContent = htmlToRicos(content);
+  const headers = wixHeaders(apiKey, siteId);
 
-  const res = await fetch(WIX_API, {
+  // Étape 1 : créer le brouillon
+  const createRes = await fetch(WIX_API, {
     method: "POST",
-    headers: wixHeaders(apiKey, siteId),
+    headers,
     body: JSON.stringify({
       post: {
         title,
         richContent,
         excerpt: metaDescription,
-        status: "PUBLISHED",
       },
     }),
   });
 
-  if (!res.ok) throw new Error(`Wix: ${await res.text()}`);
-  const data = await res.json() as { post: { id: string; slug: string } };
-  return `https://www.wix.com/blog/${data.post?.slug ?? data.post?.id}`;
+  if (!createRes.ok) {
+    const body = await createRes.text();
+    throw new Error(`Wix création (${createRes.status}): ${body || "réponse vide"}`);
+  }
+
+  const createData = await createRes.json() as { post: { id: string; slug: string } };
+  const postId = createData.post?.id;
+  if (!postId) throw new Error("Wix: ID du post introuvable dans la réponse");
+
+  // Étape 2 : publier le brouillon
+  const publishRes = await fetch(`${WIX_API}/${postId}/_publish`, {
+    method: "POST",
+    headers,
+  });
+
+  if (!publishRes.ok) {
+    const body = await publishRes.text();
+    throw new Error(`Wix publication (${publishRes.status}): ${body || "réponse vide"}`);
+  }
+
+  return `https://www.wix.com/blog/${createData.post?.slug ?? postId}`;
 }
 
 // ─── Analyse DA Wix ───────────────────────────────────────────────────────────
