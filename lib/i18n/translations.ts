@@ -145,6 +145,8 @@ export const translations = {
     faq: {
       title: "Questions fréquentes",
       subtitle: "Tout ce que vous devez savoir avant de commencer.",
+      badgeBold: "Vos identifiants restent sous votre contrôle total.",
+      badgeText: "Révoquez l'accès à tout moment depuis votre WordPress. Aucune donnée partagée avec des tiers.",
       items: [
         {
           q: "🔒 Est-ce sécurisé de donner l'accès à mon site ?",
@@ -290,6 +292,8 @@ export const translations = {
     faq: {
       title: "Frequently asked questions",
       subtitle: "Everything you need to know before getting started.",
+      badgeBold: "Your credentials remain under your full control.",
+      badgeText: "Revoke access at any time from your WordPress. No data shared with third parties.",
       items: [
         {
           q: "🔒 Is it safe to give access to my site?",
@@ -435,6 +439,8 @@ export const translations = {
     faq: {
       title: "Preguntas frecuentes",
       subtitle: "Todo lo que necesitas saber antes de empezar.",
+      badgeBold: "Tus credenciales permanecen bajo tu control total.",
+      badgeText: "Revoca el acceso en cualquier momento desde tu WordPress. Ningún dato compartido con terceros.",
       items: [
         {
           q: "🔒 ¿Es seguro dar acceso a mi sitio?",
@@ -580,6 +586,8 @@ export const translations = {
     faq: {
       title: "Häufig gestellte Fragen",
       subtitle: "Alles was Sie wissen müssen, bevor Sie beginnen.",
+      badgeBold: "Ihre Zugangsdaten bleiben vollständig unter Ihrer Kontrolle.",
+      badgeText: "Widerrufen Sie den Zugang jederzeit aus Ihrem WordPress. Keine Daten mit Dritten geteilt.",
       items: [
         {
           q: "🔒 Ist es sicher, meiner Website Zugang zu geben?",
@@ -725,6 +733,8 @@ export const translations = {
     faq: {
       title: "Domande frequenti",
       subtitle: "Tutto quello che devi sapere prima di iniziare.",
+      badgeBold: "Le tue credenziali rimangono sotto il tuo pieno controllo.",
+      badgeText: "Revoca l'accesso in qualsiasi momento dal tuo WordPress. Nessun dato condiviso con terzi.",
       items: [
         {
           q: "🔒 È sicuro dare accesso al mio sito?",

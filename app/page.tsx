@@ -141,8 +141,8 @@ function FaqSection() {
         <div className="mt-10 flex items-center justify-center gap-3 bg-orange-500/5 border border-orange-500/15 rounded-2xl p-5">
           <span className="text-2xl">🔒</span>
           <p className="text-gray-400 text-sm">
-            <span className="text-white font-bold">Vos identifiants restent sous votre contrôle total.</span>{" "}
-            Révoquez l&apos;accès à tout moment depuis votre WordPress. Aucune donnée partagée avec des tiers.
+            <span className="text-white font-bold">{t.faq.badgeBold}</span>{" "}
+            {t.faq.badgeText}
           </p>
         </div>
       </div>

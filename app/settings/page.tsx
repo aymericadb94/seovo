@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { LOCALES, localeFlags, localeNames, type Locale } from "@/lib/i18n/translations";
 
 type SiteConfig = {
@@ -145,12 +146,15 @@ export default function SettingsPage() {
             </Link>
             <p className="text-gray-500 text-sm mt-1">{t.settings.title}</p>
           </div>
-          <Link
-            href="/dashboard"
-            className="text-gray-500 hover:text-white text-sm px-4 py-2 rounded-lg border border-white/10 hover:border-white/20 transition-colors"
-          >
-            {t.settings.backToDashboard}
-          </Link>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <Link
+              href="/dashboard"
+              className="text-gray-500 hover:text-white text-sm px-4 py-2 rounded-lg border border-white/10 hover:border-white/20 transition-colors"
+            >
+              {t.settings.backToDashboard}
+            </Link>
+          </div>
         </div>
 
         <form onSubmit={handleSave} className="flex flex-col gap-6">

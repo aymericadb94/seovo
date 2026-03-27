@@ -4,51 +4,53 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request: Request) {
   try {
-    const { keyword, businessName, industry, allKeywords } = await request.json();
+    const { keyword, businessName, industry, allKeywords, language = "fr" } = await request.json();
 
     const otherKeywords = (allKeywords ?? []).filter((k: string) => k !== keyword).slice(0, 5);
     const internalLinksContext = otherKeywords.length > 0
-      ? `\n\nMots-clés secondaires à mentionner naturellement pour le maillage interne : ${otherKeywords.join(", ")}`
+      ? `\n\nSecondary keywords to mention naturally for internal linking: ${otherKeywords.join(", ")}`
       : "";
 
     const message = await client.messages.create({
       model: "claude-opus-4-6",
       max_tokens: 8000,
-      system: `Tu es le meilleur rédacteur SEO francophone au monde. Chaque article que tu produis est unique, créatif, et génère du trafic organique réel. Tu ne produis jamais de contenu générique ou répétitif. Tu penses comme un éditeur de presse spécialisé qui veut captiver son lecteur tout en satisfaisant les algorithmes Google.`,
+      system: `You are the world's best SEO content writer. Every article you produce is unique, creative, and generates real organic traffic. You never produce generic or repetitive content. You always write in the language specified — this is non-negotiable.`,
       messages: [
         {
           role: "user",
-          content: `Tu es un rédacteur SEO expert de niveau mondial, spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}" — tu connais parfaitement leur audience, leur ton, et leurs objectifs commerciaux.
+          content: `You are a world-class SEO writer specializing in the "${industry ?? "e-commerce"}" sector. You work for "${businessName}".
 
-MISSION : Rédiger un article de blog SEO exceptionnel sur le mot-clé principal : "${keyword}"${internalLinksContext}
+MISSION: Write an exceptional SEO blog article on the main keyword: "${keyword}"
 
-EXIGENCES DE QUALITÉ (niveau agence SEO premium) :
+LANGUAGE: Write the ENTIRE article in ${language}. Every word must be in ${language}.${internalLinksContext}
 
-1. TITRE (H1) : Accrocheur, contient le mot-clé, donne envie de lire. Entre 50-60 caractères idéalement.
+QUALITY REQUIREMENTS (premium SEO agency level):
 
-2. MÉTA DESCRIPTION : 150-160 caractères, incitative, contient le mot-clé.
+1. TITLE (H1): Catchy, contains the keyword, 50-60 characters ideally.
 
-3. INTRODUCTION (150-200 mots) : Accroche forte qui parle directement au lecteur. Pose le problème ou l'opportunité. Annonce ce qu'il va apprendre.
+2. META DESCRIPTION: 150-160 characters, compelling, contains the keyword.
 
-4. CORPS DE L'ARTICLE (1200-1800 mots) :
-   - 4 à 6 sections H2 bien structurées
-   - Sous-sections H3 quand nécessaire
-   - Paragraphes courts et aérés (3-4 lignes max)
-   - Exemples concrets liés au secteur
-   - Données chiffrées pour crédibiliser
-   - Listes à puces pour améliorer la lisibilité
-   - Ton : expert mais accessible, jamais robotique
-   - Densité de mots-clés : naturelle, 1-2% maximum
+3. INTRODUCTION (150-200 words): Strong hook, states the problem or opportunity.
 
-5. SECTION FAQ (3-4 questions) : Questions que se pose vraiment l'audience cible.
+4. ARTICLE BODY (1200-1800 words):
+   - 4 to 6 well-structured H2 sections
+   - H3 subsections when needed
+   - Short paragraphs (3-4 lines max)
+   - Concrete examples related to the sector
+   - Figures and statistics for credibility
+   - Bullet lists for readability
+   - Tone: expert but accessible, never robotic
+   - Keyword density: natural, 1-2% maximum
 
-6. CONCLUSION (100-150 mots) : Résumé des points clés + appel à l'action fort.
+5. FAQ SECTION (3-4 questions): Questions the target audience really asks.
 
-FORMAT DE RÉPONSE : JSON valide uniquement, sans texte avant ni après.
+6. CONCLUSION (100-150 words): Summary + strong call to action.
 
-{"title": "Le titre H1 optimisé", "meta_description": "La méta description 150-160 caractères", "content": "Le contenu HTML complet"}
+RESPONSE FORMAT: Valid JSON only, no text before or after.
 
-Le contenu HTML doit utiliser : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>. Pas de <html>, <body>, <head>.`,
+{"title": "The optimized H1 title", "meta_description": "The 150-160 character meta description", "content": "The complete HTML content"}
+
+HTML must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>. No <html>, <body>, <head>.`,
         },
       ],
     });
