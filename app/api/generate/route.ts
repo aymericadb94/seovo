@@ -127,7 +127,15 @@ QUALITY REQUIREMENTS (premium SEO agency level):
 
 3. INTRODUCTION (150-200 words): Strong hook, states the problem or opportunity.
 
-4. ARTICLE BODY (1200-1800 words):
+4. FEATURED SNIPPET BLOCK (immediately after introduction — critical for Google position 0):
+   Write a block specifically designed to capture the Google featured snippet:
+   - Start with an H2 containing the main keyword phrased as a question (e.g. "What is X?" / "How to X?" / "Why X?")
+   - Immediately follow with a <p> of exactly 40-60 words giving a direct, complete answer. No filler, no "in this article".
+   - If the keyword implies steps (how to, guide, tutorial): use a <ol> with 4-8 concise numbered steps right after the H2.
+   - If the keyword implies comparison: add a <table> with 2-4 columns and 3-6 rows with relevant data.
+   - If the keyword implies a definition: start the paragraph with "[Keyword] is/are..." followed by the definition.
+
+5. ARTICLE BODY (1200-1800 words):
    - 4 to 6 well-structured H2 sections
    - H3 subsections when needed
    - Short paragraphs (3-4 lines max)
@@ -137,15 +145,15 @@ QUALITY REQUIREMENTS (premium SEO agency level):
    - Tone: expert but accessible, never robotic (unless DA says otherwise)
    - Keyword density: natural, 1-2% maximum
 
-5. FAQ SECTION (3-4 questions): Questions the target audience really asks.
+6. FAQ SECTION (3-4 questions): Questions the target audience really asks. Each answer must be 40-60 words max — short enough to also be captured as a featured snippet.
 
-6. CONCLUSION (100-150 words): Summary + strong call to action.
+7. CONCLUSION (100-150 words): Summary + strong call to action.
 
 RESPONSE FORMAT: Valid JSON only, no text before or after.
 
 {"title": "The optimized H1 title", "meta_description": "The 150-160 character meta description", "content": "The complete HTML content"}
 
-HTML must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>. No <html>, <body>, <head>.`,
+HTML must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. No <html>, <body>, <head>.`,
         },
       ],
     });
