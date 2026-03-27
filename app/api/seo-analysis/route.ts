@@ -61,12 +61,13 @@ export async function POST(request: Request) {
 
 CONTEXTE DU SITE :
 - Nom : ${site.business_name}
-- Secteur : ${site.industry ?? "e-commerce"}
 - URL : ${site.site_url}
 - Mots-clés actuels : ${(site.keywords ?? []).join(", ") || "aucun"}
 
 CONTENU DE LA PAGE D'ACCUEIL (extrait) :
 ${homepageContent || "Non disponible"}
+
+IMPORTANT : Pour déterminer le secteur d'activité, base-toi UNIQUEMENT sur le contenu textuel de la page d'accueil ci-dessus. N'infère jamais le secteur à partir du nom du site — il peut être trompeur ou sans rapport avec l'activité réelle.
 
 RÉPONSES DU PROPRIÉTAIRE :
 - Points forts : ${answers.strengths}
