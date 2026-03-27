@@ -248,16 +248,19 @@ export async function GET(request: Request) {
           existingTitles = analysis.existingTitles;
         }
 
-        // Choisir le mot-clé intelligemment (rotation séquentielle)
-        const keywordIndex = (publicationsCount ?? 0) % keywords.length;
-        const keyword = keywords[keywordIndex];
-
         // Langues cibles (défaut : français)
         const targetLanguages: string[] = site.target_languages?.length > 0
           ? site.target_languages
           : ["fr"];
 
-        // Générer et publier un article par langue
+        // Fréquence : nombre d'articles à publier par run (1 ou 2)
+        const frequency = Math.max(1, site.frequency ?? 1);
+
+        // Générer N articles (selon fréquence), chacun dans toutes les langues
+        for (let f = 0; f < frequency; f++) {
+        const keywordIndex = ((publicationsCount ?? 0) + f) % keywords.length;
+        const keyword = keywords[keywordIndex];
+
         for (const language of targetLanguages) {
           const { title, content, meta_description } = await generateArticle({
             keyword,
@@ -297,6 +300,7 @@ export async function GET(request: Request) {
           results.push({ site: site.site_url, cms: site.cms, status: "ok", title });
           await new Promise((r) => setTimeout(r, 1000));
         }
+        } // fin boucle fréquence
 
       } catch (err: unknown) {
         results.push({

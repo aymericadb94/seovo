@@ -1,23 +1,33 @@
+import { createClient } from "@/lib/supabase/server";
+
 export async function GET() {
   try {
-    const wpUrl = process.env.WORDPRESS_URL;
-    const username = process.env.WORDPRESS_USERNAME;
-    const appPassword = process.env.WORDPRESS_APP_PASSWORD;
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return Response.json({ error: "Non authentifié" }, { status: 401 });
+    }
 
-    const credentials = Buffer.from(`${username}:${appPassword}`).toString("base64");
+    const { data: site } = await supabase
+      .from("sites")
+      .select("cms, site_url, wp_username, wp_app_password")
+      .eq("user_id", user.id)
+      .single();
 
-    const res = await fetch(`${wpUrl}/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc`, {
-      headers: {
-        Authorization: `Basic ${credentials}`,
-      },
+    if (!site) return Response.json({ error: "Site non configuré" }, { status: 404 });
+    if (site.cms !== "wordpress") return Response.json({ error: "Disponible uniquement pour WordPress" }, { status: 400 });
+    if (!site.wp_username || !site.wp_app_password) return Response.json({ error: "Identifiants WordPress manquants" }, { status: 400 });
+
+    const credentials = Buffer.from(`${site.wp_username}:${site.wp_app_password}`).toString("base64");
+    const res = await fetch(`${site.site_url}/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc`, {
+      headers: { Authorization: `Basic ${credentials}` },
     });
 
     if (!res.ok) {
-      return Response.json({ error: "Impossible de récupérer les articles" }, { status: 500 });
+      return Response.json({ error: "Impossible de récupérer les articles WordPress" }, { status: 500 });
     }
 
     const posts = await res.json();
-
     const simplified = posts.map((post: {
       id: number;
       title: { rendered: string };

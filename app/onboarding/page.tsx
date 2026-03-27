@@ -252,6 +252,7 @@ export default function OnboardingPage() {
   }
 
   async function handleSubmit() {
+    if (loading) return;
     setLoading(true);
     setError("");
     const keywords = form.keywords.split(",").map((k) => k.trim()).filter(Boolean);
