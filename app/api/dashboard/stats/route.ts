@@ -110,6 +110,7 @@ export async function GET() {
         cms: site.cms,
         site_url: site.site_url,
         frequency,
+        seo_analysis_done: site.seo_analysis_done ?? false,
       } : null,
       kpis: {
         totalArticles,

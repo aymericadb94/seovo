@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import SeoAnalysisModal from "@/components/SeoAnalysisModal";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, BarChart, Bar,
@@ -19,6 +20,7 @@ type DashboardData = {
     cms: string;
     site_url: string;
     frequency: number;
+    seo_analysis_done: boolean;
   } | null;
   kpis: {
     totalArticles: number;
@@ -159,11 +161,18 @@ export default function Dashboard() {
   const [cronRunning, setCronRunning] = useState(false);
   const [cronResult, setCronResult] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "publications" | "keywords">("overview");
+  const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null); // null = inconnu, attente des données
 
   async function loadData() {
     const res = await fetch("/api/dashboard/stats");
     const json = await res.json();
-    if (!json.error) setData(json);
+    if (!json.error) {
+      setData(json);
+      // Afficher le modal si l'analyse n'a pas encore été faite
+      setShowSeoModal(json.site ? !json.site.seo_analysis_done : false);
+    } else {
+      setShowSeoModal(false);
+    }
     setLoading(false);
   }
 
@@ -202,6 +211,11 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-[#080808] text-white overflow-x-hidden">
+      {/* SEO Analysis Modal — s'affiche uniquement quand showSeoModal est explicitement true */}
+      {showSeoModal === true && (
+        <SeoAnalysisModal onComplete={() => { setShowSeoModal(false); loadData(); }} />
+      )}
+
       {/* Orbes de fond animées */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="animate-orb absolute top-[-200px] left-[-100px] w-[600px] h-[600px] rounded-full bg-orange-500/5 blur-[120px]" />
