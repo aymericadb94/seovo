@@ -135,7 +135,7 @@ const WIX_API = "https://www.wixapis.com/blog/v3/posts";
 function wixHeaders(apiKey: string, siteId: string) {
   return {
     "Content-Type": "application/json",
-    Authorization: apiKey,
+    Authorization: `Bearer ${apiKey}`,
     "wix-site-id": siteId,
   };
 }
@@ -190,7 +190,7 @@ export async function analyzeWixSite(apiKey: string, siteId: string) {
 
 export async function testWixConnection(apiKey: string, siteId: string): Promise<{ ok: boolean; reason?: string }> {
   try {
-    const res = await fetch(WIX_API, {
+    const res = await fetch("https://www.wixapis.com/site-properties/v4/properties", {
       headers: wixHeaders(apiKey, siteId),
     });
     if (res.ok) return { ok: true };
