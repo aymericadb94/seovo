@@ -62,7 +62,7 @@ export default function SettingsPage() {
         setDiscoverError("Aucun mot-clé généré, réessayez.");
       }
     } catch {
-      setDiscoverError("Impossible de contacter l'IA. Vérifiez votre connexion.");
+      setDiscoverError("Impossible de générer les mots-clés. Vérifiez votre connexion.");
     }
     setDiscoveringKw(false);
   }

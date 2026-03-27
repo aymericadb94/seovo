@@ -7,7 +7,7 @@ const steps = [
   { icon: "🔗", label: "Site connecté", delay: 0 },
   { icon: "🧠", label: "Analyse du secteur", delay: 600 },
   { icon: "🎯", label: "Mots-clés configurés", delay: 1200 },
-  { icon: "⚡", label: "IA prête à publier", delay: 1800 },
+  { icon: "⚡", label: "Prêt à publier", delay: 1800 },
 ];
 
 export default function OnboardingSuccess() {
@@ -55,7 +55,7 @@ export default function OnboardingSuccess() {
           </span>
         </h1>
         <p className="text-gray-400 text-lg mb-10 leading-relaxed">
-          Votre IA SEO démarre dans les prochaines 24h.<br />
+          Votre service SEO démarre dans les prochaines 24h.<br />
           Le premier article sera publié automatiquement.
         </p>
 

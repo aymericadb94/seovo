@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SEOVO — SEO automatisé par l'IA",
+  title: "SEOVO — SEO automatisé",
   description: "SEOVO génère et publie chaque jour des contenus SEO optimisés sur votre site. Sans rédacteur. Sans agence. Sans effort.",
 };
 

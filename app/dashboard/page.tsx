@@ -254,9 +254,9 @@ export default function Dashboard() {
               {cronRunning ? (
                 <>
                   <span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" />
-                  IA en cours...
+                  Publication en cours...
                 </>
-              ) : "▶ Lancer l'IA"}
+              ) : "▶ Lancer la publication"}
             </button>
             <Link href="/generate" className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-4 py-2 rounded-lg text-xs uppercase tracking-wide shadow-lg shadow-orange-500/20">
               + Générer
@@ -370,7 +370,7 @@ export default function Dashboard() {
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up delay-200">
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Publications IA</p>
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Publications automatisées</p>
                       <p className="text-xl font-black text-white">Historique sur 30 jours</p>
                     </div>
                     <span className="text-xs bg-orange-500/10 text-orange-400 font-bold px-3 py-1.5 rounded-full">
@@ -442,7 +442,7 @@ export default function Dashboard() {
                         {[
                           { label: "CMS connecté", ok: !!data.site, value: data.site?.cms === "wordpress" ? "WordPress" : "Shopify" },
                           { label: "Site URL", ok: !!data.site?.site_url, value: data.site?.site_url ? "Configuré" : "Non défini" },
-                          { label: "IA SEO", ok: true, value: "Active" },
+                          { label: "Automatisation SEO", ok: true, value: "Active" },
                           { label: "Publication auto", ok: true, value: `${data.site?.frequency ?? 1}×/jour` },
                         ].map(row => (
                           <div key={row.label} className="flex items-center justify-between">
@@ -529,9 +529,9 @@ export default function Dashboard() {
                   {data.recentPublications.length === 0 ? (
                     <div className="text-center py-16">
                       <p className="text-white font-bold mb-2">Aucun article pour l'instant</p>
-                      <p className="text-gray-500 text-sm mb-5">Lancez l'IA ou générez manuellement</p>
+                      <p className="text-gray-500 text-sm mb-5">Lancez la publication ou générez manuellement</p>
                       <button onClick={handleManualPublish} className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-6 py-2.5 rounded-lg text-sm uppercase tracking-wide">
-                        Lancer l'IA maintenant
+                        Lancer la publication maintenant
                       </button>
                     </div>
                   ) : (

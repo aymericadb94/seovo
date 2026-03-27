@@ -105,7 +105,7 @@ export default function AdminDashboard() {
           {[
             { label: "Utilisateurs inscrits", value: data.stats.totalUsers, sub: `+${data.stats.newUsersThisMonth} ce mois`, highlight: true },
             { label: "Sites connectés", value: data.stats.totalSites, sub: "WordPress & Shopify", highlight: false },
-            { label: "Articles publiés par l'IA", value: data.stats.totalPublications, sub: "Depuis le lancement", highlight: false },
+            { label: "Articles publiés", value: data.stats.totalPublications, sub: "Depuis le lancement", highlight: false },
             { label: "MRR estimé", value: `${data.stats.totalSites * 49}€`, sub: "Forfait Starter × sites", highlight: false },
           ].map((kpi) => (
             <div key={kpi.label} className={`rounded-2xl p-6 border ${kpi.highlight ? "bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-500/20" : "bg-white/[0.03] border-white/[0.07]"}`}>
@@ -142,9 +142,9 @@ export default function AdminDashboard() {
             </ResponsiveContainer>
           </div>
 
-          {/* Publications IA */}
+          {/* Publications automatisées */}
           <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Publications IA</p>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Publications automatisées</p>
             <p className="text-lg font-black text-white mb-5">14 derniers jours</p>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={data.pubsChart} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
@@ -221,10 +221,10 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* ── Dernières publications IA ─────────────────────────── */}
+        {/* ── Dernières publications ────────────────────────────── */}
         <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-white/[0.06]">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dernières publications de l&apos;IA</p>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dernières publications automatisées</p>
           </div>
           {data.recentPublications.length === 0 ? (
             <div className="px-6 py-8 text-center text-gray-600 text-sm">Aucune publication automatique pour l&apos;instant</div>

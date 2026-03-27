@@ -307,7 +307,7 @@ export default function GeneratePage() {
               <div className="inline-flex items-center gap-3 bg-orange-500/10 border border-orange-500/20 rounded-full px-5 py-2.5 mb-4">
                 <span className="w-2.5 h-2.5 bg-orange-400 rounded-full animate-pulse" />
                 <span className="text-orange-400 font-bold text-sm">
-                  {status === "publishing" ? "Publication en cours..." : "IA en cours de rédaction"}
+                  {status === "publishing" ? "Publication en cours..." : "Rédaction en cours..."}
                 </span>
               </div>
               <p className="text-gray-500 text-sm">
