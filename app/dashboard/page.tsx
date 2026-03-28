@@ -167,6 +167,8 @@ export default function Dashboard() {
   const [cronResult, setCronResult] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "publications" | "keywords" | "calendar">("overview");
   const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null); // null = inconnu, attente des données
+  const [indexationResults, setIndexationResults] = useState<Record<string, { indexed: boolean | null; verdict: string; coverage: string }>>({});
+  const [indexationLoading, setIndexationLoading] = useState(false);
 
   async function loadData() {
     const res = await fetch("/api/dashboard/stats");
@@ -187,6 +189,26 @@ export default function Dashboard() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
+  }
+
+  async function checkIndexation() {
+    if (!data?.recentPublications.length) return;
+    setIndexationLoading(true);
+    const urls = data.recentPublications.filter(p => p.url).map(p => p.url);
+    try {
+      const res = await fetch("/api/gsc/inspect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
+      });
+      const json = await res.json();
+      if (json.results) {
+        const map: Record<string, { indexed: boolean | null; verdict: string; coverage: string }> = {};
+        for (const r of json.results) map[r.url] = r;
+        setIndexationResults(map);
+      }
+    } catch { /* silently fail */ }
+    setIndexationLoading(false);
   }
 
   async function handleManualPublish() {
@@ -595,9 +617,24 @@ export default function Dashboard() {
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
                     <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Tous les articles publiés</p>
-                    <Link href="/generate" className="text-orange-400 hover:text-orange-300 text-xs font-bold uppercase tracking-wide transition-colors">
-                      + Générer un article
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      {data.site?.gsc_connected && data.site?.gsc_site_url && (
+                        <button
+                          onClick={checkIndexation}
+                          disabled={indexationLoading}
+                          className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 transition-all disabled:opacity-40"
+                        >
+                          {indexationLoading ? (
+                            <><span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" /> Vérification...</>
+                          ) : (
+                            <><span>🔍</span> Vérifier l&apos;indexation</>
+                          )}
+                        </button>
+                      )}
+                      <Link href="/generate" className="text-orange-400 hover:text-orange-300 text-xs font-bold uppercase tracking-wide transition-colors">
+                        + Générer un article
+                      </Link>
+                    </div>
                   </div>
 
                   {data.recentPublications.length === 0 ? (
@@ -617,11 +654,14 @@ export default function Dashboard() {
                             <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Mot-clé</th>
                             <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Date</th>
                             <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Statut</th>
+                            <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Indexation</th>
                             <th className="px-6 py-3" />
                           </tr>
                         </thead>
                         <tbody>
-                          {data.recentPublications.map((pub, i) => (
+                          {data.recentPublications.map((pub, i) => {
+                            const idx = pub.url ? indexationResults[pub.url] : null;
+                            return (
                             <tr key={pub.id} className={`border-b border-white/[0.04] hover:bg-white/[0.03] transition-all animate-fade-in-up ${i === data.recentPublications.length - 1 ? "border-b-0" : ""}`} style={{animationDelay: `${i * 60}ms`}}>
                               <td className="px-6 py-4 text-white font-medium max-w-xs truncate text-sm">{pub.title}</td>
                               <td className="px-6 py-4">
@@ -638,6 +678,21 @@ export default function Dashboard() {
                                   Publié
                                 </span>
                               </td>
+                              <td className="px-6 py-4">
+                                {!idx ? (
+                                  <span className="text-gray-700 text-xs">—</span>
+                                ) : idx.indexed === true ? (
+                                  <span className="flex items-center gap-1.5 text-xs font-bold text-green-400">
+                                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full" /> Indexé
+                                  </span>
+                                ) : idx.indexed === false ? (
+                                  <span className="flex items-center gap-1.5 text-xs font-bold text-red-400">
+                                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full" /> Non indexé
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-500 text-xs">Inconnu</span>
+                                )}
+                              </td>
                               <td className="px-6 py-4 text-right">
                                 {pub.url && (
                                   <a href={pub.url} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors">
@@ -646,7 +701,8 @@ export default function Dashboard() {
                                 )}
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
