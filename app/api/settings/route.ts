@@ -14,7 +14,14 @@ export async function GET() {
       .single();
 
     if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json(data);
+    return Response.json({
+      ...data,
+      gsc_connected: !!data.google_access_token,
+      // Never expose tokens to client
+      google_access_token: undefined,
+      google_refresh_token: undefined,
+      google_token_expiry: undefined,
+    });
   } catch (err: unknown) {
     return Response.json({ error: err instanceof Error ? err.message : "Erreur" }, { status: 500 });
   }
@@ -46,6 +53,7 @@ export async function PATCH(request: Request) {
         shopify_api_key: body.shopify_api_key || null,
         wix_api_key: body.wix_api_key || null,
         wix_site_id: body.wix_site_id || null,
+        gsc_site_url: body.gsc_site_url || null,
         keywords,
         frequency: body.frequency,
         target_languages,
