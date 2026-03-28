@@ -9,6 +9,9 @@
     "app/api/cron/publish/route.ts": {
       "maxDuration": 300
     },
+    "app/api/cron/trigger/route.ts": {
+      "maxDuration": 300
+    },
     "app/api/generate/route.ts": {
       "maxDuration": 120
     }
