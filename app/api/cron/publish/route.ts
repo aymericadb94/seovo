@@ -291,6 +291,8 @@ async function publishToShopify(
   return `${baseUrl}/blogs/${blogHandle}/${article.article.handle}`;
 }
 
+export const maxDuration = 60;
+
 // ─── Handler principal ────────────────────────────────────────────────────────
 
 export async function GET(request: Request) {
@@ -299,11 +301,17 @@ export async function GET(request: Request) {
     return Response.json({ error: "Non autorisé" }, { status: 401 });
   }
 
+  // Mode manuel : userId passé en query param → ne traite que ce site
+  const url = new URL(request.url);
+  const userId = url.searchParams.get("userId");
+
   const supabase = createAdminClient();
   const results: { site: string; cms: string; status: string; title?: string; error?: string }[] = [];
 
   try {
-    const { data: sites, error } = await supabase.from("sites").select("*");
+    let query = supabase.from("sites").select("*");
+    if (userId) query = query.eq("user_id", userId);
+    const { data: sites, error } = await query;
 
     if (error) throw new Error(error.message);
     if (!sites || sites.length === 0) {

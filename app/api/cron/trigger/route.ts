@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 
+export const maxDuration = 60;
+
 // Route proxy — appelée par le dashboard, utilise CRON_SECRET côté serveur uniquement
+// En mode manuel, passe userId pour ne traiter que le site de l'utilisateur courant
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -15,7 +18,7 @@ export async function POST(request: Request) {
     }
 
     const origin = new URL(request.url).origin;
-    const res = await fetch(`${origin}/api/cron/publish`, {
+    const res = await fetch(`${origin}/api/cron/publish?userId=${user.id}`, {
       headers: { Authorization: `Bearer ${secret}` },
     });
 
