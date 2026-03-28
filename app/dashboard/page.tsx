@@ -146,6 +146,49 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
+// ─── Custom bar with glow dot ─────────────────────────────────────────────────
+
+function GlowBar(props: { x?: number; y?: number; width?: number; height?: number; value?: number }) {
+  const { x = 0, y = 0, width = 0, height = 0, value = 0 } = props;
+  if (!value || height <= 0) return null;
+  const cx = x + width / 2;
+  return (
+    <g>
+      {/* Barre principale avec filter glow */}
+      <defs>
+        <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#f97316" />
+          <stop offset="100%" stopColor="#ef4444" stopOpacity={0.7} />
+        </linearGradient>
+        <filter id="barGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      {/* Reflet de fond sous la barre */}
+      <rect
+        x={x + width * 0.2} y={y + height * 0.6}
+        width={width * 0.6} height={height * 0.4}
+        rx={3}
+        fill="#f97316"
+        opacity={0.12}
+        filter="url(#barGlow)"
+      />
+      {/* Barre */}
+      <rect
+        x={x} y={y}
+        width={width} height={height}
+        rx={4}
+        fill="url(#barGrad)"
+        filter="url(#barGlow)"
+      />
+      {/* Dot lumineux au sommet */}
+      <circle cx={cx} cy={y} r={4} fill="#f97316" filter="url(#barGlow)" />
+      <circle cx={cx} cy={y} r={2} fill="#fff" opacity={0.9} />
+    </g>
+  );
+}
+
 // ─── Tooltip chart ────────────────────────────────────────────────────────────
 
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
@@ -548,18 +591,26 @@ export default function Dashboard() {
                 )}
 
                 {/* ── Row 2 : Graphique publications ───────────────────── */}
-                <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up delay-200">
-                  <div className="flex items-center justify-between mb-6">
+                <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up delay-200 overflow-hidden">
+                  {/* Halo orange en bas à droite */}
+                  <div className="absolute bottom-0 right-0 w-64 h-40 pointer-events-none"
+                    style={{ background: "radial-gradient(ellipse at bottom right, rgba(249,115,22,0.08) 0%, transparent 70%)" }} />
+
+                  <div className="flex items-center justify-between mb-6 relative">
                     <div>
                       <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Publications automatisées</p>
                       <p className="text-xl font-black text-white">Historique sur 30 jours</p>
                     </div>
-                    <span className="text-xs bg-orange-500/10 text-orange-400 font-bold px-3 py-1.5 rounded-full">
+                    {/* Badge avec sweep shimmer */}
+                    <span className="relative overflow-hidden text-xs bg-orange-500/10 text-orange-400 font-bold px-3 py-1.5 rounded-full">
+                      <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]"
+                        style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.25), transparent)" }} />
                       {kpis?.totalArticles ?? 0} articles au total
                     </span>
                   </div>
+
                   <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={data.pubsChart} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <BarChart data={data.pubsChart} margin={{ top: 12, right: 5, left: -20, bottom: 0 }}>
                       <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
                       <XAxis
                         dataKey="date"
@@ -568,15 +619,14 @@ export default function Dashboard() {
                         interval={4}
                       />
                       <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(249,115,22,0.05)" }} />
-                      <Bar dataKey="articles" fill="url(#barGrad)" radius={[4, 4, 0, 0]}>
-                        <defs>
-                          <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#f97316" />
-                            <stop offset="100%" stopColor="#ef4444" />
-                          </linearGradient>
-                        </defs>
-                      </Bar>
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(249,115,22,0.04)" }} />
+                      <Bar
+                        dataKey="articles"
+                        shape={<GlowBar />}
+                        isAnimationActive={true}
+                        animationDuration={1200}
+                        animationEasing="ease-out"
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
