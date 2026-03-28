@@ -77,7 +77,7 @@ const SHOPIFY_TUTORIAL = {
     { num: "02", title: "Accédez au Dev Dashboard", detail: "Cliquez sur le bouton :", code: "Développer des applications dans le Dev Dashboard" },
     { num: "03", title: "Créez une nouvelle app", detail: "Sur dev.shopify.com, cliquez sur \"Create app\". Donnez-lui le nom :", code: "RankPill" },
     { num: "04", title: "Configurez les accès API", detail: "Dans l'app, allez dans \"Configuration\" → \"Admin API integration\". Activez ces deux autorisations :", permissions: true },
-    { num: "05", title: "Créez une version et publiez", detail: "Allez dans \"Versions\" → \"Créer une version\". Entrez l'URL de l'app :", code: "https://rankpill-vbo3.vercel.app" },
+    { num: "05", title: "Créez une version et publiez", detail: "Allez dans \"Versions\" → \"Créer une version\". Entrez l'URL de l'app :", code: "https://www.rankpill.fr" },
     { num: "06", title: "Installez l'app sur votre boutique", detail: "Cliquez sur \"Publier\", puis installez l'app sur votre boutique depuis le lien d'installation." },
     { num: "07", title: "Copiez le token d'accès", detail: "Dans \"Configuration\" → \"API credentials\", copiez le :", code: "Jeton d'accès à l'API Admin (shpat_...)" },
     { num: "08", title: "Collez le token dans le champ", detail: "Revenez ici et collez le token dans le champ \"Clé API Admin Shopify\" à gauche." },
