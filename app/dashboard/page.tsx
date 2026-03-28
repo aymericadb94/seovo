@@ -259,9 +259,16 @@ export default function Dashboard() {
               Rank<span className="text-shimmer">Pill</span>
             </span>
             {data?.site && (
-              <div className="hidden md:flex items-center gap-2 text-xs text-gray-500">
-                <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse" />
-                {data.site.business_name} · {kpis?.totalArticles ?? 0} articles publiés
+              <div className="hidden md:flex items-center gap-3 text-xs text-gray-500">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse flex-shrink-0" />
+                  {data.site.business_name}
+                </span>
+                <span className="text-gray-700">·</span>
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse flex-shrink-0" />
+                  {kpis?.totalArticles ?? 0} articles publiés
+                </span>
               </div>
             )}
           </div>
