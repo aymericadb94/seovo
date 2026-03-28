@@ -353,25 +353,56 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            {/* Bouton Auto-publier */}
             <button
               onClick={handleManualPublish}
               disabled={cronRunning}
-              className={`text-xs px-3 py-2 rounded-lg border transition-all font-bold flex items-center gap-2 ${
-                cronRunning
-                  ? "text-orange-400 border-orange-500/60 bg-orange-500/10 animate-pulse cursor-not-allowed"
-                  : "text-orange-400 hover:text-white border-orange-500/30 hover:border-orange-500/60"
-              }`}
+              className="group relative flex items-center gap-2 px-4 py-2 rounded-xl border border-orange-500/25 bg-orange-500/[0.06] hover:bg-orange-500/[0.12] hover:border-orange-500/50 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
+              {/* Pulse ring quand en cours */}
+              {cronRunning && (
+                <span className="absolute inset-0 rounded-xl border border-orange-500/40 animate-ping" />
+              )}
               {cronRunning ? (
                 <>
-                  <span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" />
-                  En cours...
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-orange-400 border-t-transparent animate-spin flex-shrink-0" />
+                  <span className="text-xs font-bold text-orange-400">Publication...</span>
                 </>
-              ) : "▶ Publier"}
+              ) : (
+                <>
+                  {/* Icône éclair */}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                    className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors flex-shrink-0">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" stroke="none"/>
+                  </svg>
+                  <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300 transition-colors">Auto</span>
+                  {/* Tooltip au hover */}
+                  <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1a1a1a] border border-white/10 text-gray-400 text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                    Publie automatiquement le prochain mot-clé
+                  </span>
+                </>
+              )}
             </button>
-            <Link href="/generate" className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-4 py-2 rounded-lg text-xs uppercase tracking-wide shadow-lg shadow-orange-500/20">
-              + Générer
+
+            {/* Bouton Créer un article */}
+            <Link
+              href="/generate"
+              className="group relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-xs shadow-lg shadow-orange-500/25 hover:shadow-orange-500/45 transition-all duration-300 hover:scale-[1.03]"
+            >
+              {/* Shimmer sweep */}
+              <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]"
+                style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)" }} />
+              {/* Icône crayon */}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                className="w-3.5 h-3.5 flex-shrink-0 relative">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+              <span className="relative">Créer</span>
+              {/* Tooltip au hover */}
+              <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1a1a1a] border border-white/10 text-gray-400 text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 font-normal">
+                Choisir le mot-clé et prévisualiser avant publication
+              </span>
             </Link>
             <Link href="/settings" className="text-gray-500 hover:text-white text-xs px-3 py-2 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
               ⚙
