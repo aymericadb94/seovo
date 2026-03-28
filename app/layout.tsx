@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SeoCorp — SEO automatisé",
-  description: "SeoCorp génère et publie chaque jour des contenus SEO optimisés sur votre site. Sans rédacteur. Sans agence. Sans effort.",
+  title: "RankPill — SEO automatisé",
+  description: "RankPill génère et publie chaque jour des contenus SEO optimisés sur votre site. Sans rédacteur. Sans agence. Sans effort.",
 };
 
 export default function RootLayout({

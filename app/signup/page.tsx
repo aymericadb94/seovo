@@ -65,7 +65,7 @@ export default function SignupPage() {
       <div className="relative w-full max-w-md">
         <div className="text-center mb-10">
           <Link href="/" className="text-3xl font-black tracking-tight">
-            Seo<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Corp</span>
+            Rank<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Pill</span>
           </Link>
           <p className="text-gray-500 mt-2">{t.auth.signup.subtitle}</p>
         </div>

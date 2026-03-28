@@ -39,7 +39,7 @@ export type Translations = typeof translations.fr;
 export const translations = {
   fr: {
     beta: {
-      banner: "🚀 SeoCorp est en accès Beta — Tarifs réduits pour les premiers testeurs",
+      banner: "🚀 RankPill est en accès Beta — Tarifs réduits pour les premiers testeurs",
       join: "Rejoindre maintenant →",
     },
     nav: {
@@ -53,7 +53,7 @@ export const translations = {
       badge: "Propulsé par notre technologie d'automatisation avancée",
       title1: "Dominez Google.",
       title2: "Automatiquement.",
-      subtitle: "SeoCorp génère et publie chaque jour des contenus SEO optimisés sur votre site. Sans rédacteur. Sans agence. Sans effort.",
+      subtitle: "RankPill génère et publie chaque jour des contenus SEO optimisés sur votre site. Sans rédacteur. Sans agence. Sans effort.",
       cta: "Démarrer maintenant →",
       ctaSecondary: "Voir comment ça marche",
       note: "Sans engagement • Premiers résultats en 48h",
@@ -69,7 +69,7 @@ export const translations = {
       subtitle: "Trois étapes. Zéro complexité.",
       steps: [
         { number: "01", title: "Connectez votre site", description: "WordPress ou Shopify — la connexion prend moins de 2 minutes." },
-        { number: "02", title: "Notre système analyse votre secteur", description: "SeoCorp identifie les mots-clés à fort potentiel pour votre activité." },
+        { number: "02", title: "Notre système analyse votre secteur", description: "RankPill identifie les mots-clés à fort potentiel pour votre activité." },
         { number: "03", title: "Les contenus se publient seuls", description: "Chaque jour, un nouvel article optimisé apparaît sur votre site." },
       ],
     },
@@ -107,7 +107,7 @@ export const translations = {
       note: "Sans carte bancaire • Annulable à tout moment",
     },
     footer: {
-      rights: "© 2025 SeoCorp. Tous droits réservés.",
+      rights: "© 2025 RankPill. Tous droits réservés.",
       privacy: "Confidentialité",
       terms: "CGU",
       contact: "Contact",
@@ -180,7 +180,7 @@ export const translations = {
       steps: ["Votre activité", "Votre site", "Mots-clés"],
       next: "Continuer →",
       back: "← Retour",
-      finish: "Lancer SeoCorp →",
+      finish: "Lancer RankPill →",
       businessName: "Nom de votre entreprise",
       businessNamePlaceholder: "Ex: Boulangerie Dupont",
       industry: "Secteur d'activité",
@@ -229,11 +229,11 @@ export const translations = {
       items: [
         {
           q: "🔒 Est-ce sécurisé de donner l'accès à mon site ?",
-          a: "Totalement. SeoCorp utilise les \"Mots de passe d'application\" de WordPress — un système officiel conçu exactement pour ça. Ce token est différent de votre vrai mot de passe. Il donne uniquement la permission de créer des articles. Vous pouvez le révoquer en un clic depuis votre profil WordPress à n'importe quel moment, sans affecter votre site.",
+          a: "Totalement. RankPill utilise les \"Mots de passe d'application\" de WordPress — un système officiel conçu exactement pour ça. Ce token est différent de votre vrai mot de passe. Il donne uniquement la permission de créer des articles. Vous pouvez le révoquer en un clic depuis votre profil WordPress à n'importe quel moment, sans affecter votre site.",
         },
         {
-          q: "Que peut faire SeoCorp avec mes identifiants ?",
-          a: "Une seule chose : créer des articles de blog. SeoCorp ne peut pas supprimer vos pages, modifier votre thème, accéder à vos commandes ou données clients, changer vos paramètres, ni toucher à quoi que ce soit d'autre. L'API WordPress est cloisonnée par permission — nous n'avons accès qu'à la publication de contenus.",
+          q: "Que peut faire RankPill avec mes identifiants ?",
+          a: "Une seule chose : créer des articles de blog. RankPill ne peut pas supprimer vos pages, modifier votre thème, accéder à vos commandes ou données clients, changer vos paramètres, ni toucher à quoi que ce soit d'autre. L'API WordPress est cloisonnée par permission — nous n'avons accès qu'à la publication de contenus.",
         },
         {
           q: "Comment mes identifiants sont-ils stockés ?",
@@ -241,23 +241,23 @@ export const translations = {
         },
         {
           q: "Google pénalise-t-il le contenu automatisé ?",
-          a: "Non — Google pénalise le contenu de mauvaise qualité, peu importe son origine. SeoCorp génère des articles de 1500+ mots, contextualisés à votre secteur, structurés avec H2/H3/FAQ, et uniques à chaque publication. Ce type de contenu est parfaitement conforme aux guidelines Google et contribue positivement à votre référencement.",
+          a: "Non — Google pénalise le contenu de mauvaise qualité, peu importe son origine. RankPill génère des articles de 1500+ mots, contextualisés à votre secteur, structurés avec H2/H3/FAQ, et uniques à chaque publication. Ce type de contenu est parfaitement conforme aux guidelines Google et contribue positivement à votre référencement.",
         },
         {
           q: "Quand vais-je voir des résultats SEO ?",
           a: "Le SEO prend du temps — c'est une réalité. En général : 2-4 semaines pour que Google indexe les nouveaux articles, 2-3 mois pour les premiers positionnements sur des mots-clés longue traîne, 4-6 mois pour un trafic organique significatif. Plus vous publiez régulièrement, plus l'effet s'accélère.",
         },
         {
-          q: "SeoCorp modifie-t-il mes pages existantes ?",
-          a: "Jamais. SeoCorp crée uniquement de nouveaux articles de blog. Il ne touche pas à vos pages, à votre page d'accueil, à votre menu, ni à aucun contenu existant. Votre site reste exactement comme il est — SeoCorp y ajoute seulement du contenu frais chaque jour.",
+          q: "RankPill modifie-t-il mes pages existantes ?",
+          a: "Jamais. RankPill crée uniquement de nouveaux articles de blog. Il ne touche pas à vos pages, à votre page d'accueil, à votre menu, ni à aucun contenu existant. Votre site reste exactement comme il est — RankPill y ajoute seulement du contenu frais chaque jour.",
         },
         {
           q: "Puis-je modifier ou supprimer les articles publiés ?",
-          a: "Oui, absolument. Les articles sont publiés comme n'importe quel contenu WordPress ou Shopify. Vous pouvez les modifier, les compléter, les supprimer, ou les dépublier directement depuis votre interface d'administration habituelle. SeoCorp n'a aucun contrôle sur le contenu une fois publié.",
+          a: "Oui, absolument. Les articles sont publiés comme n'importe quel contenu WordPress ou Shopify. Vous pouvez les modifier, les compléter, les supprimer, ou les dépublier directement depuis votre interface d'administration habituelle. RankPill n'a aucun contrôle sur le contenu une fois publié.",
         },
         {
           q: "Que se passe-t-il si je résilie mon abonnement ?",
-          a: "Tous les articles déjà publiés restent sur votre site — ils vous appartiennent à 100%. SeoCorp cesse simplement de publier de nouveaux contenus. Vous ne perdez rien de ce qui a déjà été créé.",
+          a: "Tous les articles déjà publiés restent sur votre site — ils vous appartiennent à 100%. RankPill cesse simplement de publier de nouveaux contenus. Vous ne perdez rien de ce qui a déjà été créé.",
         },
       ],
     },
@@ -265,7 +265,7 @@ export const translations = {
 
   en: {
     beta: {
-      banner: "🚀 SeoCorp is in Beta access — Reduced prices for early testers",
+      banner: "🚀 RankPill is in Beta access — Reduced prices for early testers",
       join: "Join now →",
     },
     nav: {
@@ -279,7 +279,7 @@ export const translations = {
       badge: "Powered by our advanced automation technology",
       title1: "Dominate Google.",
       title2: "Automatically.",
-      subtitle: "SeoCorp generates and publishes daily SEO-optimized content on your site. No writer. No agency. No effort.",
+      subtitle: "RankPill generates and publishes daily SEO-optimized content on your site. No writer. No agency. No effort.",
       cta: "Start now →",
       ctaSecondary: "See how it works",
       note: "No commitment • First results in 48h",
@@ -295,7 +295,7 @@ export const translations = {
       subtitle: "Three steps. Zero complexity.",
       steps: [
         { number: "01", title: "Connect your site", description: "WordPress or Shopify — connection takes less than 2 minutes." },
-        { number: "02", title: "Our system analyzes your industry", description: "SeoCorp identifies high-potential keywords for your business." },
+        { number: "02", title: "Our system analyzes your industry", description: "RankPill identifies high-potential keywords for your business." },
         { number: "03", title: "Content publishes itself", description: "Every day, a new optimized article appears on your site." },
       ],
     },
@@ -333,7 +333,7 @@ export const translations = {
       note: "No credit card • Cancel anytime",
     },
     footer: {
-      rights: "© 2025 SeoCorp. All rights reserved.",
+      rights: "© 2025 RankPill. All rights reserved.",
       privacy: "Privacy",
       terms: "Terms",
       contact: "Contact",
@@ -406,7 +406,7 @@ export const translations = {
       steps: ["Your business", "Your site", "Keywords"],
       next: "Continue →",
       back: "← Back",
-      finish: "Launch SeoCorp →",
+      finish: "Launch RankPill →",
       businessName: "Your business name",
       businessNamePlaceholder: "e.g. Dupont Bakery",
       industry: "Industry",
@@ -455,11 +455,11 @@ export const translations = {
       items: [
         {
           q: "🔒 Is it safe to give access to my site?",
-          a: "Absolutely. SeoCorp uses WordPress \"Application Passwords\" — an official system designed exactly for this. This token is different from your real password. It only grants permission to create articles. You can revoke it in one click from your WordPress profile at any time, without affecting your site.",
+          a: "Absolutely. RankPill uses WordPress \"Application Passwords\" — an official system designed exactly for this. This token is different from your real password. It only grants permission to create articles. You can revoke it in one click from your WordPress profile at any time, without affecting your site.",
         },
         {
-          q: "What can SeoCorp do with my credentials?",
-          a: "One thing only: create blog articles. SeoCorp cannot delete your pages, modify your theme, access your orders or customer data, change your settings, or touch anything else. The WordPress API is permission-scoped — we only have access to content publishing.",
+          q: "What can RankPill do with my credentials?",
+          a: "One thing only: create blog articles. RankPill cannot delete your pages, modify your theme, access your orders or customer data, change your settings, or touch anything else. The WordPress API is permission-scoped — we only have access to content publishing.",
         },
         {
           q: "How are my credentials stored?",
@@ -467,23 +467,23 @@ export const translations = {
         },
         {
           q: "Does Google penalize automated content?",
-          a: "No — Google penalizes low-quality content, regardless of its origin. SeoCorp generates 1500+ word articles, contextualized to your industry, structured with H2/H3/FAQ, and unique with each publication. This type of content fully complies with Google guidelines and positively contributes to your rankings.",
+          a: "No — Google penalizes low-quality content, regardless of its origin. RankPill generates 1500+ word articles, contextualized to your industry, structured with H2/H3/FAQ, and unique with each publication. This type of content fully complies with Google guidelines and positively contributes to your rankings.",
         },
         {
           q: "When will I see SEO results?",
           a: "SEO takes time — that's a reality. Generally: 2-4 weeks for Google to index new articles, 2-3 months for first rankings on long-tail keywords, 4-6 months for significant organic traffic. The more regularly you publish, the faster the effect accelerates.",
         },
         {
-          q: "Does SeoCorp modify my existing pages?",
-          a: "Never. SeoCorp only creates new blog articles. It does not touch your pages, homepage, menu, or any existing content. Your site stays exactly as it is — SeoCorp simply adds fresh content every day.",
+          q: "Does RankPill modify my existing pages?",
+          a: "Never. RankPill only creates new blog articles. It does not touch your pages, homepage, menu, or any existing content. Your site stays exactly as it is — RankPill simply adds fresh content every day.",
         },
         {
           q: "Can I edit or delete published articles?",
-          a: "Yes, absolutely. Articles are published like any standard WordPress or Shopify content. You can edit, supplement, delete, or unpublish them directly from your usual admin interface. SeoCorp has no control over content once published.",
+          a: "Yes, absolutely. Articles are published like any standard WordPress or Shopify content. You can edit, supplement, delete, or unpublish them directly from your usual admin interface. RankPill has no control over content once published.",
         },
         {
           q: "What happens if I cancel my subscription?",
-          a: "All already-published articles remain on your site — they are 100% yours. SeoCorp simply stops publishing new content. You lose nothing of what has already been created.",
+          a: "All already-published articles remain on your site — they are 100% yours. RankPill simply stops publishing new content. You lose nothing of what has already been created.",
         },
       ],
     },
@@ -491,7 +491,7 @@ export const translations = {
 
   es: {
     beta: {
-      banner: "🚀 SeoCorp está en acceso Beta — Precios reducidos para los primeros testers",
+      banner: "🚀 RankPill está en acceso Beta — Precios reducidos para los primeros testers",
       join: "Únete ahora →",
     },
     nav: {
@@ -505,7 +505,7 @@ export const translations = {
       badge: "Impulsado por nuestra tecnología de automatización avanzada",
       title1: "Domina Google.",
       title2: "Automáticamente.",
-      subtitle: "SeoCorp genera y publica cada día contenidos SEO optimizados en tu sitio. Sin redactores. Sin agencias. Sin esfuerzo.",
+      subtitle: "RankPill genera y publica cada día contenidos SEO optimizados en tu sitio. Sin redactores. Sin agencias. Sin esfuerzo.",
       cta: "Empezar ahora →",
       ctaSecondary: "Ver cómo funciona",
       note: "Sin compromiso • Primeros resultados en 48h",
@@ -521,7 +521,7 @@ export const translations = {
       subtitle: "Tres pasos. Cero complejidad.",
       steps: [
         { number: "01", title: "Conecta tu sitio", description: "WordPress o Shopify — la conexión tarda menos de 2 minutos." },
-        { number: "02", title: "Nuestro sistema analiza tu sector", description: "SeoCorp identifica las palabras clave con mayor potencial para tu negocio." },
+        { number: "02", title: "Nuestro sistema analiza tu sector", description: "RankPill identifica las palabras clave con mayor potencial para tu negocio." },
         { number: "03", title: "Los contenidos se publican solos", description: "Cada día, un nuevo artículo optimizado aparece en tu sitio." },
       ],
     },
@@ -559,7 +559,7 @@ export const translations = {
       note: "Sin tarjeta bancaria • Cancela cuando quieras",
     },
     footer: {
-      rights: "© 2025 SeoCorp. Todos los derechos reservados.",
+      rights: "© 2025 RankPill. Todos los derechos reservados.",
       privacy: "Privacidad",
       terms: "Términos",
       contact: "Contacto",
@@ -632,7 +632,7 @@ export const translations = {
       steps: ["Tu negocio", "Tu sitio", "Palabras clave"],
       next: "Continuar →",
       back: "← Atrás",
-      finish: "Lanzar SeoCorp →",
+      finish: "Lanzar RankPill →",
       businessName: "Nombre de tu empresa",
       businessNamePlaceholder: "Ej: Panadería Dupont",
       industry: "Sector",
@@ -681,11 +681,11 @@ export const translations = {
       items: [
         {
           q: "🔒 ¿Es seguro dar acceso a mi sitio?",
-          a: "Totalmente. SeoCorp utiliza las \"Contraseñas de aplicación\" de WordPress — un sistema oficial diseñado exactamente para esto. Este token es diferente de tu contraseña real. Solo otorga permiso para crear artículos. Puedes revocarlo con un clic desde tu perfil WordPress en cualquier momento, sin afectar tu sitio.",
+          a: "Totalmente. RankPill utiliza las \"Contraseñas de aplicación\" de WordPress — un sistema oficial diseñado exactamente para esto. Este token es diferente de tu contraseña real. Solo otorga permiso para crear artículos. Puedes revocarlo con un clic desde tu perfil WordPress en cualquier momento, sin afectar tu sitio.",
         },
         {
-          q: "¿Qué puede hacer SeoCorp con mis credenciales?",
-          a: "Solo una cosa: crear artículos de blog. SeoCorp no puede eliminar tus páginas, modificar tu tema, acceder a tus pedidos o datos de clientes, cambiar tu configuración, ni tocar nada más. La API de WordPress está delimitada por permisos — solo tenemos acceso a la publicación de contenido.",
+          q: "¿Qué puede hacer RankPill con mis credenciales?",
+          a: "Solo una cosa: crear artículos de blog. RankPill no puede eliminar tus páginas, modificar tu tema, acceder a tus pedidos o datos de clientes, cambiar tu configuración, ni tocar nada más. La API de WordPress está delimitada por permisos — solo tenemos acceso a la publicación de contenido.",
         },
         {
           q: "¿Cómo se almacenan mis credenciales?",
@@ -693,15 +693,15 @@ export const translations = {
         },
         {
           q: "¿Google penaliza el contenido automatizado?",
-          a: "No — Google penaliza el contenido de baja calidad, independientemente de su origen. SeoCorp genera artículos de 1500+ palabras, contextualizados a tu sector, estructurados con H2/H3/FAQ, y únicos en cada publicación. Este tipo de contenido cumple plenamente con las directrices de Google.",
+          a: "No — Google penaliza el contenido de baja calidad, independientemente de su origen. RankPill genera artículos de 1500+ palabras, contextualizados a tu sector, estructurados con H2/H3/FAQ, y únicos en cada publicación. Este tipo de contenido cumple plenamente con las directrices de Google.",
         },
         {
           q: "¿Cuándo veré resultados SEO?",
           a: "El SEO lleva tiempo — es una realidad. En general: 2-4 semanas para que Google indexe los nuevos artículos, 2-3 meses para las primeras posiciones en palabras clave de cola larga, 4-6 meses para tráfico orgánico significativo.",
         },
         {
-          q: "¿SeoCorp modifica mis páginas existentes?",
-          a: "Nunca. SeoCorp solo crea nuevos artículos de blog. No toca tus páginas, página de inicio, menú, ni ningún contenido existente. Tu sitio permanece exactamente como está — SeoCorp simplemente añade contenido fresco cada día.",
+          q: "¿RankPill modifica mis páginas existentes?",
+          a: "Nunca. RankPill solo crea nuevos artículos de blog. No toca tus páginas, página de inicio, menú, ni ningún contenido existente. Tu sitio permanece exactamente como está — RankPill simplemente añade contenido fresco cada día.",
         },
         {
           q: "¿Puedo editar o eliminar los artículos publicados?",
@@ -709,7 +709,7 @@ export const translations = {
         },
         {
           q: "¿Qué pasa si cancelo mi suscripción?",
-          a: "Todos los artículos ya publicados permanecen en tu sitio — son 100% tuyos. SeoCorp simplemente deja de publicar nuevo contenido. No pierdes nada de lo que ya se ha creado.",
+          a: "Todos los artículos ya publicados permanecen en tu sitio — son 100% tuyos. RankPill simplemente deja de publicar nuevo contenido. No pierdes nada de lo que ya se ha creado.",
         },
       ],
     },
@@ -717,7 +717,7 @@ export const translations = {
 
   de: {
     beta: {
-      banner: "🚀 SeoCorp ist im Beta-Zugang — Reduzierte Preise für erste Tester",
+      banner: "🚀 RankPill ist im Beta-Zugang — Reduzierte Preise für erste Tester",
       join: "Jetzt beitreten →",
     },
     nav: {
@@ -731,7 +731,7 @@ export const translations = {
       badge: "Angetrieben von unserer fortschrittlichen Automatisierungstechnologie",
       title1: "Google dominieren.",
       title2: "Automatisch.",
-      subtitle: "SeoCorp erstellt und veröffentlicht täglich SEO-optimierte Inhalte auf Ihrer Website. Ohne Texter. Ohne Agentur. Ohne Aufwand.",
+      subtitle: "RankPill erstellt und veröffentlicht täglich SEO-optimierte Inhalte auf Ihrer Website. Ohne Texter. Ohne Agentur. Ohne Aufwand.",
       cta: "Jetzt starten →",
       ctaSecondary: "Sehen wie es funktioniert",
       note: "Ohne Verpflichtung • Erste Ergebnisse in 48h",
@@ -747,7 +747,7 @@ export const translations = {
       subtitle: "Drei Schritte. Null Komplexität.",
       steps: [
         { number: "01", title: "Verbinden Sie Ihre Website", description: "WordPress oder Shopify — die Verbindung dauert weniger als 2 Minuten." },
-        { number: "02", title: "Unser System analysiert Ihre Branche", description: "SeoCorp identifiziert hochpotenzielle Keywords für Ihr Unternehmen." },
+        { number: "02", title: "Unser System analysiert Ihre Branche", description: "RankPill identifiziert hochpotenzielle Keywords für Ihr Unternehmen." },
         { number: "03", title: "Inhalte veröffentlichen sich selbst", description: "Jeden Tag erscheint ein neuer optimierter Artikel auf Ihrer Website." },
       ],
     },
@@ -785,7 +785,7 @@ export const translations = {
       note: "Keine Kreditkarte • Jederzeit kündbar",
     },
     footer: {
-      rights: "© 2025 SeoCorp. Alle Rechte vorbehalten.",
+      rights: "© 2025 RankPill. Alle Rechte vorbehalten.",
       privacy: "Datenschutz",
       terms: "AGB",
       contact: "Kontakt",
@@ -858,7 +858,7 @@ export const translations = {
       steps: ["Ihr Unternehmen", "Ihre Website", "Keywords"],
       next: "Weiter →",
       back: "← Zurück",
-      finish: "SeoCorp starten →",
+      finish: "RankPill starten →",
       businessName: "Ihr Unternehmensname",
       businessNamePlaceholder: "z.B. Bäckerei Müller",
       industry: "Branche",
@@ -907,11 +907,11 @@ export const translations = {
       items: [
         {
           q: "🔒 Ist es sicher, meiner Website Zugang zu geben?",
-          a: "Absolut. SeoCorp verwendet WordPress \"Anwendungspasswörter\" — ein offizielles System, das genau dafür entwickelt wurde. Dieses Token unterscheidet sich von Ihrem echten Passwort. Es gewährt nur die Berechtigung, Artikel zu erstellen. Sie können es mit einem Klick aus Ihrem WordPress-Profil jederzeit widerrufen, ohne Ihre Website zu beeinträchtigen.",
+          a: "Absolut. RankPill verwendet WordPress \"Anwendungspasswörter\" — ein offizielles System, das genau dafür entwickelt wurde. Dieses Token unterscheidet sich von Ihrem echten Passwort. Es gewährt nur die Berechtigung, Artikel zu erstellen. Sie können es mit einem Klick aus Ihrem WordPress-Profil jederzeit widerrufen, ohne Ihre Website zu beeinträchtigen.",
         },
         {
-          q: "Was kann SeoCorp mit meinen Zugangsdaten tun?",
-          a: "Nur eine Sache: Blog-Artikel erstellen. SeoCorp kann Ihre Seiten nicht löschen, Ihr Theme nicht ändern, auf Ihre Bestellungen oder Kundendaten nicht zugreifen, Ihre Einstellungen nicht ändern oder sonst etwas berühren. Die WordPress-API ist berechtigungsbasiert — wir haben nur Zugang zur Inhaltsveröffentlichung.",
+          q: "Was kann RankPill mit meinen Zugangsdaten tun?",
+          a: "Nur eine Sache: Blog-Artikel erstellen. RankPill kann Ihre Seiten nicht löschen, Ihr Theme nicht ändern, auf Ihre Bestellungen oder Kundendaten nicht zugreifen, Ihre Einstellungen nicht ändern oder sonst etwas berühren. Die WordPress-API ist berechtigungsbasiert — wir haben nur Zugang zur Inhaltsveröffentlichung.",
         },
         {
           q: "Wie werden meine Zugangsdaten gespeichert?",
@@ -919,15 +919,15 @@ export const translations = {
         },
         {
           q: "Bestraft Google automatisierten Inhalt?",
-          a: "Nein — Google bestraft qualitativ schlechten Inhalt, unabhängig von seiner Herkunft. SeoCorp generiert Artikel mit 1500+ Wörtern, auf Ihre Branche zugeschnitten, strukturiert mit H2/H3/FAQ und bei jeder Veröffentlichung einzigartig. Diese Art von Inhalt entspricht vollständig den Google-Richtlinien.",
+          a: "Nein — Google bestraft qualitativ schlechten Inhalt, unabhängig von seiner Herkunft. RankPill generiert Artikel mit 1500+ Wörtern, auf Ihre Branche zugeschnitten, strukturiert mit H2/H3/FAQ und bei jeder Veröffentlichung einzigartig. Diese Art von Inhalt entspricht vollständig den Google-Richtlinien.",
         },
         {
           q: "Wann werde ich SEO-Ergebnisse sehen?",
           a: "SEO braucht Zeit — das ist eine Realität. Im Allgemeinen: 2-4 Wochen damit Google neue Artikel indexiert, 2-3 Monate für erste Rankings bei Long-Tail-Keywords, 4-6 Monate für signifikanten organischen Traffic.",
         },
         {
-          q: "Ändert SeoCorp meine bestehenden Seiten?",
-          a: "Niemals. SeoCorp erstellt nur neue Blog-Artikel. Es berührt nicht Ihre Seiten, Startseite, Menü oder bestehende Inhalte. Ihre Website bleibt genau so wie sie ist — SeoCorp fügt täglich nur frischen Inhalt hinzu.",
+          q: "Ändert RankPill meine bestehenden Seiten?",
+          a: "Niemals. RankPill erstellt nur neue Blog-Artikel. Es berührt nicht Ihre Seiten, Startseite, Menü oder bestehende Inhalte. Ihre Website bleibt genau so wie sie ist — RankPill fügt täglich nur frischen Inhalt hinzu.",
         },
         {
           q: "Kann ich veröffentlichte Artikel bearbeiten oder löschen?",
@@ -935,7 +935,7 @@ export const translations = {
         },
         {
           q: "Was passiert, wenn ich mein Abonnement kündige?",
-          a: "Alle bereits veröffentlichten Artikel bleiben auf Ihrer Website — sie gehören zu 100% Ihnen. SeoCorp veröffentlicht einfach keine neuen Inhalte mehr. Sie verlieren nichts von dem, was bereits erstellt wurde.",
+          a: "Alle bereits veröffentlichten Artikel bleiben auf Ihrer Website — sie gehören zu 100% Ihnen. RankPill veröffentlicht einfach keine neuen Inhalte mehr. Sie verlieren nichts von dem, was bereits erstellt wurde.",
         },
       ],
     },
@@ -943,7 +943,7 @@ export const translations = {
 
   it: {
     beta: {
-      banner: "🚀 SeoCorp è in accesso Beta — Prezzi ridotti per i primi tester",
+      banner: "🚀 RankPill è in accesso Beta — Prezzi ridotti per i primi tester",
       join: "Unisciti ora →",
     },
     nav: {
@@ -957,7 +957,7 @@ export const translations = {
       badge: "Alimentato dalla nostra tecnologia di automazione avanzata",
       title1: "Domina Google.",
       title2: "Automaticamente.",
-      subtitle: "SeoCorp genera e pubblica ogni giorno contenuti SEO ottimizzati sul tuo sito. Senza redattori. Senza agenzie. Senza sforzo.",
+      subtitle: "RankPill genera e pubblica ogni giorno contenuti SEO ottimizzati sul tuo sito. Senza redattori. Senza agenzie. Senza sforzo.",
       cta: "Inizia ora →",
       ctaSecondary: "Vedi come funziona",
       note: "Senza impegno • Primi risultati in 48h",
@@ -973,7 +973,7 @@ export const translations = {
       subtitle: "Tre passi. Zero complessità.",
       steps: [
         { number: "01", title: "Connetti il tuo sito", description: "WordPress o Shopify — la connessione richiede meno di 2 minuti." },
-        { number: "02", title: "Il nostro sistema analizza il tuo settore", description: "SeoCorp identifica le parole chiave ad alto potenziale per la tua attività." },
+        { number: "02", title: "Il nostro sistema analizza il tuo settore", description: "RankPill identifica le parole chiave ad alto potenziale per la tua attività." },
         { number: "03", title: "I contenuti si pubblicano da soli", description: "Ogni giorno, un nuovo articolo ottimizzato appare sul tuo sito." },
       ],
     },
@@ -1011,7 +1011,7 @@ export const translations = {
       note: "Senza carta di credito • Annullabile in qualsiasi momento",
     },
     footer: {
-      rights: "© 2025 SeoCorp. Tutti i diritti riservati.",
+      rights: "© 2025 RankPill. Tutti i diritti riservati.",
       privacy: "Privacy",
       terms: "Termini",
       contact: "Contatto",
@@ -1084,7 +1084,7 @@ export const translations = {
       steps: ["La tua attività", "Il tuo sito", "Parole chiave"],
       next: "Continua →",
       back: "← Indietro",
-      finish: "Lancia SeoCorp →",
+      finish: "Lancia RankPill →",
       businessName: "Nome della tua azienda",
       businessNamePlaceholder: "Es: Panetteria Rossi",
       industry: "Settore",
@@ -1133,11 +1133,11 @@ export const translations = {
       items: [
         {
           q: "🔒 È sicuro dare accesso al mio sito?",
-          a: "Assolutamente. SeoCorp utilizza le \"Password applicazione\" di WordPress — un sistema ufficiale progettato esattamente per questo. Questo token è diverso dalla tua vera password. Concede solo il permesso di creare articoli. Puoi revocarlo con un clic dal tuo profilo WordPress in qualsiasi momento, senza influire sul tuo sito.",
+          a: "Assolutamente. RankPill utilizza le \"Password applicazione\" di WordPress — un sistema ufficiale progettato esattamente per questo. Questo token è diverso dalla tua vera password. Concede solo il permesso di creare articoli. Puoi revocarlo con un clic dal tuo profilo WordPress in qualsiasi momento, senza influire sul tuo sito.",
         },
         {
-          q: "Cosa può fare SeoCorp con le mie credenziali?",
-          a: "Solo una cosa: creare articoli di blog. SeoCorp non può eliminare le tue pagine, modificare il tuo tema, accedere ai tuoi ordini o dati clienti, modificare le tue impostazioni o toccare qualsiasi altra cosa. L'API WordPress è delimitata da permessi — abbiamo accesso solo alla pubblicazione di contenuti.",
+          q: "Cosa può fare RankPill con le mie credenziali?",
+          a: "Solo una cosa: creare articoli di blog. RankPill non può eliminare le tue pagine, modificare il tuo tema, accedere ai tuoi ordini o dati clienti, modificare le tue impostazioni o toccare qualsiasi altra cosa. L'API WordPress è delimitata da permessi — abbiamo accesso solo alla pubblicazione di contenuti.",
         },
         {
           q: "Come vengono memorizzate le mie credenziali?",
@@ -1145,15 +1145,15 @@ export const translations = {
         },
         {
           q: "Google penalizza i contenuti automatizzati?",
-          a: "No — Google penalizza i contenuti di bassa qualità, indipendentemente dalla loro origine. SeoCorp genera articoli di 1500+ parole, contestualizzati al tuo settore, strutturati con H2/H3/FAQ e unici ad ogni pubblicazione. Questo tipo di contenuto è pienamente conforme alle linee guida di Google.",
+          a: "No — Google penalizza i contenuti di bassa qualità, indipendentemente dalla loro origine. RankPill genera articoli di 1500+ parole, contestualizzati al tuo settore, strutturati con H2/H3/FAQ e unici ad ogni pubblicazione. Questo tipo di contenuto è pienamente conforme alle linee guida di Google.",
         },
         {
           q: "Quando vedrò risultati SEO?",
           a: "Il SEO richiede tempo — è una realtà. In generale: 2-4 settimane perché Google indicizzi i nuovi articoli, 2-3 mesi per i primi posizionamenti su parole chiave a coda lunga, 4-6 mesi per traffico organico significativo.",
         },
         {
-          q: "SeoCorp modifica le mie pagine esistenti?",
-          a: "Mai. SeoCorp crea solo nuovi articoli di blog. Non tocca le tue pagine, la tua homepage, il menu o nessun contenuto esistente. Il tuo sito rimane esattamente com'è — SeoCorp aggiunge semplicemente contenuto fresco ogni giorno.",
+          q: "RankPill modifica le mie pagine esistenti?",
+          a: "Mai. RankPill crea solo nuovi articoli di blog. Non tocca le tue pagine, la tua homepage, il menu o nessun contenuto esistente. Il tuo sito rimane esattamente com'è — RankPill aggiunge semplicemente contenuto fresco ogni giorno.",
         },
         {
           q: "Posso modificare o eliminare gli articoli pubblicati?",
@@ -1161,7 +1161,7 @@ export const translations = {
         },
         {
           q: "Cosa succede se cancello il mio abbonamento?",
-          a: "Tutti gli articoli già pubblicati rimangono sul tuo sito — sono al 100% tuoi. SeoCorp smette semplicemente di pubblicare nuovi contenuti. Non perdi nulla di ciò che è già stato creato.",
+          a: "Tutti gli articoli già pubblicati rimangono sul tuo sito — sono al 100% tuoi. RankPill smette semplicemente di pubblicare nuovi contenuti. Non perdi nulla di ciò che è già stato creato.",
         },
       ],
     },

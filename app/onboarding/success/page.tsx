@@ -36,7 +36,7 @@ export default function OnboardingSuccess() {
 
         {/* Logo */}
         <div className="text-2xl font-black tracking-tight mb-12">
-          Seo<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Corp</span>
+          Rank<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Pill</span>
         </div>
 
         {/* Icône centrale */}
@@ -49,7 +49,7 @@ export default function OnboardingSuccess() {
 
         {/* Titre */}
         <h1 className="text-4xl font-black mb-3 tracking-tight">
-          SeoCorp est{" "}
+          RankPill est{" "}
           <span className="bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
             opérationnel
           </span>

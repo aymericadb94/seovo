@@ -232,7 +232,7 @@ export default function Dashboard() {
         <div className="max-w-screen-xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="text-xl font-black tracking-tight logo-glow cursor-default">
-              Seo<span className="text-shimmer">Corp</span>
+              Rank<span className="text-shimmer">Pill</span>
             </span>
             {data?.site && (
               <div className="hidden md:flex items-center gap-2 text-xs text-gray-500">

@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-const FROM = process.env.RESEND_FROM ?? "SeoCorp <onboarding@resend.dev>";
+const FROM = process.env.RESEND_FROM ?? "RankPill <onboarding@resend.dev>";
 
 export async function sendArticlePublishedEmail(params: {
   to: string;
@@ -77,7 +77,7 @@ export async function sendArticlePublishedEmail(params: {
         <tr>
           <td style="padding:24px 40px;border-top:1px solid #1f1f1f;">
             <p style="margin:0;font-size:12px;color:#444;text-align:center;">
-              SeoCorp publie automatiquement du contenu SEO sur votre site.<br>
+              RankPill publie automatiquement du contenu SEO sur votre site.<br>
               Vous recevez cet email car un article a été publié sur <strong style="color:#666;">${businessName}</strong>.
             </p>
           </td>

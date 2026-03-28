@@ -49,7 +49,7 @@ const WP_TUTORIAL = {
       num: "03",
       title: "Créez un mot de passe d'application",
       detail: "Descendez jusqu'à la section \"Mots de passe d'application\". Dans le champ \"Nom du mot de passe\", tapez :",
-      code: "SeoCorp",
+      code: "RankPill",
     },
     {
       num: "04",
@@ -94,7 +94,7 @@ const SHOPIFY_TUTORIAL = {
       num: "03",
       title: "Créez une nouvelle app",
       detail: "Sur dev.shopify.com, cliquez sur \"Create app\". Donnez-lui le nom :",
-      code: "SeoCorp",
+      code: "RankPill",
     },
     {
       num: "04",
@@ -106,7 +106,7 @@ const SHOPIFY_TUTORIAL = {
       num: "05",
       title: "Créez une version et publiez",
       detail: "Allez dans \"Versions\" → \"Créer une version\". Entrez l'URL de l'app :",
-      code: "https://seocorp-vbo3.vercel.app",
+      code: "https://rankpill-vbo3.vercel.app",
     },
     {
       num: "06",
@@ -150,7 +150,7 @@ const WIX_TUTORIAL = {
       num: "03",
       title: "Créez une nouvelle clé API",
       detail: "Cliquez sur \"Générer une clé API\". Donnez-lui le nom :",
-      code: "SeoCorp",
+      code: "RankPill",
     },
     {
       num: "04",
@@ -339,7 +339,7 @@ export default function OnboardingPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="text-3xl font-black tracking-tight">
-            Seo<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Corp</span>
+            Rank<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Pill</span>
           </Link>
           <p className="text-gray-500 mt-2 text-sm">{t.onboarding.subtitle}</p>
         </div>

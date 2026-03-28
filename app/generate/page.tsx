@@ -160,7 +160,7 @@ export default function GeneratePage() {
         <div className="mb-10">
           <div className="flex items-center justify-between mb-6">
             <Link href="/dashboard" className="text-2xl font-black tracking-tight">
-              Seo<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Corp</span>
+              Rank<span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Pill</span>
             </Link>
             <Link
               href="/dashboard"
