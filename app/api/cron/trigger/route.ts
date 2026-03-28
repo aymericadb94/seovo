@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Route proxy — appelée par le dashboard, utilise CRON_SECRET côté serveur uniquement
 // En mode manuel, passe userId pour ne traiter que le site de l'utilisateur courant

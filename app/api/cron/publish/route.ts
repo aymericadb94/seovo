@@ -291,7 +291,7 @@ async function publishToShopify(
   return `${baseUrl}/blogs/${blogHandle}/${article.article.handle}`;
 }
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // ─── Handler principal ────────────────────────────────────────────────────────
 
