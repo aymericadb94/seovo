@@ -764,57 +764,114 @@ export default function Dashboard() {
                 {/* Stat rapide */}
                 <div className="grid grid-cols-3 gap-4">
                   {[
-                    { label: "Total", value: kpis?.totalArticles ?? 0 },
-                    { label: "Ce mois", value: kpis?.articlesThisMonth ?? 0 },
-                    { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0 },
+                    { label: "Total", value: kpis?.totalArticles ?? 0, icon: (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                      </svg>), color: "#f97316", delay: "0ms" },
+                    { label: "Ce mois", value: kpis?.articlesThisMonth ?? 0, icon: (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>), color: "#fb923c", delay: "100ms" },
+                    { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, icon: (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                      </svg>), color: "#ef4444", delay: "200ms" },
                   ].map(s => (
-                    <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 text-center">
-                      <p className="text-3xl font-black text-white">{s.value}</p>
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mt-1">{s.label}</p>
+                    <div key={s.label}
+                      className="relative group bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden"
+                      style={{ animationDelay: s.delay }}
+                    >
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+                        style={{ background: `radial-gradient(ellipse at top right, ${s.color}12, transparent 60%)` }} />
+                      <div className="flex items-center justify-between mb-4">
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">{s.label}</p>
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                          style={{ background: `${s.color}15`, color: s.color }}>
+                          {s.icon}
+                        </div>
+                      </div>
+                      <p className="text-4xl font-black text-white tracking-tight">{s.value}</p>
+                      <div className="mt-3 h-0.5 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className="h-full rounded-full animate-[sweep_3s_ease-in-out_infinite]"
+                          style={{ background: `linear-gradient(90deg, transparent, ${s.color}60, transparent)` }} />
+                      </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Graphique */}
-                <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-                  <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-5">Publications par jour — 30 jours</p>
+                {/* Graphique area */}
+                <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 overflow-hidden animate-fade-in-up delay-200">
+                  <div className="absolute bottom-0 left-0 w-72 h-48 pointer-events-none"
+                    style={{ background: "radial-gradient(ellipse at bottom left, rgba(249,115,22,0.07) 0%, transparent 70%)" }} />
+                  <div className="flex items-center justify-between mb-5 relative">
+                    <div>
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Publications par jour</p>
+                      <p className="text-xl font-black text-white">30 derniers jours</p>
+                    </div>
+                    <span className="relative overflow-hidden text-xs bg-orange-500/10 text-orange-400 font-bold px-3 py-1.5 rounded-full">
+                      <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]"
+                        style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.25), transparent)" }} />
+                      {kpis?.totalArticles ?? 0} au total
+                    </span>
+                  </div>
                   <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={data.pubsChart} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <AreaChart data={data.pubsChart} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#f97316" stopOpacity={0.4} />
-                          <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+                        <linearGradient id="areaGrad2" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
+                          <stop offset="85%" stopColor="#ef4444" stopOpacity={0} />
                         </linearGradient>
+                        <filter id="areaGlow" x="-5%" y="-30%" width="110%" height="160%">
+                          <feGaussianBlur stdDeviation="3" result="blur"/>
+                          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
                       </defs>
                       <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
                       <XAxis dataKey="date" tick={{ fill: "#4b5563", fontSize: 10 }} axisLine={false} tickLine={false} interval={4} />
                       <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Area type="monotone" dataKey="articles" stroke="#f97316" strokeWidth={2} fill="url(#areaGrad)" />
+                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(249,115,22,0.2)", strokeWidth: 1 }} />
+                      <Area type="monotone" dataKey="articles"
+                        stroke="#f97316" strokeWidth={2.5} fill="url(#areaGrad2)"
+                        filter="url(#areaGlow)"
+                        isAnimationActive={true} animationDuration={1400} animationEasing="ease-out"
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
 
                 {/* Table complète */}
-                <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
+                <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden animate-fade-in-up delay-300">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
-                    <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Tous les articles publiés</p>
+                    <div>
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-0.5">Tous les articles publiés</p>
+                    </div>
                     <div className="flex items-center gap-3">
                       {data.site?.gsc_connected && data.site?.gsc_site_url && (
                         <button
                           onClick={checkIndexation}
                           disabled={indexationLoading}
-                          className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 transition-all disabled:opacity-40"
+                          className="group flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 transition-all disabled:opacity-40"
                         >
                           {indexationLoading ? (
                             <><span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" /> Vérification...</>
                           ) : (
-                            <><span>🔍</span> Vérifier l&apos;indexation</>
+                            <>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform">
+                                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                              </svg>
+                              Vérifier l&apos;indexation
+                            </>
                           )}
                         </button>
                       )}
-                      <Link href="/generate" className="text-orange-400 hover:text-orange-300 text-xs font-bold uppercase tracking-wide transition-colors">
-                        + Générer un article
+                      <Link href="/generate"
+                        className="group relative overflow-hidden flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 hover:border-orange-500/50 text-orange-400 hover:text-orange-300 transition-all">
+                        <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]"
+                          style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.15), transparent)" }} />
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 relative">
+                          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                        </svg>
+                        <span className="relative">+ Créer un article</span>
                       </Link>
                     </div>
                   </div>
