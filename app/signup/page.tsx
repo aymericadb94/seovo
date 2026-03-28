@@ -106,12 +106,15 @@ export default function SignupPage() {
           </button>
         </form>
 
-        <p className="text-center text-gray-500 text-sm mt-6">
-          {t.auth.signup.hasAccount}{" "}
-          <Link href="/login" className="text-orange-400 hover:text-orange-300 font-bold transition-colors">
-            {t.auth.signup.login}
+        {/* Toggle Créer / Connecter */}
+        <div className="flex mt-6 bg-white/[0.04] border border-white/[0.08] rounded-xl p-1 gap-1">
+          <span className="flex-1 text-center text-sm font-black py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md shadow-orange-500/20 cursor-default">
+            Créer un compte
+          </span>
+          <Link href="/login" className="flex-1 text-center text-sm font-bold py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/[0.06] transition-all">
+            Se connecter
           </Link>
-        </p>
+        </div>
       </div>
     </main>
   );

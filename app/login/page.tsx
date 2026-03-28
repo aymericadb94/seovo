@@ -93,12 +93,15 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-gray-500 text-sm mt-6">
-          {t.auth.login.noAccount}{" "}
-          <Link href="/signup" className="text-orange-400 hover:text-orange-300 font-bold transition-colors">
-            {t.auth.login.createAccount}
+        {/* Toggle Créer / Connecter */}
+        <div className="flex mt-6 bg-white/[0.04] border border-white/[0.08] rounded-xl p-1 gap-1">
+          <Link href="/signup" className="flex-1 text-center text-sm font-bold py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/[0.06] transition-all">
+            Créer un compte
           </Link>
-        </p>
+          <span className="flex-1 text-center text-sm font-black py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md shadow-orange-500/20 cursor-default">
+            Se connecter
+          </span>
+        </div>
       </div>
     </main>
   );
