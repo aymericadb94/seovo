@@ -16,9 +16,9 @@ export async function GET(request: Request) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
+      client_id: process.env.GOOGLE_CLIENT_ID ?? "",
+      client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI ?? "",
       grant_type: "authorization_code",
     }),
   });
@@ -27,10 +27,15 @@ export async function GET(request: Request) {
     access_token?: string;
     refresh_token?: string;
     expires_in?: number;
+    error?: string;
+    error_description?: string;
   };
 
+  console.error("[GSC callback] token exchange:", JSON.stringify({ status: tokenRes.status, error: tokens.error, desc: tokens.error_description, hasToken: !!tokens.access_token }));
+
   if (!tokens.access_token) {
-    return Response.redirect(`${appUrl}/settings?gsc=error`);
+    const reason = encodeURIComponent(tokens.error_description ?? tokens.error ?? "token_exchange_failed");
+    return Response.redirect(`${appUrl}/settings?gsc=error&reason=${reason}`);
   }
 
   const supabase = await createClient();

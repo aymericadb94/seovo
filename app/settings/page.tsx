@@ -44,7 +44,11 @@ export default function SettingsPage() {
     // Detect GSC OAuth redirect result
     const params = new URLSearchParams(window.location.search);
     if (params.get("gsc") === "success") setGscMsg("success");
-    if (params.get("gsc") === "error") setGscMsg("error");
+    if (params.get("gsc") === "error") {
+      const reason = params.get("reason");
+      console.error("[GSC] error reason:", reason);
+      setGscMsg("error");
+    }
 
     fetch("/api/settings")
       .then((r) => r.json())
