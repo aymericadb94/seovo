@@ -30,10 +30,13 @@ type DashboardData = {
     totalKeywords: number;
     seoScore: number;
     nextPublicationIn: string;
+    streak: number;
+    bestStreak: number;
   };
   pubsChart: { date: string; articles: number }[];
   keywordStats: { keyword: string; count: number; lastPublished: string | null }[];
   uncoveredKeywords: string[];
+  calendarData: { date: string; count: number }[];
   recentPublications: {
     id: string;
     title: string;
@@ -160,7 +163,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [cronRunning, setCronRunning] = useState(false);
   const [cronResult, setCronResult] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "publications" | "keywords">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "publications" | "keywords" | "calendar">("overview");
   const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null); // null = inconnu, attente des données
 
   async function loadData() {
@@ -240,7 +243,7 @@ export default function Dashboard() {
 
           {/* Tabs */}
           <div className="flex items-center gap-1 bg-white/[0.04] rounded-lg p-1">
-            {(["overview", "publications", "keywords"] as const).map((tab) => (
+            {(["overview", "publications", "keywords", "calendar"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -250,7 +253,7 @@ export default function Dashboard() {
                     : "text-gray-500 hover:text-white"
                 }`}
               >
-                {tab === "overview" ? "Vue d'ensemble" : tab === "publications" ? "Publications" : "Mots-clés"}
+                {tab === "overview" ? "Vue d'ensemble" : tab === "publications" ? "Publications" : tab === "keywords" ? "Mots-clés" : "Calendrier"}
               </button>
             ))}
           </div>
@@ -380,6 +383,23 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {/* ── Streak banner ─────────────────────────────────── */}
+                {(kpis?.streak ?? 0) > 0 && (
+                  <div className="bg-gradient-to-r from-orange-500/10 to-red-500/5 border border-orange-500/20 rounded-2xl px-6 py-4 flex items-center justify-between animate-fade-in-up delay-150">
+                    <div className="flex items-center gap-4">
+                      <span className="text-3xl">{(kpis?.streak ?? 0) >= 7 ? "🔥" : (kpis?.streak ?? 0) >= 3 ? "⚡" : "✦"}</span>
+                      <div>
+                        <p className="text-white font-black text-lg">{kpis?.streak} jour{(kpis?.streak ?? 0) > 1 ? "s" : ""} de suite</p>
+                        <p className="text-gray-500 text-xs">Streak de publication actuel</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-orange-400 font-black text-2xl">{kpis?.bestStreak}</p>
+                      <p className="text-gray-600 text-xs">Meilleur streak</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* ── Row 2 : Graphique publications ───────────────────── */}
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up delay-200">
                   <div className="flex items-center justify-between mb-6">
@@ -434,10 +454,19 @@ export default function Dashboard() {
                     )}
                     {data.uncoveredKeywords.length > 0 && (
                       <div className="mt-5 pt-4 border-t border-white/[0.05]">
-                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-3">Pas encore couverts</p>
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">À couvrir en priorité</p>
+                          <span className="text-xs text-orange-400 font-bold">{data.uncoveredKeywords.length} restant{data.uncoveredKeywords.length > 1 ? "s" : ""}</span>
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                          {data.uncoveredKeywords.map(kw => (
-                            <span key={kw} className="bg-white/[0.04] border border-white/[0.08] text-gray-400 text-xs px-3 py-1 rounded-full">
+                          {data.uncoveredKeywords.slice(0, 3).map(kw => (
+                            <span key={kw} className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs px-3 py-1.5 rounded-full font-medium">
+                              <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse" />
+                              {kw}
+                            </span>
+                          ))}
+                          {data.uncoveredKeywords.slice(3).map(kw => (
+                            <span key={kw} className="bg-white/[0.04] border border-white/[0.08] text-gray-500 text-xs px-3 py-1.5 rounded-full">
                               {kw}
                             </span>
                           ))}
@@ -666,6 +695,112 @@ export default function Dashboard() {
                     <p className="text-gray-600 text-xs mt-1">Couvre le prochain mot-clé non traité</p>
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* ════════════════════════════════════════════════════════════
+                TAB 4 — CALENDRIER
+            ════════════════════════════════════════════════════════════ */}
+            {activeTab === "calendar" && (
+              <div className="space-y-5">
+
+                {/* Streak summary */}
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: "Streak actuel", value: kpis?.streak ?? 0, icon: (kpis?.streak ?? 0) >= 7 ? "🔥" : (kpis?.streak ?? 0) >= 3 ? "⚡" : "✦", suffix: "j" },
+                    { label: "Meilleure streak", value: kpis?.bestStreak ?? 0, icon: "🏆", suffix: "j" },
+                    { label: "Jours publiés / 90j", value: data.calendarData.filter(d => d.count > 0).length, icon: "📅", suffix: "" },
+                  ].map(s => (
+                    <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 text-center card-hover">
+                      <p className="text-2xl mb-1">{s.icon}</p>
+                      <p className="text-3xl font-black text-white">{s.value}{s.suffix}</p>
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mt-1">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Heatmap 90 jours */}
+                <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover">
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Activité éditoriale</p>
+                      <p className="text-xl font-black text-white">90 derniers jours</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                      <span>Moins</span>
+                      {["bg-white/[0.05]", "bg-orange-900/60", "bg-orange-600/60", "bg-orange-500", "bg-orange-400"].map((c, i) => (
+                        <div key={i} className={`w-3 h-3 rounded-sm ${c}`} />
+                      ))}
+                      <span>Plus</span>
+                    </div>
+                  </div>
+                  <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(13, minmax(0, 1fr))" }}>
+                    {Array.from({ length: 13 }).map((_, weekIdx) => (
+                      <div key={weekIdx} className="flex flex-col gap-1">
+                        {Array.from({ length: 7 }).map((_, dayIdx) => {
+                          const cellIdx = weekIdx * 7 + dayIdx;
+                          const entry = data.calendarData[cellIdx];
+                          if (!entry) return <div key={dayIdx} className="w-full aspect-square" />;
+                          const intensity = entry.count === 0 ? 0 : entry.count === 1 ? 1 : entry.count === 2 ? 2 : entry.count >= 3 ? 3 : 3;
+                          const colors = ["bg-white/[0.05]", "bg-orange-800/70", "bg-orange-600/80", "bg-orange-500"];
+                          const isToday = entry.date === new Date().toISOString().split("T")[0];
+                          return (
+                            <div
+                              key={dayIdx}
+                              title={`${entry.date} — ${entry.count} article${entry.count !== 1 ? "s" : ""}`}
+                              className={`w-full aspect-square rounded-sm ${colors[intensity]} ${isToday ? "ring-1 ring-orange-400" : ""} transition-all hover:scale-125 cursor-default`}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between mt-3 text-xs text-gray-700">
+                    {(() => {
+                      const labels: string[] = [];
+                      const today = new Date();
+                      for (let w = 12; w >= 0; w -= 4) {
+                        const d = new Date(today);
+                        d.setDate(d.getDate() - w * 7);
+                        labels.push(d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }));
+                      }
+                      return labels.map((l, i) => <span key={i}>{l}</span>);
+                    })()}
+                  </div>
+                </div>
+
+                {/* Prochaines publications planifiées */}
+                <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
+                  <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-5">Prochaines publications planifiées</p>
+                  <div className="space-y-3">
+                    {Array.from({ length: 7 }).map((_, i) => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + i + 1);
+                      d.setHours(8, 0, 0, 0);
+                      const kwIndex = (data.keywordStats.length > 0)
+                        ? i % data.uncoveredKeywords.length
+                        : -1;
+                      const kw = data.uncoveredKeywords[kwIndex] ?? data.keywordStats[i % Math.max(data.keywordStats.length, 1)]?.keyword ?? "—";
+                      return (
+                        <div key={i} className="flex items-center gap-4 py-2.5 border-b border-white/[0.04] last:border-0">
+                          <div className="w-12 text-center flex-shrink-0">
+                            <p className="text-white font-black text-sm">{d.getDate()}</p>
+                            <p className="text-gray-600 text-xs">{d.toLocaleDateString("fr-FR", { month: "short" })}</p>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60" />
+                              <p className="text-gray-400 text-sm">{kw}</p>
+                            </div>
+                            <p className="text-gray-700 text-xs mt-0.5">Publication automatique à 8h00</p>
+                          </div>
+                          <span className="text-xs text-gray-600 bg-white/[0.04] px-2.5 py-1 rounded-full">Planifié</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
               </div>
             )}
           </>

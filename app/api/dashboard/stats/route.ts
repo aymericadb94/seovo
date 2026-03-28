@@ -94,6 +94,48 @@ export async function GET() {
       }
     }
 
+    // ── Streak de publication ────────────────────────────────────────────────
+    const toKey = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+    const pubDaySet = new Set(pubs.map(p => toKey(new Date(p.published_at))));
+
+    // Streak actuel (en remontant depuis aujourd'hui)
+    let streak = 0;
+    const checkDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    while (pubDaySet.has(toKey(checkDay))) {
+      streak++;
+      checkDay.setDate(checkDay.getDate() - 1);
+    }
+
+    // Meilleure streak historique
+    const sortedDays = [...pubDaySet].sort();
+    let bestStreak = streak;
+    let runStreak = 0;
+    for (let i = 0; i < sortedDays.length; i++) {
+      if (i === 0) {
+        runStreak = 1;
+      } else {
+        const prev = new Date(sortedDays[i - 1]);
+        const curr = new Date(sortedDays[i]);
+        runStreak = (curr.getTime() - prev.getTime()) / 86400000 === 1 ? runStreak + 1 : 1;
+      }
+      if (runStreak > bestStreak) bestStreak = runStreak;
+    }
+
+    // ── Calendrier (90 jours) ────────────────────────────────────────────────
+    const calendarData: { date: string; count: number }[] = [];
+    for (let i = 89; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const dayStart = d;
+      const dayEnd = new Date(d.getTime() + 86400000);
+      const count = pubs.filter(p => {
+        const t = new Date(p.published_at);
+        return t >= dayStart && t < dayEnd;
+      }).length;
+      calendarData.push({ date: toKey(d), count });
+    }
+
     // ── Publications récentes (pour la table) ────────────────────────────────
     const recentPublications = pubs.slice(0, 20).map(p => ({
       id: p.id,
@@ -120,10 +162,13 @@ export async function GET() {
         totalKeywords: allKeywords.length,
         seoScore,
         nextPublicationIn,
+        streak,
+        bestStreak,
       },
       pubsChart,
       keywordStats,
       uncoveredKeywords,
+      calendarData,
       recentPublications,
     });
   } catch (err: unknown) {
