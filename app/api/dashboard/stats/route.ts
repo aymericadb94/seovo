@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getValidAccessToken } from "@/lib/google";
 
 export async function GET() {
   try {
@@ -71,10 +72,97 @@ export async function GET() {
       lastPublished: pubs.find(p => p.keyword === kw)?.published_at ?? null,
     }));
 
-    // Mots-clés jamais couverts
-    const uncoveredKeywords = allKeywords.filter(
+    // Mots-clés jamais couverts (brut)
+    const rawUncovered = allKeywords.filter(
       kw => !pubs.some(p => p.keyword === kw)
     );
+
+    // ── Données GSC pour priorisation ───────────────────────────────────────
+    type GscKwData = { impressions: number; clicks: number; position: number };
+    const gscMap: Record<string, GscKwData> = {};
+
+    if (site?.google_access_token && site?.gsc_site_url) {
+      try {
+        const token = await getValidAccessToken(user.id);
+        if (token) {
+          const siteUrl = encodeURIComponent(site.gsc_site_url);
+          const endDate = new Date(now);
+          endDate.setDate(endDate.getDate() - 2);
+          const startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 90);
+
+          const res = await fetch(
+            `https://www.googleapis.com/webmasters/v3/sites/${siteUrl}/searchAnalytics/query`,
+            {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                startDate: startDate.toISOString().split("T")[0],
+                endDate: endDate.toISOString().split("T")[0],
+                dimensions: ["query"],
+                rowLimit: 500,
+              }),
+            }
+          );
+
+          if (res.ok) {
+            type GscRow = { keys: string[]; clicks: number; impressions: number; position: number };
+            const data = await res.json() as { rows?: GscRow[] };
+            for (const row of data.rows ?? []) {
+              const query = row.keys[0].toLowerCase();
+              gscMap[query] = {
+                impressions: row.impressions,
+                clicks: row.clicks,
+                position: Math.round(row.position * 10) / 10,
+              };
+            }
+          }
+        }
+      } catch {
+        // GSC optionnel — on continue sans
+      }
+    }
+
+    // ── Priorisation des mots-clés non couverts ──────────────────────────────
+    // Pour chaque mot-clé non couvert, cherche une correspondance GSC
+    // (exact ou si la requête GSC contient le mot-clé, on prend la meilleure correspondance)
+    type UncoveredKw = {
+      keyword: string;
+      impressions: number | null;
+      clicks: number | null;
+      position: number | null;
+    };
+
+    const uncoveredKeywords: UncoveredKw[] = rawUncovered.map(kw => {
+      const kwLower = kw.toLowerCase();
+      // Cherche correspondance exacte d'abord
+      if (gscMap[kwLower]) {
+        return { keyword: kw, ...gscMap[kwLower] };
+      }
+      // Sinon, meilleure correspondance partielle (requête GSC qui contient le mot-clé)
+      let best: GscKwData | null = null;
+      for (const [query, data] of Object.entries(gscMap)) {
+        if (query.includes(kwLower) || kwLower.includes(query)) {
+          if (!best || data.impressions > best.impressions) {
+            best = data;
+          }
+        }
+      }
+      return {
+        keyword: kw,
+        impressions: best?.impressions ?? null,
+        clicks: best?.clicks ?? null,
+        position: best?.position ?? null,
+      };
+    });
+
+    // Tri : d'abord ceux avec données GSC (impressions desc), puis sans données
+    uncoveredKeywords.sort((a, b) => {
+      if (a.impressions !== null && b.impressions !== null) return b.impressions - a.impressions;
+      if (a.impressions !== null) return -1;
+      if (b.impressions !== null) return 1;
+      return 0;
+    });
 
     // ── Prochaine publication ────────────────────────────────────────────────
     const frequency = site?.frequency ?? 1;
@@ -100,7 +188,6 @@ export async function GET() {
 
     const pubDaySet = new Set(pubs.map(p => toKey(new Date(p.published_at))));
 
-    // Streak actuel (en remontant depuis aujourd'hui)
     let streak = 0;
     const checkDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     while (pubDaySet.has(toKey(checkDay))) {
@@ -108,7 +195,6 @@ export async function GET() {
       checkDay.setDate(checkDay.getDate() - 1);
     }
 
-    // Meilleure streak historique
     const sortedDays = [...pubDaySet].sort();
     let bestStreak = streak;
     let runStreak = 0;

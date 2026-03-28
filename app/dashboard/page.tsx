@@ -37,7 +37,7 @@ type DashboardData = {
   };
   pubsChart: { date: string; articles: number }[];
   keywordStats: { keyword: string; count: number; lastPublished: string | null }[];
-  uncoveredKeywords: string[];
+  uncoveredKeywords: { keyword: string; impressions: number | null; clicks: number | null; position: number | null }[];
   calendarData: { date: string; count: number }[];
   recentPublications: {
     id: string;
@@ -657,14 +657,17 @@ export default function Dashboard() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {data.uncoveredKeywords.slice(0, 3).map(kw => (
-                            <span key={kw} className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs px-3 py-1.5 rounded-full font-medium">
-                              <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse" />
-                              {kw}
+                            <span key={kw.keyword} className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs px-3 py-1.5 rounded-full font-medium">
+                              <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse flex-shrink-0" />
+                              {kw.keyword}
+                              {kw.impressions !== null && (
+                                <span className="text-orange-500/70 font-normal">{kw.impressions.toLocaleString("fr-FR")} imp.</span>
+                              )}
                             </span>
                           ))}
                           {data.uncoveredKeywords.slice(3).map(kw => (
-                            <span key={kw} className="bg-white/[0.04] border border-white/[0.08] text-gray-500 text-xs px-3 py-1.5 rounded-full">
-                              {kw}
+                            <span key={kw.keyword} className="bg-white/[0.04] border border-white/[0.08] text-gray-500 text-xs px-3 py-1.5 rounded-full">
+                              {kw.keyword}
                             </span>
                           ))}
                         </div>
@@ -1008,10 +1011,10 @@ export default function Dashboard() {
                       const d = new Date();
                       d.setDate(d.getDate() + i + 1);
                       d.setHours(8, 0, 0, 0);
-                      const kwIndex = (data.keywordStats.length > 0)
+                      const kwIndex = (data.uncoveredKeywords.length > 0)
                         ? i % data.uncoveredKeywords.length
                         : -1;
-                      const kw = data.uncoveredKeywords[kwIndex] ?? data.keywordStats[i % Math.max(data.keywordStats.length, 1)]?.keyword ?? "—";
+                      const kw = data.uncoveredKeywords[kwIndex]?.keyword ?? data.keywordStats[i % Math.max(data.keywordStats.length, 1)]?.keyword ?? "—";
                       return (
                         <div key={i} className="flex items-center gap-4 py-2.5 border-b border-white/[0.04] last:border-0">
                           <div className="w-12 text-center flex-shrink-0">
@@ -1021,7 +1024,7 @@ export default function Dashboard() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60" />
-                              <p className="text-gray-400 text-sm">{kw}</p>
+                              <p className="text-gray-400 text-sm">{typeof kw === "string" ? kw : kw}</p>
                             </div>
                             <p className="text-gray-700 text-xs mt-0.5">Publication automatique à 8h00</p>
                           </div>
