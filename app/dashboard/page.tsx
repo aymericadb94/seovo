@@ -940,17 +940,86 @@ export default function Dashboard() {
 
                 {/* Streak summary */}
                 <div className="grid grid-cols-3 gap-4">
-                  {[
-                    { label: "Streak actuel", value: kpis?.streak ?? 0, icon: (kpis?.streak ?? 0) >= 7 ? "🔥" : (kpis?.streak ?? 0) >= 3 ? "⚡" : "✦", suffix: "j" },
-                    { label: "Meilleure streak", value: kpis?.bestStreak ?? 0, icon: "🏆", suffix: "j" },
-                    { label: "Jours publiés / 90j", value: data.calendarData.filter(d => d.count > 0).length, icon: "📅", suffix: "" },
-                  ].map(s => (
-                    <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 text-center card-hover">
-                      <p className="text-2xl mb-1">{s.icon}</p>
-                      <p className="text-3xl font-black text-white">{s.value}{s.suffix}</p>
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mt-1">{s.label}</p>
-                    </div>
-                  ))}
+                  {/* Streak actuel */}
+                  {(() => {
+                    const streak = kpis?.streak ?? 0;
+                    const color = streak >= 7 ? "#f97316" : streak >= 3 ? "#fb923c" : "#6b7280";
+                    return (
+                      <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden group" style={{ animationDelay: "0ms" }}>
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+                          style={{ background: `radial-gradient(ellipse at top right, ${color}12, transparent 60%)` }} />
+                        {streak > 0 && (
+                          <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none"
+                            style={{ background: `radial-gradient(ellipse at top right, ${color}10, transparent 65%)` }} />
+                        )}
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Streak actuel</p>
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                            style={{ background: `${color}18`, color }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                            </svg>
+                          </div>
+                        </div>
+                        <p className="text-4xl font-black text-white tracking-tight">{streak}<span className="text-xl text-gray-500 font-bold ml-1">j</span></p>
+                        <p className="text-xs mt-2 font-medium" style={{ color }}>
+                          {streak >= 7 ? "En feu 🔥 continue !" : streak >= 3 ? "Bonne dynamique" : streak > 0 ? "Lancé !" : "Publie aujourd'hui"}
+                        </p>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Meilleure streak */}
+                  {(() => {
+                    const best = kpis?.bestStreak ?? 0;
+                    return (
+                      <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden group" style={{ animationDelay: "120ms" }}>
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+                          style={{ background: "radial-gradient(ellipse at top right, rgba(251,191,36,0.08), transparent 60%)" }} />
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Meilleure streak</p>
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                            style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                          </div>
+                        </div>
+                        <p className="text-4xl font-black text-white tracking-tight">{best}<span className="text-xl text-gray-500 font-bold ml-1">j</span></p>
+                        <p className="text-xs mt-2 font-medium text-yellow-500/70">Record personnel</p>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Jours publiés */}
+                  {(() => {
+                    const days = data.calendarData.filter(d => d.count > 0).length;
+                    const pct = Math.round((days / 90) * 100);
+                    return (
+                      <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden group" style={{ animationDelay: "240ms" }}>
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+                          style={{ background: "radial-gradient(ellipse at top right, rgba(34,197,94,0.07), transparent 60%)" }} />
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Jours publiés / 90j</p>
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                            style={{ background: "rgba(34,197,94,0.10)", color: "#22c55e" }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                              <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
+                            </svg>
+                          </div>
+                        </div>
+                        <p className="text-4xl font-black text-white tracking-tight">{days}</p>
+                        <div className="mt-2">
+                          <div className="h-1 bg-white/[0.05] rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-green-600 to-green-400"
+                              style={{ width: `${pct}%`, transition: "width 1.2s cubic-bezier(0.34,1.56,0.64,1) 0.3s" }} />
+                          </div>
+                          <p className="text-xs mt-1.5 font-medium text-green-500/70">{pct}% de régularité</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Heatmap 90 jours */}
