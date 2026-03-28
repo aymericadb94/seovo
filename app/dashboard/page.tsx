@@ -296,14 +296,22 @@ export default function Dashboard() {
     setCronResult(null);
     try {
       const res = await fetch("/api/cron/trigger", { method: "POST" });
-      const json = await res.json();
-      const detail = json.results?.map((r: {status: string; title?: string; error?: string}) =>
-        r.status === "error" ? `❌ ${r.error}` : `✓ ${r.title}`
-      ).join(" | ") ?? "";
-      setCronResult((json.message ?? json.error ?? "Terminé") + (detail ? ` — ${detail}` : ""));
+      const text = await res.text();
+      let json: Record<string, unknown>;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        setCronResult(`Erreur serveur (${res.status}): ${text.slice(0, 150)}`);
+        setCronRunning(false);
+        return;
+      }
+      const detail = (json.results as {status: string; title?: string; error?: string}[] | undefined)
+        ?.map((r) => r.status === "error" ? `❌ ${r.error}` : `✓ ${r.title}`)
+        .join(" | ") ?? "";
+      setCronResult(((json.message ?? json.error ?? "Terminé") as string) + (detail ? ` — ${detail}` : ""));
       await loadData();
-    } catch {
-      setCronResult("Erreur lors du déclenchement");
+    } catch (err) {
+      setCronResult("Erreur réseau : " + (err instanceof Error ? err.message : String(err)));
     }
     setCronRunning(false);
   }
