@@ -227,9 +227,10 @@ export default function Dashboard() {
       </div>
 
       {/* ── Nav ─────────────────────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-50 bg-[#080808]/95 backdrop-blur-md border-b border-white/[0.06] px-6 py-3 animate-fade-in">
-        <div className="max-w-screen-xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6">
+      <nav className="sticky top-0 z-50 bg-[#080808]/95 backdrop-blur-md border-b border-white/[0.06] animate-fade-in">
+        {/* Rangée 1 : logo + actions */}
+        <div className="max-w-screen-xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <span className="text-xl font-black tracking-tight logo-glow cursor-default">
               Seo<span className="text-shimmer">Corp</span>
             </span>
@@ -239,23 +240,6 @@ export default function Dashboard() {
                 {data.site.business_name} · {data.site.cms === "wordpress" ? "WordPress" : "Shopify"}
               </div>
             )}
-          </div>
-
-          {/* Tabs */}
-          <div className="flex items-center gap-1 bg-white/[0.04] rounded-lg p-1">
-            {(["overview", "publications", "keywords", "calendar"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${
-                  activeTab === tab
-                    ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow"
-                    : "text-gray-500 hover:text-white"
-                }`}
-              >
-                {tab === "overview" ? "Vue d'ensemble" : tab === "publications" ? "Publications" : tab === "keywords" ? "Mots-clés" : "Calendrier"}
-              </button>
-            ))}
           </div>
 
           <div className="flex items-center gap-2">
@@ -271,21 +255,40 @@ export default function Dashboard() {
               {cronRunning ? (
                 <>
                   <span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" />
-                  Publication en cours...
+                  En cours...
                 </>
-              ) : "▶ Lancer la publication"}
+              ) : "▶ Publier"}
             </button>
             <Link href="/generate" className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-4 py-2 rounded-lg text-xs uppercase tracking-wide shadow-lg shadow-orange-500/20">
               + Générer
             </Link>
             <Link href="/settings" className="text-gray-500 hover:text-white text-xs px-3 py-2 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
-              ⚙ Paramètres
+              ⚙
             </Link>
             <Link href="/admin" className="text-gray-600 hover:text-orange-400 text-xs px-2 py-2 transition-colors" title="Admin">◈</Link>
             <LanguageSwitcher />
             <button onClick={handleLogout} className="text-gray-500 hover:text-white text-xs px-3 py-2 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
               Déconnexion
             </button>
+          </div>
+        </div>
+
+        {/* Rangée 2 : tabs */}
+        <div className="border-t border-white/[0.04]">
+          <div className="max-w-screen-xl mx-auto px-6 flex items-center gap-1 py-0">
+            {(["overview", "publications", "keywords", "calendar"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-5 py-3 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
+                  activeTab === tab
+                    ? "border-orange-500 text-white"
+                    : "border-transparent text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                {tab === "overview" ? "Vue d'ensemble" : tab === "publications" ? "Publications" : tab === "keywords" ? "Mots-clés" : "Calendrier"}
+              </button>
+            ))}
           </div>
         </div>
       </nav>
