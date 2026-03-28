@@ -195,8 +195,8 @@ RESPONSE FORMAT: Valid JSON only, no text before or after.
 HTML content must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. No <html>, <body>, <head>.`;
 
   const message = await anthropic.messages.create({
-    model: "claude-opus-4-6",
-    max_tokens: 8000,
+    model: "claude-sonnet-4-6",
+    max_tokens: 4000,
     system: `You are the world's best SEO content writer. Every article you produce is unique, creative, and generates real organic traffic. You never produce generic or repetitive content. You think like a specialized press editor who wants to captivate the reader while satisfying Google's algorithms. You always write in the language specified in the LANGUAGE field — this is non-negotiable.`,
     messages: [{ role: "user", content: prompt }],
   });
