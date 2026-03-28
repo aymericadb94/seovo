@@ -259,7 +259,11 @@ export default function Dashboard() {
     setLoading(false);
   }
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+    window.addEventListener("focus", loadData);
+    return () => window.removeEventListener("focus", loadData);
+  }, []);
 
   async function handleLogout() {
     const supabase = createClient();
