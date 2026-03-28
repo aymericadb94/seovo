@@ -153,6 +153,8 @@ export async function GET() {
         site_url: site.site_url,
         frequency,
         seo_analysis_done: site.seo_analysis_done ?? false,
+        gsc_connected: !!site.google_access_token,
+        gsc_site_url: site.gsc_site_url ?? null,
       } : null,
       kpis: {
         totalArticles,
