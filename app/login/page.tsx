@@ -38,6 +38,14 @@ export default function LoginPage() {
         <div className="w-[500px] h-[500px] bg-orange-600/5 rounded-full blur-3xl" />
       </div>
 
+      <div className="absolute top-4 left-4">
+        <Link href="/" className="flex items-center gap-1.5 text-gray-500 hover:text-white text-sm transition-colors group">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          Accueil
+        </Link>
+      </div>
       <div className="absolute top-4 right-4">
         <LanguageSwitcher />
       </div>
