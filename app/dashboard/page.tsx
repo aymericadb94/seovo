@@ -427,29 +427,45 @@ export default function Dashboard() {
                   </div>
 
                   {/* KPIs */}
-                  <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-2 gap-4 animate-fade-in-up delay-100">
-                    {[
+                  <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-2 gap-4">
+                    {([
                       {
                         label: "Total articles publiés",
                         value: animTotal,
-                        icon: "✍️",
+                        icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                            <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                          </svg>
+                        ),
                         sub: `+${kpis?.articlesThisMonth ?? 0} ce mois`,
                         color: "#f97316",
+                        delay: "100ms",
                       },
                       {
                         label: "Mots-clés couverts",
                         value: animKw,
-                        icon: "🎯",
+                        icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+                          </svg>
+                        ),
                         sub: `sur ${kpis?.totalKeywords ?? 0} configurés`,
                         color: "#ef4444",
+                        delay: "200ms",
                       },
                       {
                         label: "Prochaine publication",
                         value: null,
                         text: kpis?.nextPublicationIn ?? "—",
-                        icon: "⏱️",
+                        icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                          </svg>
+                        ),
                         sub: `Fréquence : ${kpis ? (kpis.totalArticles > 0 ? "automatique" : "en attente") : "—"}`,
                         color: "#fb923c",
+                        delay: "300ms",
                       },
                       {
                         label: "Couverture mots-clés",
@@ -457,20 +473,58 @@ export default function Dashboard() {
                           ? Math.round((kpis.coveredKeywords / kpis.totalKeywords) * 100)
                           : 0,
                         suffix: "%",
-                        icon: "📊",
+                        icon: (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                          </svg>
+                        ),
                         sub: `${kpis?.coveredKeywords ?? 0}/${kpis?.totalKeywords ?? 0} mots-clés`,
                         color: "#fca5a5",
+                        delay: "400ms",
                       },
-                    ].map((kpi) => (
-                      <div key={kpi.label} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 flex flex-col justify-between min-h-[130px] card-hover">
-                        <div className="flex items-center justify-between mb-3">
+                    ] as const).map((kpi) => (
+                      <div
+                        key={kpi.label}
+                        className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 flex flex-col justify-between min-h-[140px] card-hover animate-fade-in-up overflow-hidden group"
+                        style={{ animationDelay: kpi.delay }}
+                      >
+                        {/* Glow de fond au hover */}
+                        <div
+                          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+                          style={{ background: `radial-gradient(ellipse at top right, ${kpi.color}10, transparent 60%)` }}
+                        />
+
+                        <div className="flex items-center justify-between mb-4">
                           <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">{kpi.label}</p>
-                          <span className="text-xl">{kpi.icon}</span>
+                          {/* Icône SVG dans container avec glow */}
+                          <div
+                            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110"
+                            style={{ background: `${kpi.color}15`, color: kpi.color, boxShadow: `0 0 0 0 ${kpi.color}30` }}
+                          >
+                            {kpi.icon}
+                          </div>
                         </div>
-                        <p className="text-3xl font-black text-white">
-                          {kpi.text ?? `${kpi.value?.toLocaleString("fr-FR") ?? 0}${kpi.suffix ?? ""}`}
+
+                        <p className="text-3xl font-black text-white tracking-tight">
+                          {"text" in kpi ? kpi.text : `${"value" in kpi ? (kpi.value?.toLocaleString("fr-FR") ?? 0) : 0}${"suffix" in kpi ? kpi.suffix ?? "" : ""}`}
                         </p>
-                        <p className="text-xs mt-2 font-medium" style={{ color: kpi.color }}>{kpi.sub}</p>
+
+                        {/* Sous-texte avec barre de progression pour couverture */}
+                        <div className="mt-3">
+                          <p className="text-xs font-medium" style={{ color: kpi.color }}>{kpi.sub}</p>
+                          {"suffix" in kpi && kpi.suffix === "%" && (
+                            <div className="mt-2 h-1 bg-white/[0.05] rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${"value" in kpi ? kpi.value : 0}%`,
+                                  background: `linear-gradient(90deg, ${kpi.color}80, ${kpi.color})`,
+                                  transition: "width 1.2s cubic-bezier(0.34,1.56,0.64,1) 0.5s",
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
