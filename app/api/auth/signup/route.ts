@@ -3,10 +3,11 @@ import { sendWelcomeEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
-    const { email, password, phone } = await request.json() as {
+    const { email, password, phone, termsAcceptedAt } = await request.json() as {
       email: string;
       password: string;
       phone?: string;
+      termsAcceptedAt?: string;
     };
 
     if (!email || !password) {
@@ -18,7 +19,10 @@ export async function POST(request: Request) {
       email,
       password,
       options: {
-        data: { phone: phone ?? "" },
+        data: {
+          phone: phone ?? "",
+          terms_accepted_at: termsAcceptedAt ?? new Date().toISOString(),
+        },
       },
     });
 

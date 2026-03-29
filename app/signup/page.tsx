@@ -19,6 +19,7 @@ export default function SignupPage() {
   const [otp, setOtp] = useState(["", "", "", "", "", "", "", ""]);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -39,11 +40,16 @@ export default function SignupPage() {
       return;
     }
 
+    if (!termsAccepted) {
+      setError("Vous devez accepter les conditions générales pour créer un compte.");
+      return;
+    }
+
     setLoading(true);
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, phone }),
+      body: JSON.stringify({ email, password, phone, termsAcceptedAt: new Date().toISOString() }),
     });
     const data = await res.json() as { error?: string };
 
@@ -232,13 +238,59 @@ export default function SignupPage() {
               </div>
             </div>
 
+            {/* Checkbox CGU/CGV */}
+            <label
+              className={`flex items-start gap-3 cursor-pointer select-none p-4 rounded-xl border transition-all ${
+                termsAccepted
+                  ? "bg-orange-500/8 border-orange-500/30"
+                  : "bg-white/[0.02] border-white/[0.07] hover:border-white/[0.12]"
+              }`}
+            >
+              <div className="flex-shrink-0 mt-0.5">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="sr-only"
+                />
+                <div
+                  className="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all"
+                  style={{
+                    background: termsAccepted ? "#f97316" : "transparent",
+                    borderColor: termsAccepted ? "#f97316" : "rgba(255,255,255,0.2)",
+                  }}
+                >
+                  {termsAccepted && (
+                    <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
+                      <polyline points="2 6 5 9 10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                J&apos;accepte les{" "}
+                <a href="/cgu" target="_blank" className="text-orange-400 hover:text-orange-300 underline underline-offset-2" onClick={e => e.stopPropagation()}>
+                  Conditions Générales d&apos;Utilisation
+                </a>
+                {" "}et les{" "}
+                <a href="/cgv" target="_blank" className="text-orange-400 hover:text-orange-300 underline underline-offset-2" onClick={e => e.stopPropagation()}>
+                  Conditions Générales de Vente
+                </a>
+                , ainsi que la{" "}
+                <a href="/confidentialite" target="_blank" className="text-orange-400 hover:text-orange-300 underline underline-offset-2" onClick={e => e.stopPropagation()}>
+                  Politique de confidentialité
+                </a>
+                {" "}de RankPill.
+              </p>
+            </label>
+
             {error && (
               <p className="text-red-400 text-sm font-medium px-1">{error}</p>
             )}
 
             <button
               type="submit"
-              disabled={loading || (!!confirmPassword && password !== confirmPassword)}
+              disabled={loading || !termsAccepted || (!!confirmPassword && password !== confirmPassword)}
               className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-3.5 rounded-xl transition-all uppercase tracking-wide shadow-lg shadow-orange-500/20 text-sm"
             >
               {loading ? (
