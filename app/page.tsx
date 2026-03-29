@@ -351,33 +351,66 @@ export default function LandingPage() {
 
       {/* ── Comment ça marche ────────────────────────────────────────────── */}
       <section id="comment" className="py-28 px-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(249,115,22,0.05), transparent 65%)" }} />
+        {/* Halos de fond */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(249,115,22,0.06), transparent 65%)" }} />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom left, rgba(239,68,68,0.04), transparent 65%)" }} />
+
         <div className="max-w-5xl mx-auto" ref={stepsSection.ref}>
-          <div className={`text-center mb-16 transition-all duration-700 ${stepsSection.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+          <div className={`text-center mb-20 transition-all duration-700 ${stepsSection.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
             <h2 className="text-4xl md:text-5xl font-black mb-4 tracking-tight">{t.howItWorks.title}</h2>
             <p className="text-gray-400 text-lg">{t.howItWorks.subtitle}</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-10 relative">
-            {/* Ligne de connexion */}
-            <div className="hidden md:block absolute top-8 left-1/6 right-1/6 h-px bg-gradient-to-r from-transparent via-orange-500/20 to-transparent" />
+
+          <div className="grid md:grid-cols-3 gap-6 relative">
+
+            {/* Ligne de progression animée */}
+            <div className="hidden md:block absolute top-[52px] left-[calc(16%+40px)] right-[calc(16%+40px)] h-px overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.05)" }}>
+              <div className={`h-full transition-all duration-1000 delay-500 rounded-full`}
+                style={{ background: "linear-gradient(90deg, #f97316, #ef4444, #f97316)", width: stepsSection.inView ? "100%" : "0%" }} />
+            </div>
+
             {t.howItWorks.steps.map((step, i) => (
               <div
                 key={step.number}
-                className={`relative transition-all duration-700 ${stepsSection.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
-                style={{ transitionDelay: `${i * 150}ms` }}
+                className={`relative flex flex-col transition-all duration-700 ${stepsSection.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"}`}
+                style={{ transitionDelay: `${i * 180}ms` }}
               >
-                <div className="relative mb-6">
-                  <div className="text-7xl font-black leading-none" style={{
-                    background: "linear-gradient(180deg, rgba(249,115,22,0.3) 0%, transparent 100%)",
-                    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text"
-                  }}>
-                    {step.number}
+                {/* Badge numéro */}
+                <div className="relative w-[104px] h-[104px] mb-8 flex-shrink-0">
+                  {/* Anneau tournant externe */}
+                  <div className="absolute inset-0 rounded-full animate-[spin_10s_linear_infinite]"
+                    style={{ background: "conic-gradient(from 0deg, transparent 0%, #f97316 30%, transparent 60%)", padding: "1px" }}>
+                    <div className="w-full h-full rounded-full" style={{ background: "#080808" }} />
                   </div>
-                  {/* Dot indicateur */}
-                  <div className="absolute top-3 left-8 w-3 h-3 bg-orange-500 rounded-full" style={{ boxShadow: "0 0 12px rgba(249,115,22,0.6)" }} />
+                  {/* Anneau pulsant */}
+                  <div className="absolute inset-[-6px] rounded-full animate-[ping_3s_ease-in-out_infinite] opacity-20"
+                    style={{ background: "radial-gradient(circle, rgba(249,115,22,0.4), transparent 70%)" }} />
+                  {/* Glow central */}
+                  <div className="absolute inset-0 rounded-full blur-xl opacity-50"
+                    style={{ background: "rgba(249,115,22,0.25)" }} />
+                  {/* Cercle principal */}
+                  <div className="absolute inset-[3px] rounded-full flex items-center justify-center"
+                    style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.18) 0%, rgba(239,68,68,0.08) 100%)", border: "1px solid rgba(249,115,22,0.35)" }}>
+                    <span className="text-3xl font-black tracking-tight"
+                      style={{ background: "linear-gradient(135deg, #f97316 0%, #fb923c 50%, #fbbf24 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                      {step.number}
+                    </span>
+                  </div>
                 </div>
-                <h3 className="text-xl font-bold mb-3">{step.title}</h3>
-                <p className="text-gray-400 leading-relaxed">{step.description}</p>
+
+                {/* Carte contenu */}
+                <div className="relative flex-1 rounded-2xl p-6 group overflow-hidden"
+                  style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  {/* Shimmer hover */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                    style={{ background: "radial-gradient(ellipse at top left, rgba(249,115,22,0.09), transparent 60%)" }} />
+                  {/* Barre bottom orange au hover */}
+                  <div className="absolute bottom-0 left-4 right-4 h-px opacity-0 group-hover:opacity-100 transition-all duration-500"
+                    style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.6), transparent)" }} />
+
+                  <h3 className="text-lg font-black mb-3 group-hover:text-orange-400 transition-colors duration-300">{step.title}</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed">{step.description}</p>
+                </div>
               </div>
             ))}
           </div>
