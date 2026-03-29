@@ -627,10 +627,12 @@ export default function LandingPage() {
             Rank<span className="text-shimmer">Pill</span>
           </span>
           <p className="text-gray-600 text-sm">{t.footer.rights}</p>
-          <div className="flex gap-6 text-sm text-gray-500">
-            <a href="#" className="hover:text-white transition-colors">{t.footer.privacy}</a>
-            <a href="#" className="hover:text-white transition-colors">{t.footer.terms}</a>
-            <a href="#" className="hover:text-white transition-colors">{t.footer.contact}</a>
+          <div className="flex flex-wrap gap-5 text-sm text-gray-500">
+            <a href="/mentions-legales" className="hover:text-white transition-colors">Mentions légales</a>
+            <a href="/cgu" className="hover:text-white transition-colors">CGU</a>
+            <a href="/cgv" className="hover:text-white transition-colors">CGV</a>
+            <a href="/confidentialite" className="hover:text-white transition-colors">Confidentialité</a>
+            <a href="mailto:contact@rankpill.fr" className="hover:text-white transition-colors">Contact</a>
           </div>
         </div>
       </footer>

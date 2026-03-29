@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import SeoAnalysisModal from "@/components/SeoAnalysisModal";
+import Footer from "@/components/Footer";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, BarChart, Bar,
@@ -1334,6 +1335,7 @@ export default function Dashboard() {
           </>
         )}
       </div>
+      <Footer />
     </main>
   );
 }

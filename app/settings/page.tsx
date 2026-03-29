@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import Footer from "@/components/Footer";
 import { LOCALES, localeFlags, localeNames, type Locale } from "@/lib/i18n/translations";
 
 type SiteConfig = {
@@ -666,6 +667,7 @@ export default function SettingsPage() {
           </button>
         </form>
       </div>
+      <Footer />
     </main>
   );
 }
