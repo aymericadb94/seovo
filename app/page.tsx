@@ -216,9 +216,30 @@ export default function LandingPage() {
   return (
     <div className="bg-black text-white min-h-screen overflow-x-hidden">
 
-      {/* Bannière Beta */}
-      <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-orange-500/90 to-red-500/90 backdrop-blur-sm text-white text-xs font-bold text-center py-2 px-4 tracking-wide">
-        {t.beta.banner} · <Link href="/signup" className="underline underline-offset-2 hover:text-orange-100 transition-colors">{t.beta.join}</Link>
+      {/* Bannière ticker animée */}
+      <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-orange-500/90 to-red-500/90 backdrop-blur-sm text-white text-xs font-bold py-2 overflow-hidden">
+        <div className="flex whitespace-nowrap animate-[ticker_30s_linear_infinite]">
+          {[
+            "🚀 Fais exploser ton référencement SEO de façon automatique",
+            "📈 Triple ton trafic organique avec nos outils professionnels",
+            "✍️ Des articles SEO publiés automatiquement sur ton site chaque jour",
+            "🎯 RankPill génère du contenu optimisé pendant que tu dors",
+            "⚡ Connecte WordPress, Shopify, Wix ou ton API en 2 minutes",
+            "🏆 +340% de trafic organique en moyenne pour nos utilisateurs",
+          ].concat([
+            "🚀 Fais exploser ton référencement SEO de façon automatique",
+            "📈 Triple ton trafic organique avec nos outils professionnels",
+            "✍️ Des articles SEO publiés automatiquement sur ton site chaque jour",
+            "🎯 RankPill génère du contenu optimisé pendant que tu dors",
+            "⚡ Connecte WordPress, Shopify, Wix ou ton API en 2 minutes",
+            "🏆 +340% de trafic organique en moyenne pour nos utilisateurs",
+          ]).map((msg, i) => (
+            <span key={i} className="inline-flex items-center gap-2 px-8">
+              {msg}
+              <span className="text-orange-200/60 mx-2">·</span>
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Nav */}
@@ -240,9 +261,9 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
-            <Link href="/signup" className="relative overflow-hidden bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 hover:scale-[1.03]">
+            <Link href="/login" className="relative overflow-hidden bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 hover:scale-[1.03]">
               <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)" }} />
-              <span className="relative">{t.nav.cta}</span>
+              <span className="relative">Se connecter</span>
             </Link>
           </div>
         </div>

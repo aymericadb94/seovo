@@ -64,6 +64,11 @@ body {
   60%, 100% { transform: translateX(200%); }
 }
 
+@keyframes ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 /* ── Classes utilitaires ─────────────────────────────────────────────────── */
 
 .animate-fade-in-up  { animation: fadeInUp 0.5s cubic-bezier(0.16,1,0.3,1) both; }
