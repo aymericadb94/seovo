@@ -449,7 +449,7 @@ export default function OnboardingPage() {
                         type="url"
                         value={form.site_url}
                         onChange={(e) => update("site_url", e.target.value)}
-                        placeholder={form.cms === "wordpress" ? "https://monsite.com" : form.cms === "shopify" ? "https://maboutique.myshopify.com" : form.cms === "custom" ? "https://monsite.com" : "https://monsite.com"}
+                        placeholder={form.cms === "shopify" ? "https://maboutique.myshopify.com" : "https://votresite.com"}
                         className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
                       />
                     </div>

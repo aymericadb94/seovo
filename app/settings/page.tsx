@@ -269,7 +269,8 @@ export default function SettingsPage() {
                   type="url"
                   value={config.site_url}
                   onChange={(e) => update("site_url", e.target.value)}
-                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                  placeholder="https://votresite.com"
+                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
                 />
               </div>
               {config.cms === "wordpress" && (
