@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { testWixConnection } from "@/lib/wix";
+import { sendOnboardingRecapEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -68,6 +69,19 @@ export async function POST(request: Request) {
     });
 
     if (error) return Response.json({ error: error.message }, { status: 500 });
+
+    // Email récap onboarding (non bloquant)
+    try {
+      if (user.email) {
+        await sendOnboardingRecapEmail({
+          to: user.email,
+          businessName: body.business_name,
+          siteUrl: body.site_url,
+          cms: body.cms,
+          keywords: body.keywords ?? [],
+        });
+      }
+    } catch { /* Email optionnel */ }
 
     return Response.json({ success: true });
   } catch (err: unknown) {
