@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       if (!site.wix_api_key || !site.wix_site_id) {
         return Response.json({ error: "Clé API ou Site ID Wix manquants dans la configuration." }, { status: 400 });
       }
-      url = await publishToWix(site.wix_api_key, site.wix_site_id, title, content, meta_description);
+      url = await publishToWix(site.wix_api_key, site.wix_site_id, title, content, meta_description, site.site_url);
     } else {
       return Response.json({ error: `CMS non supporté : ${site.cms}` }, { status: 400 });
     }

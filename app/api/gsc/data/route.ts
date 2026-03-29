@@ -50,6 +50,11 @@ export async function GET() {
     type GSCRow = { keys: string[]; clicks: number; impressions: number; ctr: number; position: number };
     type GSCResponse = { rows?: GSCRow[] };
 
+    if (!globalRes.ok || !pagesRes.ok) {
+      const errBody = await (!globalRes.ok ? globalRes : pagesRes).json().catch(() => ({})) as { error?: { message?: string } };
+      return Response.json({ error: errBody?.error?.message ?? "Erreur Google Search Console" }, { status: 502 });
+    }
+
     const globalData = await globalRes.json() as GSCResponse;
     const pagesData = await pagesRes.json() as GSCResponse;
 
