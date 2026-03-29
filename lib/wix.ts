@@ -142,16 +142,39 @@ function wixHeaders(apiKey: string, siteId: string) {
 }
 
 async function getWixMemberId(apiKey: string, siteId: string): Promise<string | null> {
+  // Stratégie 1 : lire le memberId depuis un post existant
   try {
-    const res = await fetch("https://www.wixapis.com/members/v1/members/my", {
+    const res = await fetch(`${WIX_POSTS_API}?limit=1`, {
       headers: wixHeaders(apiKey, siteId),
     });
-    if (!res.ok) return null;
-    const data = await res.json() as { member?: { id?: string } };
-    return data.member?.id ?? null;
-  } catch {
-    return null;
-  }
+    if (res.ok) {
+      const data = await res.json() as { posts?: { memberId?: string }[] };
+      const id = data.posts?.[0]?.memberId;
+      if (id) return id;
+    }
+  } catch { /* fallback */ }
+
+  // Stratégie 2 : le membre le plus ancien = l'owner du site
+  try {
+    const res = await fetch("https://www.wixapis.com/members/v1/members/query", {
+      method: "POST",
+      headers: wixHeaders(apiKey, siteId),
+      body: JSON.stringify({
+        query: {
+          sort: [{ fieldName: "createdDate", order: "ASC" }],
+          paging: { limit: 1 },
+          fieldsets: ["FULL"],
+        },
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json() as { members?: { id?: string }[] };
+      const id = data.members?.[0]?.id;
+      if (id) return id;
+    }
+  } catch { /* fallback */ }
+
+  return null;
 }
 
 export async function publishToWix(
@@ -167,6 +190,9 @@ export async function publishToWix(
 
   // Récupérer le memberId (requis par l'API Wix pour les apps tierces)
   const memberId = await getWixMemberId(apiKey, siteId);
+  if (!memberId) {
+    throw new Error("Impossible de récupérer l'identifiant du propriétaire du site Wix. Vérifiez que votre clé API a les permissions 'Membres' en lecture, ou publiez au moins un article manuellement sur votre blog Wix.");
+  }
 
   // Étape 1 : créer le brouillon via l'API drafts
   const createRes = await fetch(WIX_DRAFTS_API, {
@@ -177,7 +203,7 @@ export async function publishToWix(
         title,
         richContent,
         excerpt: metaDescription,
-        ...(memberId ? { memberId } : {}),
+        memberId,
       },
     }),
   });
