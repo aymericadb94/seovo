@@ -351,9 +351,7 @@ export default function LandingPage() {
 
       {/* ── Comment ça marche ────────────────────────────────────────────── */}
       <section id="comment" className="py-28 px-6 relative overflow-hidden">
-        {/* Halos de fond */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(249,115,22,0.06), transparent 65%)" }} />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom left, rgba(239,68,68,0.04), transparent 65%)" }} />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(249,115,22,0.05), transparent 65%)" }} />
 
         <div className="max-w-5xl mx-auto" ref={stepsSection.ref}>
           <div className={`text-center mb-20 transition-all duration-700 ${stepsSection.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
@@ -361,55 +359,70 @@ export default function LandingPage() {
             <p className="text-gray-400 text-lg">{t.howItWorks.subtitle}</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 relative">
-
-            {/* Ligne de progression animée */}
-            <div className="hidden md:block absolute top-[52px] left-[calc(16%+40px)] right-[calc(16%+40px)] h-px overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.05)" }}>
-              <div className={`h-full transition-all duration-1000 delay-500 rounded-full`}
-                style={{ background: "linear-gradient(90deg, #f97316, #ef4444, #f97316)", width: stepsSection.inView ? "100%" : "0%" }} />
-            </div>
-
+          {/* Desktop : flex avec connecteurs inline */}
+          <div className="hidden md:flex items-start">
             {t.howItWorks.steps.map((step, i) => (
-              <div
-                key={step.number}
-                className={`relative flex flex-col transition-all duration-700 ${stepsSection.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"}`}
-                style={{ transitionDelay: `${i * 180}ms` }}
-              >
-                {/* Badge numéro */}
-                <div className="relative w-[104px] h-[104px] mb-8 flex-shrink-0">
-                  {/* Anneau tournant externe */}
-                  <div className="absolute inset-0 rounded-full animate-[spin_10s_linear_infinite]"
-                    style={{ background: "conic-gradient(from 0deg, transparent 0%, #f97316 30%, transparent 60%)", padding: "1px" }}>
-                    <div className="w-full h-full rounded-full" style={{ background: "#080808" }} />
+              <>
+                {/* Colonne step */}
+                <div
+                  key={step.number}
+                  className={`flex-1 flex flex-col items-center transition-all duration-700 ${stepsSection.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
+                  style={{ transitionDelay: `${i * 200}ms` }}
+                >
+                  {/* Badge */}
+                  <div className="relative w-20 h-20 mb-8 flex-shrink-0">
+                    {/* Glow */}
+                    <div className="absolute inset-0 rounded-full blur-xl" style={{ background: "rgba(249,115,22,0.2)" }} />
+                    {/* Anneau tournant pointillé */}
+                    <div className="absolute inset-[-8px] rounded-full border border-dashed animate-[spin_12s_linear_infinite]" style={{ borderColor: "rgba(249,115,22,0.35)" }} />
+                    {/* Cercle */}
+                    <div className="relative w-full h-full rounded-full flex items-center justify-center"
+                      style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.15), rgba(239,68,68,0.08))", border: "1.5px solid rgba(249,115,22,0.5)", boxShadow: "0 0 24px rgba(249,115,22,0.15), inset 0 1px 0 rgba(255,255,255,0.08)" }}>
+                      <span className="text-2xl font-black text-white tracking-tight">{step.number}</span>
+                    </div>
                   </div>
-                  {/* Anneau pulsant */}
-                  <div className="absolute inset-[-6px] rounded-full animate-[ping_3s_ease-in-out_infinite] opacity-20"
-                    style={{ background: "radial-gradient(circle, rgba(249,115,22,0.4), transparent 70%)" }} />
-                  {/* Glow central */}
-                  <div className="absolute inset-0 rounded-full blur-xl opacity-50"
-                    style={{ background: "rgba(249,115,22,0.25)" }} />
-                  {/* Cercle principal */}
-                  <div className="absolute inset-[3px] rounded-full flex items-center justify-center"
-                    style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.18) 0%, rgba(239,68,68,0.08) 100%)", border: "1px solid rgba(249,115,22,0.35)" }}>
-                    <span className="text-3xl font-black tracking-tight"
-                      style={{ background: "linear-gradient(135deg, #f97316 0%, #fb923c 50%, #fbbf24 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                      {step.number}
-                    </span>
+
+                  {/* Carte */}
+                  <div className="relative w-full rounded-2xl p-6 group overflow-hidden text-center"
+                    style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                      style={{ background: "radial-gradient(ellipse at top center, rgba(249,115,22,0.08), transparent 65%)" }} />
+                    <div className="absolute bottom-0 left-6 right-6 h-px overflow-hidden">
+                      <div className="h-full w-0 group-hover:w-full transition-all duration-500"
+                        style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.5), transparent)" }} />
+                    </div>
+                    <h3 className="text-base font-black mb-2 transition-colors duration-300 group-hover:text-orange-400">{step.title}</h3>
+                    <p className="text-gray-500 text-sm leading-relaxed">{step.description}</p>
                   </div>
                 </div>
 
-                {/* Carte contenu */}
-                <div className="relative flex-1 rounded-2xl p-6 group overflow-hidden"
-                  style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  {/* Shimmer hover */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                    style={{ background: "radial-gradient(ellipse at top left, rgba(249,115,22,0.09), transparent 60%)" }} />
-                  {/* Barre bottom orange au hover */}
-                  <div className="absolute bottom-0 left-4 right-4 h-px opacity-0 group-hover:opacity-100 transition-all duration-500"
-                    style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.6), transparent)" }} />
+                {/* Connecteur — centré sur les cercles (mt = moitié du badge = 40px) */}
+                {i < t.howItWorks.steps.length - 1 && (
+                  <div className="flex-shrink-0 w-16 overflow-hidden" style={{ marginTop: "39px", height: "2px" }}>
+                    <div className={`h-full transition-all duration-700 rounded-full`}
+                      style={{ background: "linear-gradient(90deg, rgba(249,115,22,0.7), rgba(249,115,22,0.3))", width: stepsSection.inView ? "100%" : "0%", transitionDelay: `${i * 200 + 400}ms` }} />
+                  </div>
+                )}
+              </>
+            ))}
+          </div>
 
-                  <h3 className="text-lg font-black mb-3 group-hover:text-orange-400 transition-colors duration-300">{step.title}</h3>
-                  <p className="text-gray-400 text-sm leading-relaxed">{step.description}</p>
+          {/* Mobile : vertical */}
+          <div className="md:hidden flex flex-col gap-8">
+            {t.howItWorks.steps.map((step, i) => (
+              <div key={step.number}
+                className={`flex gap-5 transition-all duration-700 ${stepsSection.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                style={{ transitionDelay: `${i * 150}ms` }}>
+                <div className="relative w-14 h-14 flex-shrink-0">
+                  <div className="absolute inset-0 rounded-full blur-lg" style={{ background: "rgba(249,115,22,0.2)" }} />
+                  <div className="relative w-full h-full rounded-full flex items-center justify-center"
+                    style={{ background: "rgba(249,115,22,0.1)", border: "1.5px solid rgba(249,115,22,0.45)" }}>
+                    <span className="text-lg font-black text-white">{step.number}</span>
+                  </div>
+                </div>
+                <div className="flex-1 pt-1">
+                  <h3 className="text-base font-black mb-1">{step.title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{step.description}</p>
                 </div>
               </div>
             ))}
