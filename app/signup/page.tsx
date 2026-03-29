@@ -16,7 +16,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   // OTP
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otp, setOtp] = useState(["", "", "", "", "", "", "", ""]);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const [loading, setLoading] = useState(false);
@@ -62,8 +62,8 @@ export default function SignupPage() {
     setError("");
 
     const token = otp.join("");
-    if (token.length < 6) {
-      setError("Entrez le code complet à 6 chiffres.");
+    if (token.length < 8) {
+      setError("Entrez le code complet à 8 chiffres.");
       return;
     }
 
@@ -98,7 +98,7 @@ export default function SignupPage() {
     const next = [...otp];
     next[index] = digit;
     setOtp(next);
-    if (digit && index < 5) otpRefs.current[index + 1]?.focus();
+    if (digit && index < 7) otpRefs.current[index + 1]?.focus();
   }
 
   function handleOtpKeyDown(index: number, e: React.KeyboardEvent) {
@@ -108,10 +108,10 @@ export default function SignupPage() {
   }
 
   function handleOtpPaste(e: React.ClipboardEvent) {
-    const digits = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (digits.length === 6) {
+    const digits = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 8);
+    if (digits.length === 8) {
       setOtp(digits.split(""));
-      otpRefs.current[5]?.focus();
+      otpRefs.current[7]?.focus();
     }
   }
 
@@ -279,7 +279,7 @@ export default function SignupPage() {
 
               <button
                 type="submit"
-                disabled={loading || otp.join("").length < 6}
+                disabled={loading || otp.join("").length < 8}
                 className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-3.5 rounded-xl transition-all uppercase tracking-wide shadow-lg shadow-orange-500/20 text-sm"
               >
                 {loading ? (
@@ -294,7 +294,7 @@ export default function SignupPage() {
             <div className="flex items-center justify-between px-1">
               <button
                 type="button"
-                onClick={() => { setStep("form"); setOtp(["","","","","",""]); setError(""); }}
+                onClick={() => { setStep("form"); setOtp(["","","","","","","",""]); setError(""); }}
                 className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
               >
                 ← Modifier l&apos;email
