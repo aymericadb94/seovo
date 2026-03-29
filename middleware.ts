@@ -31,8 +31,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Redirige login/signup vers dashboard si déjà connecté
-  if ((path === "/login" || path === "/signup") && user) {
+  // Redirige login/signup vers dashboard si déjà connecté (sauf ?force=true pour tests)
+  const force = request.nextUrl.searchParams.get("force") === "true";
+  if ((path === "/login" || path === "/signup") && user && !force) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
