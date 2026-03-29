@@ -3,29 +3,48 @@ import { createClient } from "@/lib/supabase/server";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-async function scrapeHomepage(siteUrl: string): Promise<string> {
+type ScrapedPage = {
+  text: string;
+  title: string;
+  metaDesc: string;
+  h1: string;
+};
+
+async function scrapeHomepage(siteUrl: string): Promise<ScrapedPage> {
+  const empty = { text: "", title: "", metaDesc: "", h1: "" };
   try {
     const url = siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`;
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; RankPill/1.0)" },
       signal: AbortSignal.timeout(8000),
     });
-    if (!res.ok) return "";
+    if (!res.ok) return empty;
     const html = await res.text();
-    // Extract visible text from key tags
+
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+    const metaMatch =
+      html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i);
+    const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+
     const text = html
       .replace(/<script[\s\S]*?<\/script>/gi, "")
       .replace(/<style[\s\S]*?<\/style>/gi, "")
       .replace(/<nav[\s\S]*?<\/nav>/gi, "")
       .replace(/<footer[\s\S]*?<\/footer>/gi, "")
-      .replace(/<header[\s\S]*?<\/header>/gi, "")
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 3000);
-    return text;
+
+    return {
+      text,
+      title: titleMatch?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "",
+      metaDesc: metaMatch?.[1]?.trim() ?? "",
+      h1: h1Match?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "",
+    };
   } catch {
-    return "";
+    return empty;
   }
 }
 
@@ -45,7 +64,6 @@ export async function POST(request: Request) {
       };
     };
 
-    // Get site info
     const { data: site } = await supabase
       .from("sites")
       .select("business_name, industry, site_url, keywords")
@@ -54,8 +72,7 @@ export async function POST(request: Request) {
 
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
-    // Scrape homepage for context
-    const homepageContent = await scrapeHomepage(site.site_url);
+    const page = await scrapeHomepage(site.site_url);
 
     const prompt = `Tu es un expert SEO de niveau mondial, spécialisé dans la création de stratégies de contenu organiques ultra-performantes.
 
@@ -64,10 +81,13 @@ CONTEXTE DU SITE :
 - URL : ${site.site_url}
 - Mots-clés actuels : ${(site.keywords ?? []).join(", ") || "aucun"}
 
-CONTENU DE LA PAGE D'ACCUEIL (extrait) :
-${homepageContent || "Non disponible"}
+SIGNAUX TECHNIQUES EXTRAITS :
+- Balise <title> : ${page.title || "ABSENTE"}
+- Meta description : ${page.metaDesc || "ABSENTE"}
+- H1 : ${page.h1 || "ABSENT"}
+- Contenu homepage : ${page.text ? `${page.text.slice(0, 2500)}` : "Non disponible"}
 
-IMPORTANT : Pour déterminer le secteur d'activité, base-toi UNIQUEMENT sur le contenu textuel de la page d'accueil ci-dessus. N'infère jamais le secteur à partir du nom du site — il peut être trompeur ou sans rapport avec l'activité réelle.
+IMPORTANT : Pour déterminer le secteur d'activité, base-toi UNIQUEMENT sur le contenu textuel de la page d'accueil ci-dessus.
 
 RÉPONSES DU PROPRIÉTAIRE :
 - Points forts : ${answers.strengths}
@@ -76,18 +96,28 @@ RÉPONSES DU PROPRIÉTAIRE :
 - Portée géographique : ${answers.geoScope}
 - Concurrents principaux : ${answers.competitors}
 
-MISSION : Génère une stratégie SEO complète et un cocon sémantique optimisé.
+MISSION : Génère un score SEO réel basé sur les signaux observés + une stratégie SEO complète.
 
 RÈGLES ABSOLUES :
-1. Les mots-clés doivent correspondre à la portée géographique (ex: "paris", "france", "europe" si pertinent)
-2. Mix de mots-clés : 30% à fort volume (génériques), 50% longue traîne (transactionnels), 20% de niche (faciles à ranker)
-3. Privilégie les mots-clés avec intention commerciale/transactionnelle
-4. Génère EXACTEMENT 20 mots-clés prioritaires, du plus stratégique au moins
-5. Chaque mot-clé doit être une vraie requête Google (pas un thème générique)
+1. Les mots-clés doivent correspondre à la portée géographique
+2. Mix de mots-clés : 30% fort volume, 50% longue traîne transactionnelle, 20% niche facile
+3. Génère EXACTEMENT 20 mots-clés prioritaires
+4. Chaque mot-clé doit être une vraie requête Google
+5. Le score SEO doit refléter l'état RÉEL du site avant d'utiliser RankPill (pas de score gonflé)
 
 RÉPONSE : JSON uniquement, sans texte avant/après.
 
 {
+  "seo_score": {
+    "overall": <number 0-100, score global basé sur title/meta/H1/contenu observés>,
+    "breakdown": {
+      "qualite_contenu": <number 0-100, richesse et pertinence du contenu homepage>,
+      "optimisation_meta": <number 0-100, présence et qualité de title + meta description + H1>,
+      "ciblage_mots_cles": <number 0-100, alignement entre contenu actuel et intention de recherche>,
+      "potentiel_croissance": <number 0-100, estimation du potentiel SEO inexploité>
+    },
+    "verdict": "Diagnostic SEO en 1-2 phrases percutantes décrivant l'état actuel et ce qu'il manque"
+  },
   "strategy_summary": "Résumé de la stratégie SEO en 3-4 phrases percutantes",
   "semantic_cocoon": {
     "pillar": "Le mot-clé pilier principal (1 seul, le plus important)",
@@ -126,15 +156,12 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
 
     const analysis = JSON.parse(raw.slice(start, end + 1));
 
-    // Extract all keywords from analysis + priority_keywords
     const allNewKeywords: string[] = [
       ...(analysis.priority_keywords ?? []).map((k: { keyword: string }) => k.keyword),
       ...(analysis.quick_wins ?? []),
     ];
-    // Deduplicate and limit to 25
     const uniqueKeywords = [...new Set(allNewKeywords)].slice(0, 25);
 
-    // Update site: save keywords + mark analysis done
     const { error: updateError } = await supabase
       .from("sites")
       .update({

@@ -1,8 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+
+type SeoScore = {
+  overall: number;
+  breakdown: {
+    qualite_contenu: number;
+    optimisation_meta: number;
+    ciblage_mots_cles: number;
+    potentiel_croissance: number;
+  };
+  verdict: string;
+};
 
 type AnalysisResult = {
+  seo_score: SeoScore;
   strategy_summary: string;
   semantic_cocoon: {
     pillar: string;
@@ -46,6 +58,133 @@ const difficultyLabel: Record<string, string> = {
   hard: "Difficile",
 };
 
+const MATRIX_CHARS = "アイウエオカキクケコ01234ABCDEF#$<>{}|\\~_+=?!@";
+
+function randomChar() {
+  return MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
+}
+
+function ScrambleLine({ text, isLast }: { text: string; isLast: boolean }) {
+  const [chars, setChars] = useState<string[]>(() => text.split("").map(() => randomChar()));
+  const [done, setDone] = useState(false);
+  const stepRef = useRef(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      stepRef.current += 0.6;
+      const resolved = Math.floor(stepRef.current);
+      if (resolved >= text.length) {
+        setChars(text.split(""));
+        setDone(true);
+        clearInterval(interval);
+        return;
+      }
+      setChars(
+        text.split("").map((c, i) => (i < resolved ? c : randomChar()))
+      );
+    }, 28);
+    return () => clearInterval(interval);
+  }, [text]);
+
+  return (
+    <div className="flex items-center gap-2 min-h-[20px]">
+      <span
+        className="text-xs flex-shrink-0 transition-colors duration-300"
+        style={{ color: done ? "#f97316" : "#fb923c99" }}
+      >
+        ▸
+      </span>
+      <span
+        className="text-xs font-mono tracking-wide transition-colors duration-500"
+        style={{ color: done ? "#d1d5db" : "#fb923ccc" }}
+      >
+        {chars.join("")}
+      </span>
+      {isLast && !done && (
+        <span
+          className="inline-block flex-shrink-0 animate-pulse"
+          style={{ width: 6, height: 12, background: "#fb923c", marginLeft: 2 }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ScoreCircle({ score }: { score: number }) {
+  const [animated, setAnimated] = useState(0);
+  const r = 38;
+  const circumference = 2 * Math.PI * r;
+  const color = score >= 66 ? "#22c55e" : score >= 40 ? "#f97316" : "#ef4444";
+  const label = score >= 66 ? "Bon" : score >= 40 ? "Moyen" : "Faible";
+
+  useEffect(() => {
+    const t = setTimeout(() => setAnimated(score), 100);
+    return () => clearTimeout(t);
+  }, [score]);
+
+  const offset = circumference * (1 - animated / 100);
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <svg width={96} height={96} viewBox="0 0 96 96">
+        {/* Track */}
+        <circle cx={48} cy={48} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={7} />
+        {/* Progress */}
+        <circle
+          cx={48}
+          cy={48}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={7}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          transform="rotate(-90 48 48)"
+          style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(0.34,1.56,0.64,1), stroke 0.5s" }}
+        />
+        <text x={48} y={44} textAnchor="middle" fill="white" fontSize={20} fontWeight="900" fontFamily="inherit">
+          {animated}
+        </text>
+        <text x={48} y={60} textAnchor="middle" fill="rgba(156,163,175,0.8)" fontSize={10} fontFamily="inherit">
+          / 100
+        </text>
+      </svg>
+      <span className="text-xs font-bold" style={{ color }}>{label}</span>
+    </div>
+  );
+}
+
+function BreakdownBar({ label, score }: { label: string; score: number }) {
+  const [width, setWidth] = useState(0);
+  const color = score >= 66 ? "#22c55e" : score >= 40 ? "#f97316" : "#ef4444";
+
+  useEffect(() => {
+    const t = setTimeout(() => setWidth(score), 200);
+    return () => clearTimeout(t);
+  }, [score]);
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-gray-500 text-xs">{label}</span>
+        <span className="text-xs font-bold" style={{ color }}>{score}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${width}%`,
+            background: color,
+            transition: "width 1s cubic-bezier(0.34,1.56,0.64,1)",
+            boxShadow: `0 0 8px ${color}60`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function SeoAnalysisModal({ onComplete }: Props) {
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
@@ -67,11 +206,11 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
   }, []);
 
   async function runAnalysis() {
-    setStep(5); // analyzing step
+    setStep(5);
     setAnalyzing(true);
     setError(null);
+    setScanLines([]);
 
-    // Animated scan lines
     const lines = [
       "Connexion au site en cours...",
       "Analyse de la page d'accueil...",
@@ -97,12 +236,14 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
       });
       const json = await res.json();
       clearInterval(interval);
+      setScanLines(lines); // show all lines before transitioning
       if (json.error) {
         setError(json.error);
-        setStep(4); // go back to last question
+        setStep(4);
       } else {
+        await new Promise(r => setTimeout(r, 600));
         setResult(json.analysis);
-        setStep(6); // results step
+        setStep(6);
       }
     } catch {
       clearInterval(interval);
@@ -369,28 +510,91 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
 
           {/* ── Step 5: Analyzing ─────────────────────────────── */}
           {step === 5 && (
-            <div className="py-4">
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/20 mb-4">
-                  <div className="w-7 h-7 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" />
+            <div className="py-2">
+              <div className="text-center mb-6">
+                {/* Animated logo */}
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 relative"
+                  style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.15), rgba(239,68,68,0.1))", border: "1px solid rgba(249,115,22,0.25)" }}
+                >
+                  {/* Rotating ring */}
+                  <svg className="absolute inset-0" width={64} height={64} viewBox="0 0 64 64">
+                    <circle cx={32} cy={32} r={28} fill="none" stroke="rgba(249,115,22,0.15)" strokeWidth={2} />
+                    <circle
+                      cx={32} cy={32} r={28} fill="none"
+                      stroke="url(#ringGrad)" strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeDasharray="40 136"
+                      style={{ animation: "spin 1.2s linear infinite", transformOrigin: "32px 32px" }}
+                    />
+                    <defs>
+                      <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#f97316" />
+                        <stop offset="100%" stopColor="#ef4444" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <span className="text-2xl font-black" style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                    R
+                  </span>
                 </div>
-                <h2 className="text-xl font-black text-white mb-2">Analyse en cours...</h2>
-                <p className="text-gray-500 text-sm">Notre IA analyse votre site et construit votre stratégie SEO</p>
+                <h2 className="text-xl font-black text-white mb-1">Analyse en cours</h2>
+                <p className="text-gray-600 text-xs">
+                  {scanLines.length} / 7 signaux analysés
+                </p>
               </div>
-              <div className="bg-[#0a0a0a] border border-white/[0.06] rounded-xl p-4 font-mono text-xs space-y-1.5 min-h-[160px]">
-                {scanLines.map((line, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2"
-                    style={{ animation: "fadeIn 0.3s ease forwards" }}
-                  >
-                    <span className="text-orange-400">▸</span>
-                    <span className="text-gray-400">{line}</span>
-                    {i === scanLines.length - 1 && (
-                      <span className="inline-block w-1.5 h-3 bg-orange-400 animate-pulse ml-1" />
-                    )}
-                  </div>
-                ))}
+
+              {/* Terminal */}
+              <div
+                className="rounded-xl p-5 font-mono text-xs space-y-2.5 min-h-[180px] relative overflow-hidden"
+                style={{
+                  background: "#060606",
+                  border: "1px solid rgba(249,115,22,0.12)",
+                  boxShadow: "inset 0 0 40px rgba(249,115,22,0.03)",
+                }}
+              >
+                {/* Scanline CRT overlay */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px)",
+                    zIndex: 1,
+                  }}
+                />
+                {/* Glow */}
+                <div className="absolute top-0 left-0 right-0 h-8 pointer-events-none"
+                  style={{ background: "linear-gradient(180deg, rgba(249,115,22,0.04), transparent)", zIndex: 0 }} />
+
+                <div className="relative z-10 space-y-2">
+                  {scanLines.map((line, i) => (
+                    <ScrambleLine
+                      key={i}
+                      text={line}
+                      isLast={i === scanLines.length - 1}
+                    />
+                  ))}
+                  {scanLines.length === 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-orange-500 text-xs">▸</span>
+                      <span
+                        className="inline-block animate-pulse"
+                        style={{ width: 6, height: 12, background: "#f97316" }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div className="mt-4 h-0.5 rounded-full bg-white/[0.05] overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${(scanLines.length / 7) * 100}%`,
+                    background: "linear-gradient(90deg, #f97316, #ef4444)",
+                    transition: "width 0.8s ease",
+                    boxShadow: "0 0 8px rgba(249,115,22,0.5)",
+                  }}
+                />
               </div>
             </div>
           )}
@@ -398,7 +602,7 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
           {/* ── Step 6: Results ───────────────────────────────── */}
           {step === 6 && result && (
             <div>
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-3 mb-5">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/20 flex items-center justify-center text-sm">
                   ✦
                 </div>
@@ -409,6 +613,35 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
               </div>
 
               <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1" style={{ scrollbarWidth: "thin", scrollbarColor: "#333 transparent" }}>
+
+                {/* SEO Score Card */}
+                {result.seo_score && (
+                  <div
+                    className="rounded-2xl p-5"
+                    style={{
+                      background: "linear-gradient(135deg, rgba(15,15,15,1), rgba(20,20,20,1))",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                    }}
+                  >
+                    <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">
+                      Score SEO actuel — avant RankPill
+                    </p>
+                    <div className="flex items-start gap-6">
+                      <ScoreCircle score={result.seo_score.overall} />
+                      <div className="flex-1 space-y-2.5">
+                        <BreakdownBar label="Qualité du contenu" score={result.seo_score.breakdown.qualite_contenu} />
+                        <BreakdownBar label="Optimisation meta" score={result.seo_score.breakdown.optimisation_meta} />
+                        <BreakdownBar label="Ciblage mots-clés" score={result.seo_score.breakdown.ciblage_mots_cles} />
+                        <BreakdownBar label="Potentiel de croissance" score={result.seo_score.breakdown.potentiel_croissance} />
+                      </div>
+                    </div>
+                    {result.seo_score.verdict && (
+                      <p className="text-gray-500 text-xs mt-4 pt-4 border-t border-white/[0.05] leading-relaxed">
+                        {result.seo_score.verdict}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Strategy summary */}
                 <div className="bg-gradient-to-br from-orange-500/10 to-red-500/5 border border-orange-500/20 rounded-xl p-4">
@@ -524,9 +757,9 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
       </div>
 
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateX(-8px); }
-          to { opacity: 1; transform: translateX(0); }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>
