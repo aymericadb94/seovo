@@ -39,6 +39,9 @@ export default function SettingsPage() {
   const [gscSiteUrl, setGscSiteUrl] = useState("");
   const [gscProperties, setGscProperties] = useState<{ url: string }[]>([]);
   const [gscMsg, setGscMsg] = useState<"success" | "error" | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState<"success" | "error" | null>(null);
 
   useEffect(() => {
     // Detect GSC OAuth redirect result
@@ -555,6 +558,49 @@ export default function SettingsPage() {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Sécurité — changement de mot de passe */}
+          <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
+            <h2 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-5">Sécurité</h2>
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Nouveau mot de passe</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="8 caractères minimum"
+                  minLength={8}
+                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
+                />
+              </div>
+              {passwordMsg === "success" && (
+                <p className="text-green-400 text-sm font-bold">✓ Mot de passe modifié — un email de confirmation vous a été envoyé.</p>
+              )}
+              {passwordMsg === "error" && (
+                <p className="text-red-400 text-sm">Erreur lors du changement de mot de passe. Réessayez.</p>
+              )}
+              <button
+                type="button"
+                disabled={passwordSaving || newPassword.length < 8}
+                onClick={async () => {
+                  setPasswordSaving(true);
+                  setPasswordMsg(null);
+                  const res = await fetch("/api/auth/password", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ password: newPassword }),
+                  });
+                  setPasswordMsg(res.ok ? "success" : "error");
+                  if (res.ok) setNewPassword("");
+                  setPasswordSaving(false);
+                }}
+                className="w-full py-3 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.1] hover:border-white/[0.2] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm transition-all"
+              >
+                {passwordSaving ? "Modification…" : "Changer le mot de passe"}
+              </button>
+            </div>
           </div>
 
           {error && (
