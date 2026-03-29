@@ -214,13 +214,14 @@ export async function analyzeWixSite(apiKey: string, siteId: string) {
 
 export async function testWixConnection(apiKey: string, siteId: string): Promise<{ ok: boolean; reason?: string }> {
   try {
-    const res = await fetch("https://www.wixapis.com/site-properties/v4/properties", {
+    const res = await fetch(`${WIX_POSTS_API}?limit=1`, {
       headers: wixHeaders(apiKey, siteId),
     });
     if (res.ok) return { ok: true };
-    if (res.status === 401 || res.status === 403) return { ok: false, reason: "Clé API invalide ou Site ID incorrect" };
-    if (res.status === 404) return { ok: false, reason: "Site Wix introuvable — vérifiez le Site ID" };
-    return { ok: false, reason: `Erreur ${res.status}` };
+    if (res.status === 401 || res.status === 403) return { ok: false, reason: "Clé API invalide — vérifiez la clé et ses permissions Blog" };
+    if (res.status === 404) return { ok: false, reason: "Site ID incorrect ou blog non activé sur ce site Wix" };
+    const body = await res.text().catch(() => "");
+    return { ok: false, reason: `Erreur ${res.status}${body ? ` : ${body.slice(0, 120)}` : ""}` };
   } catch {
     return { ok: false, reason: "Impossible de joindre l'API Wix" };
   }
