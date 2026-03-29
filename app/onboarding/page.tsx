@@ -26,7 +26,10 @@ const industries = [
   "Mode & Vêtements", "Beauté & Cosmétiques", "Alimentation & Restauration",
   "Immobilier", "Santé & Bien-être", "Sport & Fitness", "Technologie",
   "Voyage & Tourisme", "Éducation & Formation", "Finance & Assurance",
-  "Décoration & Maison", "Automobile", "Autre",
+  "Décoration & Maison", "Automobile", "Services aux entreprises (B2B)",
+  "Services aux particuliers", "Juridique & Conseil", "Marketing & Communication",
+  "Architecture & Design", "Événementiel", "E-commerce", "Artisanat & Métiers",
+  "Médias & Contenu", "Recrutement & RH", "Logistique & Transport", "Autre",
 ];
 
 // ─── CMS SVG Icons ────────────────────────────────────────────────────────────
