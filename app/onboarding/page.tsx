@@ -525,7 +525,8 @@ export default function OnboardingPage() {
                         <div>
                           <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Endpoint URL</label>
                           <input
-                            type="url"
+                            type="text"
+                            autoComplete="off"
                             value={form.custom_api_url}
                             onChange={(e) => update("custom_api_url", e.target.value)}
                             placeholder="https://votresite.com/api/publish"
@@ -536,6 +537,7 @@ export default function OnboardingPage() {
                           <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Clé API (Bearer) <span className="text-gray-600 font-normal normal-case">(optionnel)</span></label>
                           <input
                             type="password"
+                            autoComplete="new-password"
                             value={form.custom_api_key}
                             onChange={(e) => update("custom_api_key", e.target.value)}
                             placeholder="votre-clé-api-secrète"

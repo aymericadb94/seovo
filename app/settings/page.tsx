@@ -336,7 +336,8 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Endpoint URL</label>
                     <input
-                      type="url"
+                      type="text"
+                      autoComplete="off"
                       value={config.custom_api_url}
                       onChange={(e) => update("custom_api_url", e.target.value)}
                       placeholder="https://votresite.com/api/articles"
@@ -347,6 +348,7 @@ export default function SettingsPage() {
                     <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Clé API (Bearer)</label>
                     <input
                       type="password"
+                      autoComplete="new-password"
                       value={config.custom_api_key}
                       onChange={(e) => update("custom_api_key", e.target.value)}
                       placeholder="votre-clé-api-secrète"
