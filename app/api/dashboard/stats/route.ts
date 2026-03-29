@@ -166,22 +166,15 @@ export async function GET() {
     });
 
     // ── Prochaine publication ────────────────────────────────────────────────
-    const frequency = site?.frequency ?? 1;
     const lastPub = pubs[0] ? new Date(pubs[0].published_at) : null;
-    let nextPublicationIn = "Demain 8h00";
+    const nextDate = lastPub ? new Date(lastPub) : new Date(now);
     if (lastPub) {
-      const next = new Date(lastPub);
-      next.setDate(next.getDate() + 1);
-      next.setHours(8, 0, 0, 0);
-      const diffMs = next.getTime() - now.getTime();
-      if (diffMs > 0) {
-        const diffH = Math.floor(diffMs / 3600000);
-        const diffM = Math.floor((diffMs % 3600000) / 60000);
-        nextPublicationIn = diffH > 0 ? `Dans ${diffH}h${diffM > 0 ? diffM + "min" : ""}` : `Dans ${diffM} min`;
-      } else {
-        nextPublicationIn = "Très prochainement";
-      }
+      nextDate.setDate(nextDate.getDate() + 1);
+    } else {
+      nextDate.setDate(nextDate.getDate() + 1);
     }
+    nextDate.setHours(8, 0, 0, 0);
+    const nextPublicationAt: string = nextDate.toISOString();
 
     // ── Streak de publication ────────────────────────────────────────────────
     const toKey = (d: Date) =>
@@ -238,7 +231,7 @@ export async function GET() {
         industry: site.industry,
         cms: site.cms,
         site_url: site.site_url,
-        frequency,
+        frequency: site.frequency,
         seo_analysis_done: site.seo_analysis_done ?? false,
         gsc_connected: !!site.google_access_token,
         gsc_site_url: site.gsc_site_url ?? null,
@@ -250,7 +243,7 @@ export async function GET() {
         coveredKeywords: coveredKeywords.length,
         totalKeywords: allKeywords.length,
         seoScore,
-        nextPublicationIn,
+        nextPublicationAt,
         streak,
         bestStreak,
       },

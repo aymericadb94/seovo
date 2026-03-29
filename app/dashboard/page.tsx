@@ -31,7 +31,7 @@ type DashboardData = {
     coveredKeywords: number;
     totalKeywords: number;
     seoScore: number;
-    nextPublicationIn: string;
+    nextPublicationAt: string | null;
     streak: number;
     bestStreak: number;
   };
@@ -234,6 +234,81 @@ function KeywordBar({ kw, max }: { kw: { keyword: string; count: number; lastPub
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
+
+function CountdownTimer({ targetIso }: { targetIso: string | null }) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const [time, setTime] = useState({ h: 0, m: 0, s: 0, ms: 0 });
+
+  useEffect(() => {
+    function calc() {
+      if (!targetIso) { setTime({ h: 0, m: 0, s: 0, ms: 0 }); return; }
+      const diff = new Date(targetIso).getTime() - Date.now();
+      if (diff <= 0) { setTime({ h: 0, m: 0, s: 0, ms: 0 }); return; }
+      setTime({
+        h: Math.floor(diff / 3600000),
+        m: Math.floor((diff % 3600000) / 60000),
+        s: Math.floor((diff % 60000) / 1000),
+        ms: diff,
+      });
+    }
+    calc();
+    const id = setInterval(calc, 1000);
+    return () => clearInterval(id);
+  }, [targetIso]);
+
+  const hasTime = time.ms > 0 && targetIso;
+  // Progress: % du temps écoulé depuis 8h00 J-1 vers 8h00 J (24h window)
+  const progress = targetIso
+    ? Math.max(0, Math.min(100, 100 - (time.ms / 86400000) * 100))
+    : 0;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {hasTime ? (
+        <div className="flex items-end gap-1">
+          {[
+            { val: pad(time.h), label: "h" },
+            { val: pad(time.m), label: "m" },
+            { val: pad(time.s), label: "s" },
+          ].map(({ val, label }, i) => (
+            <div key={label} className="flex items-end">
+              {i > 0 && (
+                <span
+                  className="text-2xl font-black mx-0.5 mb-1 animate-pulse"
+                  style={{ color: "rgba(249,115,22,0.5)" }}
+                >:</span>
+              )}
+              <div className="text-center">
+                <div
+                  className="px-1.5 py-0.5 rounded-lg mb-0.5"
+                  style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.12)" }}
+                >
+                  <span className="text-2xl font-black text-white tabular-nums leading-none">{val}</span>
+                </div>
+                <span className="text-xs font-bold" style={{ color: "rgba(249,115,22,0.5)" }}>{label}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-2xl font-black text-white">Très prochainement</p>
+      )}
+      <div>
+        <div className="h-0.5 bg-white/[0.05] rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${progress}%`,
+              background: "linear-gradient(90deg, #f97316, #ef4444)",
+              transition: "width 1s linear",
+              boxShadow: "0 0 6px rgba(249,115,22,0.4)",
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const router = useRouter();
@@ -545,19 +620,6 @@ export default function Dashboard() {
                         delay: "200ms",
                       },
                       {
-                        label: "Prochaine publication",
-                        value: null,
-                        text: kpis?.nextPublicationIn ?? "—",
-                        icon: (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                          </svg>
-                        ),
-                        sub: `Fréquence : ${kpis ? (kpis.totalArticles > 0 ? "automatique" : "en attente") : "—"}`,
-                        color: "#fb923c",
-                        delay: "300ms",
-                      },
-                      {
                         label: "Couverture mots-clés",
                         value: kpis && kpis.totalKeywords > 0
                           ? Math.round((kpis.coveredKeywords / kpis.totalKeywords) * 100)
@@ -596,7 +658,7 @@ export default function Dashboard() {
                         </div>
 
                         <p className="text-3xl font-black text-white tracking-tight">
-                          {"text" in kpi ? kpi.text : `${"value" in kpi ? (kpi.value?.toLocaleString("fr-FR") ?? 0) : 0}${"suffix" in kpi ? kpi.suffix ?? "" : ""}`}
+                          {"text" in kpi ? String(kpi.text) : `${"value" in kpi ? (kpi.value?.toLocaleString("fr-FR") ?? 0) : 0}${"suffix" in kpi ? kpi.suffix ?? "" : ""}`}
                         </p>
 
                         {/* Sous-texte avec barre de progression pour couverture */}
@@ -617,6 +679,28 @@ export default function Dashboard() {
                         </div>
                       </div>
                     ))}
+
+                    {/* Countdown card */}
+                    <div
+                      className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 flex flex-col justify-between min-h-[140px] card-hover animate-fade-in-up overflow-hidden group"
+                      style={{ animationDelay: "300ms" }}
+                    >
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+                        style={{ background: "radial-gradient(ellipse at top right, rgba(249,115,22,0.08), transparent 60%)" }} />
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Prochaine publication</p>
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110"
+                          style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <CountdownTimer targetIso={kpis?.nextPublicationAt ?? null} />
+                      <p className="text-xs font-medium mt-2" style={{ color: "#fb923c" }}>
+                        {kpis ? (kpis.totalArticles > 0 ? "Publication automatique" : "En attente du 1er article") : "—"}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
