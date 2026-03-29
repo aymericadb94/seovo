@@ -217,36 +217,33 @@ export default function LandingPage() {
     <div className="bg-black text-white min-h-screen overflow-x-hidden">
 
       {/* Bannière ticker */}
-      <div className="fixed top-0 left-0 right-0 z-[60] overflow-hidden" style={{ background: "linear-gradient(90deg, #0a0a0a 0%, #111 40%, #0f0f0f 60%, #0a0a0a 100%)", borderBottom: "1px solid rgba(249,115,22,0.12)", height: "36px" }}>
-        {/* Halos lumineux */}
-        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-64 h-8 rounded-full blur-2xl pointer-events-none" style={{ background: "rgba(249,115,22,0.12)" }} />
-        <div className="absolute top-1/2 right-1/3 -translate-y-1/2 w-48 h-8 rounded-full blur-2xl pointer-events-none" style={{ background: "rgba(239,68,68,0.08)" }} />
-        {/* Fade gauche / droite */}
-        <div className="absolute inset-y-0 left-0 w-24 z-10 pointer-events-none" style={{ background: "linear-gradient(90deg, #0a0a0a 0%, transparent 100%)" }} />
-        <div className="absolute inset-y-0 right-0 w-24 z-10 pointer-events-none" style={{ background: "linear-gradient(270deg, #0a0a0a 0%, transparent 100%)" }} />
-        {/* Ticker */}
-        <div className="flex items-center h-full whitespace-nowrap animate-[ticker_40s_linear_infinite]">
-          {[
-            "Fais exploser ton référencement SEO de façon automatique",
-            "Triple ton trafic organique avec nos outils professionnels",
-            "Des articles SEO publiés automatiquement sur ton site chaque jour",
-            "RankPill génère du contenu optimisé pendant que tu dors",
-            "Connecte WordPress, Shopify, Wix ou ton API en 2 minutes",
-            "+340% de trafic organique en moyenne pour nos utilisateurs",
-          ].concat([
-            "Fais exploser ton référencement SEO de façon automatique",
-            "Triple ton trafic organique avec nos outils professionnels",
-            "Des articles SEO publiés automatiquement sur ton site chaque jour",
-            "RankPill génère du contenu optimisé pendant que tu dors",
-            "Connecte WordPress, Shopify, Wix ou ton API en 2 minutes",
-            "+340% de trafic organique en moyenne pour nos utilisateurs",
-          ]).map((msg, i) => (
-            <span key={i} className="inline-flex items-center gap-4 px-8">
-              <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: i % 3 === 0 ? "#f97316" : i % 3 === 1 ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)" }}>
-                {msg}
-              </span>
-              <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "rgba(249,115,22,0.5)" }} />
-            </span>
+      <div className="fixed top-0 left-0 right-0 z-[60] overflow-hidden" style={{ background: "linear-gradient(90deg, #080808 0%, #111 40%, #0f0f0f 60%, #080808 100%)", borderBottom: "1px solid rgba(249,115,22,0.10)", height: "36px" }}>
+        {/* Halos */}
+        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-72 h-10 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(249,115,22,0.10)" }} />
+        <div className="absolute top-1/2 right-1/3 -translate-y-1/2 w-56 h-10 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(239,68,68,0.07)" }} />
+        {/* Fade bords */}
+        <div className="absolute inset-y-0 left-0 w-20 z-10 pointer-events-none" style={{ background: "linear-gradient(90deg, #080808, transparent)" }} />
+        <div className="absolute inset-y-0 right-0 w-20 z-10 pointer-events-none" style={{ background: "linear-gradient(270deg, #080808, transparent)" }} />
+        {/* Track animé — deux blocs identiques pour loop sans saut */}
+        <div className="flex items-center h-full" style={{ animation: "ticker 18s linear infinite", willChange: "transform" }}>
+          {[0, 1].map((copy) => (
+            <div key={copy} className="flex items-center flex-shrink-0" aria-hidden={copy === 1 ? "true" : undefined}>
+              {[
+                "Fais exploser ton référencement SEO de façon automatique",
+                "Triple ton trafic organique avec nos outils professionnels",
+                "Des articles SEO publiés automatiquement sur ton site chaque jour",
+                "RankPill génère du contenu optimisé pendant que tu dors",
+                "Connecte WordPress, Shopify, Wix ou ton API en 2 minutes",
+                "+340% de trafic organique en moyenne pour nos utilisateurs",
+              ].map((msg, i) => (
+                <span key={i} className="inline-flex items-center gap-3 px-7 whitespace-nowrap">
+                  <span className="text-[11px] font-black tracking-widest uppercase" style={{ color: i % 3 === 0 ? "#f97316" : i % 3 === 1 ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.4)" }}>
+                    {msg}
+                  </span>
+                  <span className="w-[3px] h-[3px] rounded-full flex-shrink-0" style={{ background: "rgba(249,115,22,0.45)" }} />
+                </span>
+              ))}
+            </div>
           ))}
         </div>
       </div>
