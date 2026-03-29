@@ -1,3 +1,9 @@
+function normalizeUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `https://${url}`;
+}
+
 export async function publishToCustomApi(
   apiUrl: string,
   apiKey: string,
@@ -6,6 +12,8 @@ export async function publishToCustomApi(
   metaDescription: string,
   siteUrl: string
 ): Promise<string> {
+  const normalizedSiteUrl = normalizeUrl(siteUrl).replace(/\/$/, "");
+
   const res = await fetch(apiUrl, {
     method: "POST",
     headers: {
@@ -18,10 +26,13 @@ export async function publishToCustomApi(
 
   try {
     const data = await res.json() as { url?: string; slug?: string };
-    if (data.url) return data.url;
-    if (data.slug) return `${siteUrl.replace(/\/$/, "")}/${data.slug}`;
+    if (data.url) return normalizeUrl(data.url);
+    if (data.slug) {
+      const slug = data.slug.startsWith("/") ? data.slug : `/${data.slug}`;
+      return `${normalizedSiteUrl}${slug}`;
+    }
   } catch {
     // Response is not JSON or has no url/slug field
   }
-  return siteUrl;
+  return normalizedSiteUrl;
 }
