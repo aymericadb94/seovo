@@ -167,6 +167,7 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
       .update({
         keywords: uniqueKeywords,
         seo_analysis_done: true,
+        seo_score_initial: analysis.seo_score?.overall ?? null,
       })
       .eq("user_id", user.id);
 

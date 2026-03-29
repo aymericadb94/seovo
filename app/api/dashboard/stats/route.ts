@@ -45,8 +45,9 @@ export async function GET() {
     const keywordCoverage = allKeywords.length > 0
       ? (coveredKeywords.length / allKeywords.length) * 100
       : 0;
+    const baseScore = site?.seo_score_initial ?? 20;
     const seoScore = Math.min(
-      Math.round(40 + (totalArticles * 2) + (keywordCoverage * 0.3)),
+      Math.round(baseScore + (totalArticles * 2) + (keywordCoverage * 0.3)),
       98
     );
 
