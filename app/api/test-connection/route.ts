@@ -2,10 +2,10 @@ import { testWixConnection } from "@/lib/wix";
 
 export async function POST(request: Request) {
   try {
-    const { cms, siteUrl, wpUsername, wpAppPassword, shopifyApiKey, wixApiKey, wixSiteId } = await request.json();
+    const { cms, siteUrl, wpUsername, wpAppPassword, shopifyApiKey, wixApiKey, wixSiteId, customApiUrl, customApiKey } = await request.json();
 
-    if (!cms || !siteUrl) {
-      return Response.json({ ok: false, reason: "URL du site manquante" }, { status: 400 });
+    if (!cms) {
+      return Response.json({ ok: false, reason: "CMS manquant" }, { status: 400 });
     }
 
     if (cms === "wordpress") {
@@ -57,6 +57,20 @@ export async function POST(request: Request) {
       }
       const result = await testWixConnection(wixApiKey, wixSiteId);
       return Response.json(result);
+    }
+
+    if (cms === "custom") {
+      if (!customApiUrl) {
+        return Response.json({ ok: false, reason: "URL de l'endpoint API manquante" }, { status: 400 });
+      }
+      const testRes = await fetch(customApiUrl, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${customApiKey ?? ""}` },
+      });
+      if (testRes.status === 401 || testRes.status === 403) {
+        return Response.json({ ok: false, reason: "Clé API invalide ou accès refusé" });
+      }
+      return Response.json({ ok: true });
     }
 
     return Response.json({ ok: false, reason: "CMS non supporté" }, { status: 400 });

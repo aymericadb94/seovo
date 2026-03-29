@@ -53,6 +53,12 @@ export async function POST(request: Request) {
       }
     }
 
+    if (body.cms === "custom") {
+      if (!body.custom_api_url) {
+        return Response.json({ error: "URL de l'endpoint API manquante." }, { status: 400 });
+      }
+    }
+
     const { error } = await supabase.from("sites").insert({
       user_id: user.id,
       business_name: body.business_name,
@@ -64,6 +70,8 @@ export async function POST(request: Request) {
       shopify_api_key: body.shopify_api_key || null,
       wix_api_key: body.wix_api_key || null,
       wix_site_id: body.wix_site_id || null,
+      custom_api_url: body.custom_api_url || null,
+      custom_api_key: body.custom_api_key || null,
       keywords: body.keywords,
       frequency: body.frequency,
     });

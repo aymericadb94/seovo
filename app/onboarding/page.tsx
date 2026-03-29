@@ -9,13 +9,15 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 type FormData = {
   business_name: string;
   industry: string;
-  cms: "wordpress" | "shopify" | "wix" | "";
+  cms: "wordpress" | "shopify" | "wix" | "custom" | "";
   site_url: string;
   wp_username: string;
   wp_app_password: string;
   shopify_api_key: string;
   wix_api_key: string;
   wix_site_id: string;
+  custom_api_url: string;
+  custom_api_key: string;
   keywords: string;
   frequency: number;
 };
@@ -49,6 +51,14 @@ function WixIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
       <path d="M11.705 5.385c-.408 1.188-1.152 3.35-1.848 5.366L7.71 4.617C7.346 3.52 6.663 3 5.726 3H3.43L7.8 15.43c.364 1.058 1.037 1.565 1.895 1.565.858 0 1.532-.507 1.895-1.565l2.148-6.24 2.148 6.24c.363 1.058 1.037 1.565 1.895 1.565.858 0 1.531-.507 1.895-1.565L24 3h-2.295c-.937 0-1.62.52-1.984 1.617l-2.148 6.134c-.695-2.017-1.44-4.178-1.848-5.366C15.29 1.826 14.285 1 12.997 1c-1.289 0-2.294.826-3.292 4.385z"/>
+    </svg>
+  );
+}
+
+function CustomIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
     </svg>
   );
 }
@@ -99,6 +109,19 @@ const WIX_TUTORIAL = {
   warning: "La clé API Wix ne s'affiche qu'une seule fois à la création. Si vous l'avez manquée, supprimez-la et générez-en une nouvelle.",
 };
 
+const CUSTOM_TUTORIAL = {
+  title: "Comment connecter votre API custom (Lovable, etc.)",
+  permissions: ["POST articles — Créer des articles via l'API", "Authentification Bearer — Clé API secrète"],
+  steps: [
+    { num: "01", title: "Créez un endpoint POST sur votre site", detail: "Votre site doit exposer un endpoint qui accepte les requêtes POST avec le body :", code: '{ "title": "...", "content": "...", "meta_description": "..." }' },
+    { num: "02", title: "Sécurisez avec un Bearer token", detail: "L'endpoint doit vérifier le header d'autorisation :", code: "Authorization: Bearer VOTRE_CLÉ_API" },
+    { num: "03", title: "Retournez l'URL publiée", detail: "Après publication, retournez une réponse JSON avec l'URL de l'article :", code: '{ "url": "https://votresite.com/articles/mon-article" }' },
+    { num: "04", title: "Renseignez l'URL de l'endpoint", detail: "Entrez l'URL complète de votre endpoint dans le champ \"Endpoint URL\" à gauche.", code: "https://votresite.com/api/publish" },
+    { num: "05", title: "Renseignez votre clé API", detail: "Entrez la clé secrète que votre endpoint vérifie. RankPill l'enverra dans le header Authorization." },
+  ],
+  warning: "Ne partagez jamais votre clé API. Elle donne accès à la publication de contenu sur votre site.",
+};
+
 // ─── Composant tutoriel ───────────────────────────────────────────────────────
 
 type TutorialStep = {
@@ -111,18 +134,20 @@ type TutorialStep = {
 };
 
 function Tutorial({ cms, shopifyPermissions, requiredPermissionsLabel, attentionLabel }: {
-  cms: "wordpress" | "shopify" | "wix";
+  cms: "wordpress" | "shopify" | "wix" | "custom";
   shopifyPermissions?: string[];
   requiredPermissionsLabel: string;
   attentionLabel: string;
 }) {
-  const tuto = cms === "wordpress" ? WP_TUTORIAL : cms === "shopify" ? SHOPIFY_TUTORIAL : WIX_TUTORIAL;
+  const tuto = cms === "wordpress" ? WP_TUTORIAL : cms === "shopify" ? SHOPIFY_TUTORIAL : cms === "wix" ? WIX_TUTORIAL : CUSTOM_TUTORIAL;
 
   const cmsIcon = cms === "wordpress"
     ? <WPIcon className="w-4 h-4" />
     : cms === "shopify"
     ? <ShopifyIcon className="w-4 h-4" />
-    : <WixIcon className="w-4 h-4" />;
+    : cms === "wix"
+    ? <WixIcon className="w-4 h-4" />
+    : <CustomIcon className="w-4 h-4" />;
 
   return (
     <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 h-full animate-[fadeInUp_0.4s_ease-out_both]">
@@ -225,6 +250,7 @@ export default function OnboardingPage() {
     business_name: "", industry: "", cms: "", site_url: "",
     wp_username: "", wp_app_password: "", shopify_api_key: "",
     wix_api_key: "", wix_site_id: "",
+    custom_api_url: "", custom_api_key: "",
     keywords: "", frequency: 1,
   });
 
@@ -245,6 +271,7 @@ export default function OnboardingPage() {
       if (form.cms === "wordpress") return form.wp_username.trim() && form.wp_app_password.trim();
       if (form.cms === "shopify") return form.shopify_api_key.trim();
       if (form.cms === "wix") return form.wix_api_key.trim() && form.wix_site_id.trim();
+      if (form.cms === "custom") return form.custom_api_url.trim();
     }
     if (step === 2) return form.keywords.trim().length > 0;
     return false;
@@ -390,11 +417,11 @@ export default function OnboardingPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.cms}</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {(["wordpress", "shopify", "wix"] as const).map((cms, idx) => (
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["wordpress", "shopify", "wix", "custom"] as const).map((cms, idx) => (
                       <button key={cms} type="button" onClick={() => update("cms", cms)}
                         style={{ animationDelay: `${idx * 60}ms` }}
-                        className={`relative py-5 rounded-xl border font-bold text-sm uppercase tracking-wide transition-all duration-200 overflow-hidden group animate-[fadeInUp_0.3s_ease-out_both] flex flex-col items-center gap-2 ${
+                        className={`relative py-4 rounded-xl border font-bold text-sm uppercase tracking-wide transition-all duration-200 overflow-hidden group animate-[fadeInUp_0.3s_ease-out_both] flex flex-col items-center gap-2 ${
                           form.cms === cms
                             ? "bg-orange-500/10 border-orange-500/40 text-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.12)]"
                             : "bg-white/[0.03] border-white/[0.08] text-gray-400 hover:border-orange-500/30 hover:text-white"
@@ -404,8 +431,8 @@ export default function OnboardingPage() {
                         )}
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
                           style={{ background: "radial-gradient(circle at 50% 50%, rgba(249,115,22,0.06) 0%, transparent 70%)" }} />
-                        {cms === "wordpress" ? <WPIcon className="w-5 h-5" /> : cms === "shopify" ? <ShopifyIcon className="w-5 h-5" /> : <WixIcon className="w-5 h-5" />}
-                        {cms === "wordpress" ? "WordPress" : cms === "shopify" ? "Shopify" : "Wix"}
+                        {cms === "wordpress" ? <WPIcon className="w-5 h-5" /> : cms === "shopify" ? <ShopifyIcon className="w-5 h-5" /> : cms === "wix" ? <WixIcon className="w-5 h-5" /> : <CustomIcon className="w-5 h-5" />}
+                        {cms === "wordpress" ? "WordPress" : cms === "shopify" ? "Shopify" : cms === "wix" ? "Wix" : "Custom API"}
                       </button>
                     ))}
                   </div>
@@ -419,7 +446,7 @@ export default function OnboardingPage() {
                         type="url"
                         value={form.site_url}
                         onChange={(e) => update("site_url", e.target.value)}
-                        placeholder={form.cms === "wordpress" ? "https://monsite.com" : "https://maboutique.myshopify.com"}
+                        placeholder={form.cms === "wordpress" ? "https://monsite.com" : form.cms === "shopify" ? "https://maboutique.myshopify.com" : form.cms === "custom" ? "https://monsite.com" : "https://monsite.com"}
                         className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
                       />
                     </div>
@@ -483,6 +510,32 @@ export default function OnboardingPage() {
                             value={form.wix_site_id}
                             onChange={(e) => update("wix_site_id", e.target.value)}
                             placeholder={t.onboarding.wixSiteIdPlaceholder}
+                            className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
+                          />
+                          <p className="text-gray-600 text-xs mt-1.5">{t.onboarding.tutorialHint}</p>
+                        </div>
+                      </>
+                    )}
+
+                    {form.cms === "custom" && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Endpoint URL</label>
+                          <input
+                            type="url"
+                            value={form.custom_api_url}
+                            onChange={(e) => update("custom_api_url", e.target.value)}
+                            placeholder="https://votresite.com/api/publish"
+                            className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Clé API (Bearer) <span className="text-gray-600 font-normal normal-case">(optionnel)</span></label>
+                          <input
+                            type="password"
+                            value={form.custom_api_key}
+                            onChange={(e) => update("custom_api_key", e.target.value)}
+                            placeholder="votre-clé-api-secrète"
                             className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
                           />
                           <p className="text-gray-600 text-xs mt-1.5">{t.onboarding.tutorialHint}</p>
@@ -604,7 +657,7 @@ export default function OnboardingPage() {
           {isWide && form.cms && (
             <div className="flex-1">
               <Tutorial
-                cms={form.cms as "wordpress" | "shopify" | "wix"}
+                cms={form.cms as "wordpress" | "shopify" | "wix" | "custom"}
                 shopifyPermissions={["write_content — Publier des articles de blog", "read_content — Lire les blogs existants"]}
                 requiredPermissionsLabel={t.onboarding.requiredPermissions}
                 attentionLabel={t.onboarding.attention}

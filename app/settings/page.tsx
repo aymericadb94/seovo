@@ -9,13 +9,15 @@ import { LOCALES, localeFlags, localeNames, type Locale } from "@/lib/i18n/trans
 type SiteConfig = {
   business_name: string;
   industry: string;
-  cms: "wordpress" | "shopify" | "wix";
+  cms: "wordpress" | "shopify" | "wix" | "custom";
   site_url: string;
   wp_username: string;
   wp_app_password: string;
   shopify_api_key: string;
   wix_api_key: string;
   wix_site_id: string;
+  custom_api_url: string;
+  custom_api_key: string;
   keywords: string[];
   frequency: number;
   target_languages: Locale[];
@@ -63,6 +65,8 @@ export default function SettingsPage() {
             target_languages: Array.isArray(data.target_languages) && data.target_languages.length > 0
               ? data.target_languages
               : ["fr"],
+            custom_api_url: data.custom_api_url ?? "",
+            custom_api_key: data.custom_api_key ?? "",
           });
           setGscConnected(!!data.gsc_connected);
           setGscSiteUrl(data.gsc_site_url ?? "");
@@ -93,6 +97,8 @@ export default function SettingsPage() {
           shopifyApiKey: config.shopify_api_key,
           wixApiKey: config.wix_api_key,
           wixSiteId: config.wix_site_id,
+          customApiUrl: config.custom_api_url,
+          customApiKey: config.custom_api_key,
         }),
       });
       const data = await res.json();
@@ -320,6 +326,30 @@ export default function SettingsPage() {
                       value={config.wix_site_id}
                       onChange={(e) => update("wix_site_id", e.target.value)}
                       placeholder={t.settings.wixSiteIdPlaceholder}
+                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
+                    />
+                  </div>
+                </>
+              )}
+              {config.cms === "custom" && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Endpoint URL</label>
+                    <input
+                      type="url"
+                      value={config.custom_api_url}
+                      onChange={(e) => update("custom_api_url", e.target.value)}
+                      placeholder="https://votresite.com/api/articles"
+                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Clé API (Bearer)</label>
+                    <input
+                      type="password"
+                      value={config.custom_api_key}
+                      onChange={(e) => update("custom_api_key", e.target.value)}
+                      placeholder="votre-clé-api-secrète"
                       className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
                     />
                   </div>

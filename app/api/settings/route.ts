@@ -53,6 +53,8 @@ export async function PATCH(request: Request) {
         shopify_api_key: body.shopify_api_key || null,
         wix_api_key: body.wix_api_key || null,
         wix_site_id: body.wix_site_id || null,
+        custom_api_url: body.custom_api_url || null,
+        custom_api_key: body.custom_api_key || null,
         gsc_site_url: body.gsc_site_url || null,
         keywords,
         frequency: body.frequency,

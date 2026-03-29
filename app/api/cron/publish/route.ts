@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { sendArticlePublishedEmail } from "@/lib/email";
 import { publishToWix, analyzeWixSite } from "@/lib/wix";
+import { publishToCustomApi } from "@/lib/custom";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -390,6 +391,11 @@ export async function GET(request: Request) {
           } else if (site.cms === "wix") {
             publishedUrl = await publishToWix(
               site.wix_api_key, site.wix_site_id,
+              title, content, meta_description, site.site_url
+            );
+          } else if (site.cms === "custom") {
+            publishedUrl = await publishToCustomApi(
+              site.custom_api_url, site.custom_api_key,
               title, content, meta_description, site.site_url
             );
           } else {
