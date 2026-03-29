@@ -21,6 +21,8 @@ export default function SignupPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Étape 1 : inscription ─────────────────────────────────────────────────
 
@@ -53,6 +55,7 @@ export default function SignupPage() {
 
     setStep("otp");
     setLoading(false);
+    startCooldown();
   }
 
   // ── Étape 2 : vérification OTP ────────────────────────────────────────────
@@ -84,11 +87,28 @@ export default function SignupPage() {
     router.push("/onboarding");
   }
 
+  function startCooldown() {
+    setResendCooldown(60);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown((c) => {
+        if (c <= 1) { clearInterval(cooldownRef.current!); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+  }
+
   async function resendCode() {
+    if (resendCooldown > 0) return;
     setError("");
     const supabase = createClient();
-    await supabase.auth.resend({ type: "signup", email });
-    setError("✓ Nouveau code envoyé.");
+    const { error: resendError } = await supabase.auth.resend({ type: "signup", email });
+    if (resendError) {
+      setError("Impossible d'envoyer le code. Réessayez dans quelques secondes.");
+    } else {
+      setError("✓ Nouveau code envoyé.");
+      startCooldown();
+    }
   }
 
   // ── OTP input handlers ────────────────────────────────────────────────────
@@ -302,9 +322,14 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={resendCode}
-                className="text-xs text-orange-500/70 hover:text-orange-400 transition-colors"
+                disabled={resendCooldown > 0}
+                className="text-xs transition-colors disabled:cursor-not-allowed"
+                style={{ color: resendCooldown > 0 ? "rgba(156,163,175,0.5)" : "" }}
               >
-                Renvoyer le code
+                {resendCooldown > 0
+                  ? `Renvoyer dans ${resendCooldown}s`
+                  : <span className="text-orange-500/70 hover:text-orange-400">Renvoyer le code</span>
+                }
               </button>
             </div>
           </form>
