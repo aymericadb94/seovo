@@ -46,11 +46,13 @@ export async function POST(request: Request) {
       }
     }
 
+    let wixMemberId: string | null = null;
     if (body.cms === "wix") {
       const result = await testWixConnection(body.wix_api_key, body.wix_site_id);
       if (!result.ok) {
         return Response.json({ error: `Connexion Wix échouée : ${result.reason}` }, { status: 400 });
       }
+      wixMemberId = result.memberId ?? null;
     }
 
     if (body.cms === "custom") {
@@ -70,6 +72,7 @@ export async function POST(request: Request) {
       shopify_api_key: body.shopify_api_key || null,
       wix_api_key: body.wix_api_key || null,
       wix_site_id: body.wix_site_id || null,
+      wix_member_id: wixMemberId,
       custom_api_url: body.custom_api_url || null,
       custom_api_key: body.custom_api_key || null,
       keywords: body.keywords,

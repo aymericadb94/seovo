@@ -183,13 +183,14 @@ export async function publishToWix(
   title: string,
   content: string,
   metaDescription: string,
-  siteUrl?: string
+  siteUrl?: string,
+  storedMemberId?: string | null
 ): Promise<string> {
   const richContent = htmlToRicos(content);
   const headers = wixHeaders(apiKey, siteId);
 
-  // Récupérer le memberId (requis par l'API Wix pour les apps tierces)
-  const memberId = await getWixMemberId(apiKey, siteId);
+  // Utiliser le memberId stocké en base, ou le résoudre dynamiquement en fallback
+  const memberId = storedMemberId || await getWixMemberId(apiKey, siteId);
   if (!memberId) {
     throw new Error("Impossible de récupérer l'identifiant du propriétaire du site Wix. Vérifiez que votre clé API a les permissions 'Membres' en lecture, ou publiez au moins un article manuellement sur votre blog Wix.");
   }
@@ -261,16 +262,26 @@ export async function analyzeWixSite(apiKey: string, siteId: string) {
 
 // ─── Test de connexion Wix ────────────────────────────────────────────────────
 
-export async function testWixConnection(apiKey: string, siteId: string): Promise<{ ok: boolean; reason?: string }> {
+export async function testWixConnection(apiKey: string, siteId: string): Promise<{ ok: boolean; reason?: string; memberId?: string }> {
   try {
     const res = await fetch(`${WIX_POSTS_API}?limit=1`, {
       headers: wixHeaders(apiKey, siteId),
     });
-    if (res.ok) return { ok: true };
-    if (res.status === 401 || res.status === 403) return { ok: false, reason: "Clé API invalide ou permissions insuffisantes — activez les permissions Blog (lecture + écriture)" };
-    if (res.status === 404) return { ok: false, reason: "Site ID incorrect — vérifiez le Site ID sur la page de votre clé API (manage.wix.com/account/api-keys)" };
-    const body = await res.text().catch(() => "");
-    return { ok: false, reason: `Erreur ${res.status}${body ? ` : ${body.slice(0, 120)}` : ""}` };
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) return { ok: false, reason: "Clé API invalide ou permissions insuffisantes — activez les permissions Blog (lecture + écriture)" };
+      if (res.status === 404) return { ok: false, reason: "Site ID incorrect — vérifiez le Site ID sur la page de votre clé API (manage.wix.com/account/api-keys)" };
+      const body = await res.text().catch(() => "");
+      return { ok: false, reason: `Erreur ${res.status}${body ? ` : ${body.slice(0, 120)}` : ""}` };
+    }
+
+    // Connexion OK — résoudre le memberId maintenant pour le stocker en base
+    const data = await res.json() as { posts?: { memberId?: string }[] };
+    const memberIdFromPost = data.posts?.[0]?.memberId ?? null;
+
+    // Si pas de posts existants, interroger l'API membres
+    const memberId = memberIdFromPost ?? await getWixMemberId(apiKey, siteId);
+
+    return { ok: true, ...(memberId ? { memberId } : {}) };
   } catch {
     return { ok: false, reason: "Impossible de joindre l'API Wix" };
   }

@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     // Lire la config du site de l'utilisateur
     const { data: site, error: siteError } = await supabase
       .from("sites")
-      .select("id, cms, site_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
+      .select("id, cms, site_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, wix_member_id, custom_api_url, custom_api_key")
       .eq("user_id", user.id)
       .limit(1)
       .single();
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       if (!site.wix_api_key || !site.wix_site_id) {
         return Response.json({ error: "Clé API ou Site ID Wix manquants dans la configuration." }, { status: 400 });
       }
-      url = await publishToWix(site.wix_api_key, site.wix_site_id, title, content, meta_description, site.site_url);
+      url = await publishToWix(site.wix_api_key, site.wix_site_id, title, content, meta_description, site.site_url, site.wix_member_id);
     } else if (site.cms === "custom") {
       if (!site.custom_api_url) {
         return Response.json({ error: "URL de l'endpoint API manquante dans la configuration." }, { status: 400 });
