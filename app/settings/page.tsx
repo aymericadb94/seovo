@@ -560,16 +560,24 @@ export default function SettingsPage() {
                   <label className="text-xs text-gray-500 uppercase tracking-wide font-bold mb-1.5 block">
                     Propriété GSC à utiliser
                   </label>
-                  <select
-                    value={gscSiteUrl}
-                    onChange={e => setGscSiteUrl(e.target.value)}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-orange-500/50"
-                  >
-                    <option value="">— Sélectionner une propriété —</option>
-                    {gscProperties.map(p => (
-                      <option key={p.url} value={p.url}>{p.url}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={gscSiteUrl}
+                      onChange={e => setGscSiteUrl(e.target.value)}
+                      className="w-full appearance-none bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-orange-500/50 transition-colors cursor-pointer"
+                      style={{ color: gscSiteUrl ? "white" : "rgba(156,163,175,0.7)" }}
+                    >
+                      <option value="" style={{ background: "#111", color: "rgba(156,163,175,0.7)" }}>Sélectionner une propriété</option>
+                      {gscProperties.map(p => (
+                        <option key={p.url} value={p.url} style={{ background: "#111", color: "white" }}>{p.url}</option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                      <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4">
+                        <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  </div>
                   <p className="text-gray-600 text-xs mt-1.5">Sélectionnez le site qui correspond à vos publications</p>
                 </div>
                 <button
@@ -582,7 +590,8 @@ export default function SettingsPage() {
                     });
                     setGscMsg("success");
                   }}
-                  className="w-full py-2.5 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-xl text-sm"
+                  disabled={!gscSiteUrl}
+                  className="w-full py-2.5 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm transition-all"
                 >
                   Enregistrer la propriété GSC
                 </button>
