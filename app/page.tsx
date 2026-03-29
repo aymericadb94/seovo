@@ -216,34 +216,43 @@ export default function LandingPage() {
   return (
     <div className="bg-black text-white min-h-screen overflow-x-hidden">
 
-      {/* Bannière ticker animée */}
-      <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-orange-500/90 to-red-500/90 backdrop-blur-sm text-white text-xs font-bold py-2 overflow-hidden">
-        <div className="flex whitespace-nowrap animate-[ticker_30s_linear_infinite]">
+      {/* Bannière ticker */}
+      <div className="fixed top-0 left-0 right-0 z-[60] overflow-hidden" style={{ background: "linear-gradient(90deg, #0a0a0a 0%, #111 40%, #0f0f0f 60%, #0a0a0a 100%)", borderBottom: "1px solid rgba(249,115,22,0.12)", height: "36px" }}>
+        {/* Halos lumineux */}
+        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-64 h-8 rounded-full blur-2xl pointer-events-none" style={{ background: "rgba(249,115,22,0.12)" }} />
+        <div className="absolute top-1/2 right-1/3 -translate-y-1/2 w-48 h-8 rounded-full blur-2xl pointer-events-none" style={{ background: "rgba(239,68,68,0.08)" }} />
+        {/* Fade gauche / droite */}
+        <div className="absolute inset-y-0 left-0 w-24 z-10 pointer-events-none" style={{ background: "linear-gradient(90deg, #0a0a0a 0%, transparent 100%)" }} />
+        <div className="absolute inset-y-0 right-0 w-24 z-10 pointer-events-none" style={{ background: "linear-gradient(270deg, #0a0a0a 0%, transparent 100%)" }} />
+        {/* Ticker */}
+        <div className="flex items-center h-full whitespace-nowrap animate-[ticker_40s_linear_infinite]">
           {[
-            "🚀 Fais exploser ton référencement SEO de façon automatique",
-            "📈 Triple ton trafic organique avec nos outils professionnels",
-            "✍️ Des articles SEO publiés automatiquement sur ton site chaque jour",
-            "🎯 RankPill génère du contenu optimisé pendant que tu dors",
-            "⚡ Connecte WordPress, Shopify, Wix ou ton API en 2 minutes",
-            "🏆 +340% de trafic organique en moyenne pour nos utilisateurs",
+            "Fais exploser ton référencement SEO de façon automatique",
+            "Triple ton trafic organique avec nos outils professionnels",
+            "Des articles SEO publiés automatiquement sur ton site chaque jour",
+            "RankPill génère du contenu optimisé pendant que tu dors",
+            "Connecte WordPress, Shopify, Wix ou ton API en 2 minutes",
+            "+340% de trafic organique en moyenne pour nos utilisateurs",
           ].concat([
-            "🚀 Fais exploser ton référencement SEO de façon automatique",
-            "📈 Triple ton trafic organique avec nos outils professionnels",
-            "✍️ Des articles SEO publiés automatiquement sur ton site chaque jour",
-            "🎯 RankPill génère du contenu optimisé pendant que tu dors",
-            "⚡ Connecte WordPress, Shopify, Wix ou ton API en 2 minutes",
-            "🏆 +340% de trafic organique en moyenne pour nos utilisateurs",
+            "Fais exploser ton référencement SEO de façon automatique",
+            "Triple ton trafic organique avec nos outils professionnels",
+            "Des articles SEO publiés automatiquement sur ton site chaque jour",
+            "RankPill génère du contenu optimisé pendant que tu dors",
+            "Connecte WordPress, Shopify, Wix ou ton API en 2 minutes",
+            "+340% de trafic organique en moyenne pour nos utilisateurs",
           ]).map((msg, i) => (
-            <span key={i} className="inline-flex items-center gap-2 px-8">
-              {msg}
-              <span className="text-orange-200/60 mx-2">·</span>
+            <span key={i} className="inline-flex items-center gap-4 px-8">
+              <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: i % 3 === 0 ? "#f97316" : i % 3 === 1 ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)" }}>
+                {msg}
+              </span>
+              <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "rgba(249,115,22,0.5)" }} />
             </span>
           ))}
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="fixed top-8 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5 animate-fade-in">
+      <nav className="fixed left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5 animate-fade-in" style={{ top: "36px" }}>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xl font-bold tracking-tight logo-glow">
