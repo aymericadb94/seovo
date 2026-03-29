@@ -34,6 +34,17 @@ export async function PATCH(request: Request) {
     if (authError || !user) return Response.json({ error: "Non authentifié" }, { status: 401 });
 
     const body = await request.json();
+
+    // Mise à jour partielle — si seul gsc_site_url est envoyé, on ne touche qu'à ce champ
+    if (Object.keys(body).length === 1 && "gsc_site_url" in body) {
+      const { error } = await supabase
+        .from("sites")
+        .update({ gsc_site_url: body.gsc_site_url || null })
+        .eq("user_id", user.id);
+      if (error) return Response.json({ error: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+
     const keywords = typeof body.keywords === "string"
       ? body.keywords.split(",").map((k: string) => k.trim()).filter(Boolean)
       : body.keywords;
