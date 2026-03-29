@@ -131,7 +131,7 @@ export function htmlToRicos(html: string): object {
 // ─── Publication Wix ──────────────────────────────────────────────────────────
 
 const WIX_POSTS_API = "https://www.wixapis.com/blog/v3/posts";
-const WIX_DRAFTS_API = "https://www.wixapis.com/blog/v3/drafts";
+const WIX_DRAFTS_API = "https://www.wixapis.com/blog/v3/draft-posts";
 
 function wixHeaders(apiKey: string, siteId: string) {
   return {
@@ -170,8 +170,8 @@ export async function publishToWix(
     throw new Error(`Wix création (${createRes.status}): ${body || "réponse vide"}`);
   }
 
-  const createData = await createRes.json() as { draft: { id: string; slug: string } };
-  const draftId = createData.draft?.id;
+  const createData = await createRes.json() as { draftPost: { id: string; slug: string } };
+  const draftId = createData.draftPost?.id;
   if (!draftId) throw new Error("Wix: ID du brouillon introuvable dans la réponse");
 
   // Étape 2 : publier le brouillon
@@ -186,7 +186,7 @@ export async function publishToWix(
   }
 
   const publishData = await publishRes.json() as { post?: { id: string; slug: string } };
-  const slug = publishData.post?.slug ?? createData.draft?.slug ?? draftId;
+  const slug = publishData.post?.slug ?? createData.draftPost?.slug ?? draftId;
   const base = siteUrl ? siteUrl.replace(/\/$/, "") : "https://www.wix.com";
   return `${base}/blog/${slug}`;
 }
