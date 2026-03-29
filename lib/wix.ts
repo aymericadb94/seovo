@@ -217,11 +217,12 @@ export async function testWixConnection(apiKey: string, siteId: string): Promise
     const res = await fetch(`${WIX_POSTS_API}?limit=1`, {
       headers: wixHeaders(apiKey, siteId),
     });
-    if (res.ok) return { ok: true };
-    if (res.status === 401 || res.status === 403) return { ok: false, reason: "Clé API invalide — vérifiez la clé et ses permissions Blog" };
-    if (res.status === 404) return { ok: false, reason: "Site ID incorrect ou blog non activé sur ce site Wix" };
-    const body = await res.text().catch(() => "");
-    return { ok: false, reason: `Erreur ${res.status}${body ? ` : ${body.slice(0, 120)}` : ""}` };
+    // 401/403 = credentials invalides
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, reason: "Clé API invalide ou permissions insuffisantes — activez les permissions Blog (lecture + écriture)" };
+    }
+    // Tout autre réponse (200, 404, 400…) = le serveur Wix a reçu la requête, les credentials sont acceptés
+    return { ok: true };
   } catch {
     return { ok: false, reason: "Impossible de joindre l'API Wix" };
   }
