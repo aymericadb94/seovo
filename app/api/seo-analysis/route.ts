@@ -135,13 +135,17 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
     const uniqueKeywords = [...new Set(allNewKeywords)].slice(0, 25);
 
     // Update site: save keywords + mark analysis done
-    await supabase
+    const { error: updateError } = await supabase
       .from("sites")
       .update({
         keywords: uniqueKeywords,
         seo_analysis_done: true,
       })
       .eq("user_id", user.id);
+
+    if (updateError) {
+      return Response.json({ error: "Analyse générée mais sauvegarde échouée : " + updateError.message }, { status: 500 });
+    }
 
     return Response.json({ analysis });
   } catch (err: unknown) {

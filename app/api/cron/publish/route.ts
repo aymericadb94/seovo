@@ -390,20 +390,23 @@ export async function GET(request: Request) {
           } else if (site.cms === "wix") {
             publishedUrl = await publishToWix(
               site.wix_api_key, site.wix_site_id,
-              title, content, meta_description
+              title, content, meta_description, site.site_url
             );
           } else {
             results.push({ site: site.site_url, cms: site.cms, status: "skip", error: "CMS non supporté" });
             break;
           }
 
-          await supabase.from("publications").insert({
+          const { error: insertError } = await supabase.from("publications").insert({
             site_id: site.id,
             user_id: site.user_id,
             title,
             keyword,
             wordpress_url: publishedUrl,
           });
+          if (insertError) {
+            console.error("[cron/publish] failed to record publication:", insertError.message);
+          }
 
           // Notification email à l'utilisateur
           try {

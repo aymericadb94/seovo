@@ -45,7 +45,7 @@ export async function GET(request: Request) {
     return Response.redirect(`${appUrl}/login`);
   }
 
-  await supabase
+  const { error: updateError } = await supabase
     .from("sites")
     .update({
       google_access_token: tokens.access_token,
@@ -53,6 +53,11 @@ export async function GET(request: Request) {
       google_token_expiry: Date.now() + (tokens.expires_in ?? 3600) * 1000,
     })
     .eq("user_id", user.id);
+
+  if (updateError) {
+    console.error("[GSC callback] failed to save tokens:", updateError.message);
+    return Response.redirect(`${appUrl}/settings?gsc=error&reason=token_save_failed`);
+  }
 
   return Response.redirect(`${appUrl}/settings?gsc=success`);
 }

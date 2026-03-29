@@ -146,7 +146,8 @@ export async function publishToWix(
   siteId: string,
   title: string,
   content: string,
-  metaDescription: string
+  metaDescription: string,
+  siteUrl?: string
 ): Promise<string> {
   const richContent = htmlToRicos(content);
   const headers = wixHeaders(apiKey, siteId);
@@ -186,7 +187,8 @@ export async function publishToWix(
 
   const publishData = await publishRes.json() as { post?: { id: string; slug: string } };
   const slug = publishData.post?.slug ?? createData.draft?.slug ?? draftId;
-  return `https://www.wix.com/blog/${slug}`;
+  const base = siteUrl ? siteUrl.replace(/\/$/, "") : "https://www.wix.com";
+  return `${base}/blog/${slug}`;
 }
 
 // ─── Analyse DA Wix ───────────────────────────────────────────────────────────
