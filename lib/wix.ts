@@ -157,7 +157,7 @@ export async function publishToWix(
     method: "POST",
     headers,
     body: JSON.stringify({
-      draft: {
+      draftPost: {
         title,
         richContent,
         excerpt: metaDescription,
