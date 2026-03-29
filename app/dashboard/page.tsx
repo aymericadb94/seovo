@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import SeoAnalysisModal from "@/components/SeoAnalysisModal";
+import AuditModal, { type AuditData } from "@/components/AuditModal";
 import Footer from "@/components/Footer";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -355,16 +356,38 @@ export default function Dashboard() {
   const [cronRunning, setCronRunning] = useState(false);
   const [cronResult, setCronResult] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "publications" | "keywords" | "calendar">("overview");
-  const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null); // null = inconnu, attente des données
+  const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null);
   const [indexationResults, setIndexationResults] = useState<Record<string, { indexed: boolean | null; verdict: string; coverage: string }>>({});
   const [indexationLoading, setIndexationLoading] = useState(false);
+
+  // Audit
+  type AuditRecord = { id: string; month: string; created_at: string; data: AuditData };
+  const [latestAudit, setLatestAudit] = useState<AuditRecord | null>(null);
+  const [auditAvailable, setAuditAvailable] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [showAuditReport, setShowAuditReport] = useState(false);
+
+  async function loadAudit() {
+    try {
+      const res = await fetch("/api/audit");
+      const json = await res.json();
+      if (!json.error) {
+        setLatestAudit(json.audit);
+        setAuditAvailable(json.isAvailable);
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function generateAudit() {
+    await fetch("/api/audit", { method: "POST" });
+    await loadAudit();
+  }
 
   async function loadData() {
     const res = await fetch("/api/dashboard/stats");
     const json = await res.json();
     if (!json.error) {
       setData(json);
-      // Afficher le modal si l'analyse n'a pas encore été faite
       setShowSeoModal(json.site ? !json.site.seo_analysis_done : false);
     } else {
       setShowSeoModal(false);
@@ -374,9 +397,21 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
+    loadAudit();
     window.addEventListener("focus", loadData);
     return () => window.removeEventListener("focus", loadData);
   }, []);
+
+  // Popup audit : uniquement à partir de la 2ème connexion
+  useEffect(() => {
+    if (!auditAvailable) return;
+    const hasVisited = localStorage.getItem("rankpill_has_visited");
+    if (!hasVisited) {
+      localStorage.setItem("rankpill_has_visited", "1");
+      return; // 1ère connexion → pas de popup
+    }
+    setShowAuditModal(true);
+  }, [auditAvailable]);
 
   async function handleLogout() {
     const supabase = createClient();

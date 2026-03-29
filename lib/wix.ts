@@ -136,7 +136,7 @@ const WIX_DRAFTS_API = "https://www.wixapis.com/blog/v3/drafts";
 function wixHeaders(apiKey: string, siteId: string) {
   return {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey}`,
+    Authorization: apiKey,
     "wix-site-id": siteId,
   };
 }
