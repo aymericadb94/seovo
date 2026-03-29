@@ -18,10 +18,47 @@ type GeneratedArticle = {
 };
 
 const STEPS = [
-  { id: "analyze", label: "Analyse du secteur et des mots-clés", icon: "🔍" },
-  { id: "write", label: "Rédaction de l'article (1500+ mots)", icon: "✍️" },
-  { id: "optimize", label: "Optimisation SEO & méta-description", icon: "📈" },
-  { id: "publish", label: "Publication sur votre site", icon: "🚀" },
+  {
+    id: "analyze",
+    label: "Analyse du secteur et des mots-clés",
+    sub: "Recherche sémantique et positionnement concurrentiel",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+      </svg>
+    ),
+  },
+  {
+    id: "write",
+    label: "Rédaction de l'article",
+    sub: "1 500+ mots structurés H1/H2/H3 optimisés SEO",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/>
+      </svg>
+    ),
+  },
+  {
+    id: "optimize",
+    label: "Optimisation SEO & méta-description",
+    sub: "Balises, densité de mots-clés et structure optimale",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    ),
+  },
+  {
+    id: "publish",
+    label: "Publication sur votre site",
+    sub: "Envoi automatique vers votre CMS",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function GeneratePage() {
@@ -58,6 +95,16 @@ export default function GeneratePage() {
         }
       });
   }, []);
+
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (status === "generating" || status === "publishing") {
+      setElapsed(0);
+      const id = setInterval(() => setElapsed(s => s + 1), 1000);
+      return () => clearInterval(id);
+    }
+  }, [status]);
 
   const activeKeyword = customKeyword.trim() || keyword;
 
@@ -302,56 +349,138 @@ export default function GeneratePage() {
 
         ) : status === "generating" || status === "publishing" ? (
           /* ── Chargement ── */
-          <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-8">
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-3 bg-orange-500/10 border border-orange-500/20 rounded-full px-5 py-2.5 mb-4">
-                <span className="w-2.5 h-2.5 bg-orange-400 rounded-full animate-pulse" />
-                <span className="text-orange-400 font-bold text-sm">
-                  {status === "publishing" ? "Publication en cours..." : "Rédaction en cours..."}
-                </span>
-              </div>
-              <p className="text-gray-500 text-sm">
-                Article sur <span className="text-white font-bold">&quot;{activeKeyword}&quot;</span> en {localeNames[language]}
-              </p>
-            </div>
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "#090909", border: "1px solid rgba(249,115,22,0.15)" }}
+          >
+            {/* Top gradient bar */}
+            <div className="h-0.5 w-full bg-gradient-to-r from-orange-500 via-red-500 to-orange-400" />
 
-            <div className="flex flex-col gap-3">
-              {STEPS.map((step, i) => {
-                const isDone = i < currentStep;
-                const isActive = i === currentStep;
-                return (
-                  <div
-                    key={step.id}
-                    className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-500 ${
-                      isDone
-                        ? "bg-orange-500/10 border-orange-500/20"
-                        : isActive
-                        ? "bg-white/[0.05] border-white/[0.15]"
-                        : "bg-white/[0.02] border-white/[0.05]"
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 ${
-                      isDone ? "bg-orange-500/20" : isActive ? "bg-white/10" : "bg-white/5"
-                    }`}>
-                      {isDone ? "✓" : isActive ? (
-                        <span className="w-4 h-4 rounded-full border-2 border-orange-400 border-t-transparent animate-spin inline-block" />
-                      ) : (
-                        <span className="text-gray-600">{step.icon}</span>
+            <div className="p-7">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: "#f97316", boxShadow: "0 0 8px rgba(249,115,22,0.8)", animation: "pulse 1.2s ease-in-out infinite" }}
+                  />
+                  <span className="text-orange-400 font-black text-sm uppercase tracking-widest">
+                    {status === "publishing" ? "Publication" : "Rédaction"} en cours
+                  </span>
+                </div>
+                {/* Live timer */}
+                <div
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg"
+                  style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.12)" }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-3 h-3 text-orange-400/60">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  <span className="text-orange-400 font-black text-xs tabular-nums">{elapsed}s</span>
+                </div>
+              </div>
+
+              {/* Context */}
+              <p className="text-gray-500 text-sm mb-5">
+                Article sur{" "}
+                <span className="text-white font-black">&ldquo;{activeKeyword}&rdquo;</span>
+                {" "}— {localeNames[language]}
+              </p>
+
+              {/* Overall progress bar */}
+              <div className="relative h-1.5 rounded-full mb-6 overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  style={{
+                    width: `${Math.min((currentStep / (STEPS.length - 1)) * 100, 100)}%`,
+                    background: "linear-gradient(90deg, #f97316, #ef4444)",
+                    transition: "width 0.8s cubic-bezier(0.34,1.56,0.64,1)",
+                    boxShadow: "0 0 8px rgba(249,115,22,0.5)",
+                  }}
+                />
+              </div>
+
+              {/* Steps */}
+              <div className="flex flex-col gap-2">
+                {STEPS.map((step, i) => {
+                  const isDone = i < currentStep;
+                  const isActive = i === currentStep;
+                  return (
+                    <div
+                      key={step.id}
+                      className="flex items-start gap-4 p-4 rounded-xl transition-all duration-500"
+                      style={{
+                        background: isDone
+                          ? "rgba(249,115,22,0.06)"
+                          : isActive
+                          ? "rgba(255,255,255,0.04)"
+                          : "transparent",
+                        borderLeft: isActive ? "2px solid #f97316" : "2px solid transparent",
+                        opacity: !isDone && !isActive ? 0.35 : 1,
+                      }}
+                    >
+                      {/* Icon */}
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 transition-all duration-500"
+                        style={{
+                          background: isDone
+                            ? "rgba(249,115,22,0.2)"
+                            : isActive
+                            ? "rgba(249,115,22,0.1)"
+                            : "rgba(255,255,255,0.04)",
+                          color: isDone ? "#f97316" : isActive ? "#fb923c" : "#4b5563",
+                        }}
+                      >
+                        {isDone ? (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        ) : isActive ? (
+                          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="9" stroke="rgba(249,115,22,0.2)" strokeWidth="2"/>
+                            <path d="M12 3a9 9 0 019 9" stroke="#f97316" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                        ) : (
+                          step.icon
+                        )}
+                      </div>
+
+                      {/* Text */}
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="text-sm font-bold leading-snug transition-colors duration-300"
+                          style={{ color: isDone ? "#fdba74" : isActive ? "white" : "#6b7280" }}
+                        >
+                          {step.label}
+                        </p>
+                        {(isDone || isActive) && (
+                          <p className="text-xs mt-0.5 transition-all duration-300" style={{ color: "rgba(156,163,175,0.6)" }}>
+                            {step.sub}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Done badge */}
+                      {isDone && (
+                        <span className="text-xs font-bold flex-shrink-0 mt-0.5" style={{ color: "rgba(249,115,22,0.6)" }}>
+                          ✓
+                        </span>
                       )}
                     </div>
-                    <span className={`text-sm font-medium ${
-                      isDone ? "text-orange-300" : isActive ? "text-white" : "text-gray-600"
-                    }`}>
-                      {step.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
 
-            <p className="text-center text-gray-600 text-xs mt-6">
-              Cela prend environ 30 à 60 secondes ☕
-            </p>
+              {/* Footer */}
+              <div className="flex items-center justify-between mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <p className="text-gray-600 text-xs">
+                  Étape {Math.min(currentStep + 1, STEPS.length)} sur {STEPS.length}
+                </p>
+                <p className="text-gray-600 text-xs">
+                  {elapsed < 15 ? "Estimation : 30 – 60s" : elapsed < 40 ? "Presque terminé..." : "Finalisation en cours..."}
+                </p>
+              </div>
+            </div>
           </div>
 
         ) : status === "preview" && generated ? (
