@@ -184,6 +184,12 @@ export async function publishToWix(
 
   if (!createRes.ok) {
     const body = await createRes.text();
+    if (createRes.status === 404) {
+      throw new Error("Site ID Wix invalide — vérifiez le Site ID dans l'URL de votre dashboard Wix : manage.wix.com/dashboard/VOTRE-SITE-ID/home");
+    }
+    if (createRes.status === 401 || createRes.status === 403) {
+      throw new Error("Clé API Wix invalide ou permissions insuffisantes — vérifiez que la clé a les permissions Blog (lecture + écriture)");
+    }
     throw new Error(`Wix création (${createRes.status}): ${body || "réponse vide"}`);
   }
 
