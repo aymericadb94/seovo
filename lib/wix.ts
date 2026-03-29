@@ -141,6 +141,19 @@ function wixHeaders(apiKey: string, siteId: string) {
   };
 }
 
+async function getWixMemberId(apiKey: string, siteId: string): Promise<string | null> {
+  try {
+    const res = await fetch("https://www.wixapis.com/members/v1/members/my", {
+      headers: wixHeaders(apiKey, siteId),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { member?: { id?: string } };
+    return data.member?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function publishToWix(
   apiKey: string,
   siteId: string,
@@ -152,6 +165,9 @@ export async function publishToWix(
   const richContent = htmlToRicos(content);
   const headers = wixHeaders(apiKey, siteId);
 
+  // Récupérer le memberId (requis par l'API Wix pour les apps tierces)
+  const memberId = await getWixMemberId(apiKey, siteId);
+
   // Étape 1 : créer le brouillon via l'API drafts
   const createRes = await fetch(WIX_DRAFTS_API, {
     method: "POST",
@@ -161,6 +177,7 @@ export async function publishToWix(
         title,
         richContent,
         excerpt: metaDescription,
+        ...(memberId ? { memberId } : {}),
       },
     }),
   });
