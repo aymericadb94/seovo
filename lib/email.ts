@@ -1,7 +1,5 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const FROM_HELLO        = "RankPill <hello@rankpill.fr>";
 const FROM_SUBSCRIPTION = "RankPill <subscription@rankpill.fr>";
 const FROM_NOREPLY      = "RankPill <noreply@rankpill.fr>";
@@ -132,7 +130,7 @@ export async function sendWelcomeEmail(params: { to: string; firstName?: string 
       </td>
     </tr>`;
 
-  await resend.emails.send({
+  await new Resend(process.env.RESEND_API_KEY).emails.send({
     from: FROM_HELLO,
     to,
     subject: "Bienvenue sur RankPill — votre SEO automatique commence",
@@ -166,7 +164,7 @@ export async function sendPasswordChangedEmail(params: { to: string }) {
       </td>
     </tr>`;
 
-  await resend.emails.send({
+  await new Resend(process.env.RESEND_API_KEY).emails.send({
     from: FROM_NOREPLY,
     to,
     subject: "Votre mot de passe RankPill a été modifié",
@@ -217,7 +215,7 @@ export async function sendOnboardingRecapEmail(params: {
       </td>
     </tr>`;
 
-  await resend.emails.send({
+  await new Resend(process.env.RESEND_API_KEY).emails.send({
     from: FROM_HELLO,
     to,
     subject: `${businessName} est configuré — RankPill démarre`,
@@ -262,7 +260,7 @@ export async function sendArticlePublishedEmail(params: {
       </td>
     </tr>`;
 
-  await resend.emails.send({
+  await new Resend(process.env.RESEND_API_KEY).emails.send({
     from: FROM_NOREPLY,
     to,
     subject: `✦ Article publié — ${title}`,
@@ -309,7 +307,7 @@ export async function sendNewSubscriptionEmail(params: {
       </td>
     </tr>`;
 
-  await resend.emails.send({
+  await new Resend(process.env.RESEND_API_KEY).emails.send({
     from: FROM_SUBSCRIPTION,
     to,
     subject: `Abonnement ${plan} confirmé — RankPill`,
@@ -359,7 +357,7 @@ export async function sendInvoiceEmail(params: {
       </td>
     </tr>`;
 
-  await resend.emails.send({
+  await new Resend(process.env.RESEND_API_KEY).emails.send({
     from: FROM_SUBSCRIPTION,
     to,
     subject: `Facture ${invoiceNumber} — RankPill`,
@@ -407,7 +405,7 @@ export async function sendUnsubscribeEmail(params: {
       </td>
     </tr>`;
 
-  await resend.emails.send({
+  await new Resend(process.env.RESEND_API_KEY).emails.send({
     from: FROM_SUBSCRIPTION,
     to,
     subject: `Votre abonnement RankPill a été annulé`,
