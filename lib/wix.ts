@@ -333,6 +333,17 @@ async function getWixMemberId(apiKey: string, siteId: string): Promise<string | 
   return null;
 }
 
+function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 100);
+}
+
 export async function publishToWix(
   apiKey: string,
   siteId: string,
@@ -378,6 +389,9 @@ export async function publishToWix(
     }
   }
 
+  // Slug généré côté RankPill — garanti lisible, utilisé comme fallback
+  const seoSlug = generateSlug(title);
+
   // Étape 1 : créer le brouillon
   const createRes = await fetch(WIX_DRAFTS_API, {
     method: "POST",
@@ -388,6 +402,7 @@ export async function publishToWix(
         richContent,
         excerpt: metaDescription,
         memberId,
+        seoSlug,
         ...(mediaData ? { media: mediaData } : {}),
         seoData: {
           tags: [
@@ -430,13 +445,13 @@ export async function publishToWix(
     post?: { id: string; slug?: string; url?: { base: string; path: string } };
   };
 
-  // Utiliser l'URL complète retournée par Wix (contient /post/slug)
+  // Utiliser l'URL complète retournée par Wix
   if (publishData.post?.url?.base && publishData.post?.url?.path) {
     return `${publishData.post.url.base}${publishData.post.url.path}`;
   }
 
-  // Fallback : construire l'URL manuellement avec /post/ (pas /blog/)
-  const slug = publishData.post?.slug ?? createData.draftPost?.seoSlug ?? draftId;
+  // Fallback : slug Wix → notre seoSlug généré → l'ID (dernier recours)
+  const slug = publishData.post?.slug ?? seoSlug;
   const base = siteUrl ? siteUrl.replace(/\/$/, "") : "https://www.wix.com";
   return `${base}/post/${slug}`;
 }
