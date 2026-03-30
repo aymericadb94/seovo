@@ -769,20 +769,75 @@ export default function Dashboard() {
 
                   {/* KPIs */}
                   <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-2 gap-4">
-                    {([
-                      {
-                        label: "Total articles publiés",
-                        value: animTotal,
-                        icon: (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                            <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                          </svg>
-                        ),
-                        sub: `+${kpis?.articlesThisMonth ?? 0} ce mois`,
-                        color: "#f97316",
-                        delay: "100ms",
-                      },
-                      {
+
+                    {/* Carte Roadmap — prochains articles */}
+                    {(() => {
+                      const publishedKeywords = new Set((data?.recentPublications ?? []).map(p => p.keyword?.toLowerCase()));
+                      const nextArticles = (roadmapRecord?.data?.articles ?? [])
+                        .filter(a => !publishedKeywords.has(a.keyword?.toLowerCase()))
+                        .sort((a, b) => a.priority - b.priority)
+                        .slice(0, 3);
+                      const total = roadmapRecord?.data?.articles?.length ?? 0;
+                      const done = (data?.kpis.totalArticles ?? 0);
+                      return (
+                        <button
+                          onClick={() => setShowRoadmapModal(true)}
+                          className="relative bg-white/[0.03] border border-white/[0.07] hover:border-violet-500/30 rounded-2xl p-5 flex flex-col justify-between min-h-[140px] overflow-hidden group text-left animate-fade-in-up"
+                          style={{ animationDelay: "100ms" }}
+                        >
+                          {/* Gradient animé */}
+                          <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-60"
+                            style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.07) 0%, rgba(96,165,250,0.05) 50%, transparent 100%)" }} />
+                          <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                            style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.12), transparent 65%)" }} />
+
+                          <div className="flex items-center justify-between mb-2 relative">
+                            <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Roadmap SEO</p>
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110"
+                              style={{ background: "rgba(167,139,250,0.12)", color: "#a78bfa" }}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                              </svg>
+                            </div>
+                          </div>
+
+                          {total > 0 ? (
+                            <>
+                              <div className="relative space-y-1.5 flex-1">
+                                {nextArticles.length > 0 ? nextArticles.map((a, i) => (
+                                  <div key={a.id} className="flex items-center gap-2"
+                                    style={{ opacity: 1 - i * 0.25, transform: `translateX(${i * 4}px)`, transition: `all 0.4s ease ${i * 80}ms` }}>
+                                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black flex-shrink-0"
+                                      style={{ background: "linear-gradient(135deg, #a78bfa, #60a5fa)", color: "white" }}>
+                                      {a.priority}
+                                    </span>
+                                    <span className="text-white/70 text-xs truncate">{a.title}</span>
+                                  </div>
+                                )) : (
+                                  <p className="text-white/40 text-xs">Tous les articles publiés !</p>
+                                )}
+                              </div>
+                              <div className="mt-3 relative">
+                                <div className="flex justify-between text-xs mb-1">
+                                  <span className="text-violet-400 font-medium">{done}/{total} publiés</span>
+                                  <span className="text-white/30">{Math.round((done / Math.max(total, 1)) * 100)}%</span>
+                                </div>
+                                <div className="h-1 bg-white/[0.05] rounded-full overflow-hidden">
+                                  <div className="h-full rounded-full transition-all duration-1000"
+                                    style={{ width: `${Math.round((done / Math.max(total, 1)) * 100)}%`, background: "linear-gradient(90deg, #a78bfa, #60a5fa)" }} />
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex-1 flex items-center">
+                              <p className="text-white/40 text-xs leading-relaxed">Générez votre roadmap pour voir les prochains articles à publier</p>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })()}
+
+                    {([{
                         label: "Mots-clés couverts",
                         value: animKw,
                         icon: (
