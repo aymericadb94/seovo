@@ -109,7 +109,7 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="relative w-full max-w-5xl rounded-2xl shadow-2xl mb-8 overflow-hidden"
-        style={{ background: "linear-gradient(160deg, #100d1a 0%, #0d0b15 40%, #0a0a0f 100%)", border: "1px solid rgba(167,139,250,0.15)" }}>
+        style={{ background: "#0e0e0e", border: "1px solid rgba(167,139,250,0.15)" }}>
 
         {/* Orbes de fond */}
         <div className="absolute top-0 left-0 w-[500px] h-[300px] pointer-events-none"

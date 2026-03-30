@@ -810,8 +810,8 @@ export default function Dashboard() {
                           className="relative rounded-2xl p-5 flex flex-col justify-between min-h-[140px] overflow-hidden group text-left animate-fade-in-up"
                           style={{
                             animationDelay: "100ms",
-                            background: "linear-gradient(145deg, #100d1a 0%, #0d0d14 60%, #090910 100%)",
-                            border: "1px solid rgba(167,139,250,0.18)",
+                            background: "rgba(255,255,255,0.03)",
+                            border: "1px solid rgba(255,255,255,0.07)",
                           }}
                         >
                           {/* Halos de fond */}
