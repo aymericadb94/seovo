@@ -1,10 +1,47 @@
 import { createClient } from "@/lib/supabase/server";
 import { publishToWix } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
+import { fetchPexelsImage } from "@/lib/pexels";
+
+async function uploadImageToWordPress(
+  siteUrl: string, username: string, appPassword: string,
+  imageUrl: string, alt: string
+): Promise<number | null> {
+  try {
+    const credentials = Buffer.from(`${username}:${appPassword}`).toString("base64");
+    const imgRes = await fetch(imageUrl);
+    if (!imgRes.ok) return null;
+    const imgBuffer = await imgRes.arrayBuffer();
+    const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+
+    const mediaRes = await fetch(`${siteUrl}/wp-json/wp/v2/media`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        "Content-Disposition": `attachment; filename="cover-${Date.now()}.jpg"`,
+        "Content-Type": contentType,
+      },
+      body: imgBuffer,
+    });
+    if (!mediaRes.ok) return null;
+    const media = await mediaRes.json() as { id: number };
+    if (media.id && alt) {
+      await fetch(`${siteUrl}/wp-json/wp/v2/media/${media.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Basic ${credentials}` },
+        body: JSON.stringify({ alt_text: alt }),
+      }).catch(() => {});
+    }
+    return media.id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 async function publishToWordPress(
   siteUrl: string, username: string, appPassword: string,
-  title: string, content: string, metaDescription: string
+  title: string, content: string, metaDescription: string,
+  featuredMediaId?: number | null
 ) {
   const credentials = Buffer.from(`${username}:${appPassword}`).toString("base64");
   const res = await fetch(`${siteUrl}/wp-json/wp/v2/posts`, {
@@ -18,6 +55,7 @@ async function publishToWordPress(
       content,
       status: "publish",
       excerpt: metaDescription,
+      ...(featuredMediaId ? { featured_media: featuredMediaId } : {}),
     }),
   });
   if (!res.ok) throw new Error(`WordPress: ${await res.text()}`);
@@ -27,7 +65,8 @@ async function publishToWordPress(
 
 async function publishToShopify(
   storeUrl: string, apiKey: string,
-  title: string, content: string, metaDescription: string
+  title: string, content: string, metaDescription: string,
+  imageUrl?: string | null, imageAlt?: string | null
 ) {
   const baseUrl = storeUrl.replace(/\/$/, "");
   const headers = {
@@ -67,6 +106,7 @@ async function publishToShopify(
         body_html: content,
         summary_html: metaDescription,
         published: true,
+        ...(imageUrl ? { image: { src: imageUrl, alt: imageAlt || title } } : {}),
       },
     }),
   });
@@ -103,12 +143,27 @@ export async function POST(request: Request) {
       if (!site.wp_username || !site.wp_app_password) {
         return Response.json({ error: "Identifiants WordPress manquants dans la configuration." }, { status: 400 });
       }
-      url = await publishToWordPress(site.site_url, site.wp_username, site.wp_app_password, title, content, meta_description);
+      let featuredMediaId: number | null = null;
+      if (cover_image_query) {
+        const pexelsImg = await fetchPexelsImage(cover_image_query);
+        if (pexelsImg) {
+          featuredMediaId = await uploadImageToWordPress(
+            site.site_url, site.wp_username, site.wp_app_password,
+            pexelsImg.url, cover_alt_text || title
+          );
+        }
+      }
+      url = await publishToWordPress(site.site_url, site.wp_username, site.wp_app_password, title, content, meta_description, featuredMediaId);
     } else if (site.cms === "shopify") {
       if (!site.shopify_api_key) {
         return Response.json({ error: "Clé API Shopify manquante dans la configuration." }, { status: 400 });
       }
-      url = await publishToShopify(site.site_url, site.shopify_api_key, title, content, meta_description);
+      let shopifyImageUrl: string | null = null;
+      if (cover_image_query) {
+        const pexelsImg = await fetchPexelsImage(cover_image_query);
+        if (pexelsImg) shopifyImageUrl = pexelsImg.url;
+      }
+      url = await publishToShopify(site.site_url, site.shopify_api_key, title, content, meta_description, shopifyImageUrl, cover_alt_text);
     } else if (site.cms === "wix") {
       if (!site.wix_api_key || !site.wix_site_id) {
         return Response.json({ error: "Clé API ou Site ID Wix manquants dans la configuration." }, { status: 400 });

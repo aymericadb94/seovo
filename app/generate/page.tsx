@@ -148,8 +148,8 @@ export default function GeneratePage() {
         throw new Error(data.error || "Erreur lors de la génération");
       }
 
-      const { title, content, meta_description } = await genRes.json();
-      setGenerated({ title, content, meta_description });
+      const { title, content, meta_description, cover_image_query = null, cover_alt_text = null } = await genRes.json();
+      setGenerated({ title, content, meta_description, cover_image_query, cover_alt_text });
 
       if (previewMode) {
         setCurrentStep(2);

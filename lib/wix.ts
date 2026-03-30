@@ -236,25 +236,7 @@ function wixHeaders(apiKey: string, siteId: string) {
 
 // ─── Image cover via Pexels ───────────────────────────────────────────────────
 
-async function fetchPexelsImage(query: string): Promise<{ url: string; width: number; height: number; alt: string } | null> {
-  const key = process.env.PEXELS_API_KEY;
-  if (!key) return null;
-  try {
-    const res = await fetch(
-      `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`,
-      { headers: { Authorization: key } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json() as {
-      photos: { src: { large2x: string }; width: number; height: number; alt: string }[];
-    };
-    const photo = data.photos?.[0];
-    if (!photo) return null;
-    return { url: photo.src.large2x, width: photo.width, height: photo.height, alt: photo.alt };
-  } catch {
-    return null;
-  }
-}
+import { fetchPexelsImage } from "@/lib/pexels";
 
 async function importImageToWix(
   apiKey: string,
@@ -267,30 +249,38 @@ async function importImageToWix(
       method: "POST",
       headers: wixHeaders(apiKey, siteId),
       body: JSON.stringify({
-        importFileRequest: {
-          url: imageUrl,
-          displayName: displayName.slice(0, 60),
-          mimeType: "image/jpeg",
-          mediaType: "IMAGE",
-        },
+        url: imageUrl,
+        displayName: displayName.slice(0, 60),
+        mimeType: "image/jpeg",
+        mediaType: "IMAGE",
       }),
     });
-    if (!res.ok) return null;
-    const data = await res.json() as {
+    const rawBody = await res.text();
+    if (!res.ok) {
+      console.error(`[wix/importImage] ${res.status}: ${rawBody.slice(0, 300)}`);
+      return null;
+    }
+    console.log("[wix/importImage] response:", rawBody.slice(0, 600));
+    const data = JSON.parse(rawBody) as {
       file?: {
         id?: string;
-        media?: { image?: { image?: { id?: string; url?: string; height?: number; width?: number } } };
+        url?: string; // wix:image://v1/... scheme
+        internalTags?: Record<string, string>[];
       };
     };
-    const img = data.file?.media?.image?.image;
-    if (!img?.id) return null;
+    const fileId = data.file?.id;
+    if (!fileId) {
+      console.error("[wix/importImage] no file.id in response");
+      return null;
+    }
     return {
-      id: img.id,
-      url: img.url ?? "",
-      width: img.width ?? 1200,
-      height: img.height ?? 630,
+      id: fileId,
+      url: data.file?.url ?? imageUrl,
+      width: 1200,
+      height: 630,
     };
-  } catch {
+  } catch (err) {
+    console.error("[wix/importImage] exception:", err);
     return null;
   }
 }
@@ -367,10 +357,13 @@ export async function publishToWix(
   // Image de couverture (optionnelle)
   let mediaData: Record<string, unknown> | undefined;
   if (imageQuery) {
+    console.log(`[wix/cover] recherche Pexels: "${imageQuery}"`);
     const pexelsImg = await fetchPexelsImage(imageQuery);
     if (pexelsImg) {
+      console.log("[wix/cover] import vers Wix Media...");
       const wixImg = await importImageToWix(apiKey, siteId, pexelsImg.url, imageAlt || title);
       if (wixImg) {
+        console.log(`[wix/cover] image importée: id=${wixImg.id}`);
         mediaData = {
           wixMedia: {
             image: {
@@ -385,6 +378,8 @@ export async function publishToWix(
           },
           displayed: true,
         };
+      } else {
+        console.error("[wix/cover] import Wix Media échoué");
       }
     }
   }

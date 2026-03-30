@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { sendArticlePublishedEmail } from "@/lib/email";
 import { publishToWix, analyzeWixSite } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
+import { fetchPexelsImage } from "@/lib/pexels";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -189,7 +190,9 @@ RESPONSE FORMAT: Valid JSON only, no text before or after.
 {
   "title": "The optimized H1 title",
   "meta_description": "The 150-160 character meta description",
-  "content": "The complete HTML content with all tags"
+  "content": "The complete HTML content with all tags",
+  "cover_image_query": "3-5 english keywords for a relevant stock photo (e.g. 'vintage clothing warehouse wholesale')",
+  "cover_alt_text": "SEO-optimized alt text, 8-12 words, includes main keyword, written in the article language"
 }
 
 HTML content must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. No <html>, <body>, <head>.`;
@@ -210,6 +213,8 @@ HTML content must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table
     title: string;
     meta_description: string;
     content: string;
+    cover_image_query?: string;
+    cover_alt_text?: string;
   };
 
   return parsed;
@@ -217,9 +222,49 @@ HTML content must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table
 
 // ─── Publication WordPress ────────────────────────────────────────────────────
 
+async function uploadImageToWordPress(
+  siteUrl: string, username: string, appPassword: string,
+  imageUrl: string, alt: string
+): Promise<number | null> {
+  try {
+    const credentials = Buffer.from(`${username}:${appPassword}`).toString("base64");
+    const imgRes = await fetch(imageUrl);
+    if (!imgRes.ok) return null;
+    const imgBuffer = await imgRes.arrayBuffer();
+    const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+
+    const mediaRes = await fetch(`${siteUrl}/wp-json/wp/v2/media`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        "Content-Disposition": `attachment; filename="cover-${Date.now()}.jpg"`,
+        "Content-Type": contentType,
+        "ngrok-skip-browser-warning": "true",
+      },
+      body: imgBuffer,
+    });
+    if (!mediaRes.ok) {
+      console.error(`[wp/uploadImage] ${mediaRes.status}: ${(await mediaRes.text()).slice(0, 200)}`);
+      return null;
+    }
+    const media = await mediaRes.json() as { id: number };
+    if (media.id && alt) {
+      await fetch(`${siteUrl}/wp-json/wp/v2/media/${media.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Basic ${credentials}`, "ngrok-skip-browser-warning": "true" },
+        body: JSON.stringify({ alt_text: alt }),
+      }).catch(() => {});
+    }
+    return media.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function publishToWordPress(
   siteUrl: string, username: string, appPassword: string,
-  title: string, content: string, metaDescription: string
+  title: string, content: string, metaDescription: string,
+  featuredMediaId?: number | null
 ) {
   const credentials = Buffer.from(`${username}:${appPassword}`).toString("base64");
   const res = await fetch(`${siteUrl}/wp-json/wp/v2/posts`, {
@@ -234,6 +279,7 @@ async function publishToWordPress(
       content,
       status: "publish",
       excerpt: metaDescription,
+      ...(featuredMediaId ? { featured_media: featuredMediaId } : {}),
     }),
   });
   if (!res.ok) throw new Error(`WordPress: ${await res.text()}`);
@@ -245,7 +291,8 @@ async function publishToWordPress(
 
 async function publishToShopify(
   storeUrl: string, apiKey: string,
-  title: string, content: string, metaDescription: string
+  title: string, content: string, metaDescription: string,
+  imageUrl?: string | null, imageAlt?: string | null
 ) {
   const baseUrl = storeUrl.replace(/\/$/, "");
   const headers = {
@@ -283,6 +330,7 @@ async function publishToShopify(
         body_html: content,
         summary_html: metaDescription,
         published: true,
+        ...(imageUrl ? { image: { src: imageUrl, alt: imageAlt || title } } : {}),
       },
     }),
   });
@@ -391,7 +439,7 @@ export async function GET(request: Request) {
         const keyword = keywords[keywordIndex];
 
         for (const language of targetLanguages) {
-          const { title, content, meta_description } = await generateArticle({
+          const { title, content, meta_description, cover_image_query, cover_alt_text } = await generateArticle({
             keyword,
             allKeywords: keywords,
             businessName: site.business_name,
@@ -405,20 +453,39 @@ export async function GET(request: Request) {
           let publishedUrl = "";
 
           if (site.cms === "wordpress") {
+            let featuredMediaId: number | null = null;
+            if (cover_image_query) {
+              const pexelsImg = await fetchPexelsImage(cover_image_query);
+              if (pexelsImg) {
+                featuredMediaId = await uploadImageToWordPress(
+                  site.site_url, site.wp_username, site.wp_app_password,
+                  pexelsImg.url, cover_alt_text || title
+                );
+                console.log(`[cron/wp] featured_media id: ${featuredMediaId}`);
+              }
+            }
             publishedUrl = await publishToWordPress(
               site.site_url, site.wp_username, site.wp_app_password,
-              title, content, meta_description
+              title, content, meta_description, featuredMediaId
             );
           } else if (site.cms === "shopify") {
+            let shopifyImageUrl: string | null = null;
+            if (cover_image_query) {
+              const pexelsImg = await fetchPexelsImage(cover_image_query);
+              if (pexelsImg) {
+                shopifyImageUrl = pexelsImg.url;
+                console.log(`[cron/shopify] image url: ${shopifyImageUrl.slice(0, 80)}`);
+              }
+            }
             publishedUrl = await publishToShopify(
               site.site_url, site.shopify_api_key,
-              title, content, meta_description
+              title, content, meta_description, shopifyImageUrl, cover_alt_text ?? null
             );
           } else if (site.cms === "wix") {
             publishedUrl = await publishToWix(
               site.wix_api_key, site.wix_site_id,
               title, content, meta_description, site.site_url, site.wix_member_id,
-              keyword, keyword
+              cover_image_query ?? null, cover_alt_text ?? null
             );
           } else if (site.cms === "custom") {
             publishedUrl = await publishToCustomApi(
