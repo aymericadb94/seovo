@@ -305,6 +305,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const userId = url.searchParams.get("userId");
   const isManual = url.searchParams.get("manual") === "1";
+  const isForced = url.searchParams.get("force") === "1";
 
   const supabase = createAdminClient();
   const results: { site: string; cms: string; status: string; title?: string; error?: string }[] = [];
@@ -346,7 +347,7 @@ export async function GET(request: Request) {
           .gte("published_at", startOfTodayUtc.toISOString());
         const pubsToday = pubsTodayCount ?? 0;
 
-        if (pubsToday >= dailyMax) {
+        if (pubsToday >= dailyMax && !isForced) {
           results.push({ site: site.site_url, cms: site.cms, status: "skip", error: `Limite journalière atteinte (${pubsToday}/${dailyMax})` });
           continue;
         }

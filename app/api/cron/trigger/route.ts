@@ -18,7 +18,10 @@ export async function POST(request: Request) {
     }
 
     const origin = new URL(request.url).origin;
-    const res = await fetch(`${origin}/api/cron/publish?userId=${user.id}&manual=1`, {
+    const body = await request.json().catch(() => ({})) as { force?: boolean };
+    const params = new URLSearchParams({ userId: user.id, manual: "1" });
+    if (body.force) params.set("force", "1");
+    const res = await fetch(`${origin}/api/cron/publish?${params}`, {
       headers: { Authorization: `Bearer ${secret}` },
     });
 

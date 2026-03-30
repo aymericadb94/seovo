@@ -356,6 +356,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [cronRunning, setCronRunning] = useState(false);
   const [cronResult, setCronResult] = useState<string | null>(null);
+  const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "publications" | "keywords" | "calendar">("overview");
   const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null);
   const [indexationResults, setIndexationResults] = useState<Record<string, { indexed: boolean | null; verdict: string; coverage: string }>>({});
@@ -440,11 +441,21 @@ export default function Dashboard() {
     setIndexationLoading(false);
   }
 
-  async function handleManualPublish() {
+  async function handleManualPublish(force = false) {
+    const pubsToday = data?.kpis.pubsToday ?? 0;
+    if (pubsToday >= 3 && !force) {
+      setShowDailyLimitModal(true);
+      return;
+    }
+    setShowDailyLimitModal(false);
     setCronRunning(true);
     setCronResult(null);
     try {
-      const res = await fetch("/api/cron/trigger", { method: "POST" });
+      const res = await fetch("/api/cron/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(force ? { force: true } : {}),
+      });
       const text = await res.text();
       let json: Record<string, unknown>;
       try {
@@ -478,6 +489,49 @@ export default function Dashboard() {
       {/* SEO Analysis Modal — s'affiche uniquement quand showSeoModal est explicitement true */}
       {showSeoModal === true && (
         <SeoAnalysisModal onComplete={() => { setShowSeoModal(false); loadData(); }} />
+      )}
+
+      {/* Modale limite journalière */}
+      {showDailyLimitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="relative w-full max-w-md bg-[#111] border border-orange-500/30 rounded-2xl p-6 shadow-2xl">
+            {/* Icône */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center flex-shrink-0">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-orange-400">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-base">Limite journalière atteinte</h3>
+                <p className="text-orange-400 text-xs font-medium">3/3 articles publiés aujourd'hui</p>
+              </div>
+            </div>
+
+            <p className="text-gray-400 text-sm leading-relaxed mb-2">
+              Vous avez atteint la limite recommandée de <span className="text-white font-semibold">3 publications par jour</span>. Publier davantage peut nuire à votre référencement naturel.
+            </p>
+            <p className="text-gray-500 text-xs mb-6">
+              Google peut interpréter un volume excessif de publications comme du spam. Il est conseillé d'attendre demain pour maintenir une croissance organique optimale.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDailyLimitModal(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all text-sm font-medium"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => handleManualPublish(true)}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-orange-500/20 border border-orange-500/40 hover:bg-orange-500/30 text-orange-300 hover:text-orange-200 transition-all text-sm font-bold"
+              >
+                Générer quand même
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Orbes de fond animées */}
@@ -518,8 +572,8 @@ export default function Dashboard() {
               const limitReached = pubsToday >= dailyMax;
               return (
             <button
-              onClick={handleManualPublish}
-              disabled={cronRunning || limitReached}
+              onClick={() => handleManualPublish()}
+              disabled={cronRunning}
               className="group relative flex items-center gap-2 px-4 py-2 rounded-xl border border-orange-500/25 bg-orange-500/[0.06] hover:bg-orange-500/[0.12] hover:border-orange-500/50 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {cronRunning && (
@@ -1057,7 +1111,7 @@ export default function Dashboard() {
                     <div className="text-center py-16">
                       <p className="text-white font-bold mb-2">Aucun article pour l'instant</p>
                       <p className="text-gray-500 text-sm mb-5">Lancez la publication ou générez manuellement</p>
-                      <button onClick={handleManualPublish} className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-6 py-2.5 rounded-lg text-sm uppercase tracking-wide">
+                      <button onClick={() => handleManualPublish()} className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-6 py-2.5 rounded-lg text-sm uppercase tracking-wide">
                         Lancer la publication maintenant
                       </button>
                     </div>
@@ -1190,14 +1244,14 @@ export default function Dashboard() {
                     <p className="text-gray-600 text-xs mt-1">Ajouter ou supprimer des mots-clés cibles</p>
                   </Link>
                   <button
-                    onClick={handleManualPublish}
-                    disabled={cronRunning || (data?.kpis.pubsToday ?? 0) >= 3}
+                    onClick={() => handleManualPublish()}
+                    disabled={cronRunning}
                     className="flex-1 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 hover:border-orange-500/40 rounded-xl p-4 text-center transition-colors disabled:opacity-40"
                   >
                     <p className="text-orange-400 font-bold">
-                      {cronRunning ? "⏳ En cours..." : (data?.kpis.pubsToday ?? 0) >= 3 ? "✓ Limite journalière atteinte" : "▶ Générer un article maintenant"}
+                      {cronRunning ? "⏳ En cours..." : "▶ Générer un article maintenant"}
                     </p>
-                    <p className="text-gray-600 text-xs mt-1">{(data?.kpis.pubsToday ?? 0) >= 3 ? "3/3 articles publiés aujourd'hui" : "Couvre le prochain mot-clé non traité"}</p>
+                    <p className="text-gray-600 text-xs mt-1">Couvre le prochain mot-clé non traité</p>
                   </button>
                 </div>
               </div>
