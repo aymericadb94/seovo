@@ -101,8 +101,8 @@ RÉPONSE : JSON uniquement, sans texte avant ou après. Structure exacte :
       "objective": "trafic|autorité|conversion",
       "role": "pilier|cluster|support",
       "related": [2, 5],
-      "summary": "Résumé stratégique de 2-3 lignes",
-      "key_points": ["point clé 1", "point clé 2", "point clé 3"],
+      "summary": "Résumé en 1 phrase percutante",
+      "key_points": ["point 1", "point 2"],
       "priority": 1
     }
   ],
@@ -137,11 +137,11 @@ RÉPONSE : JSON uniquement, sans texte avant ou après. Structure exacte :
   "editorial_guidelines": "Directives éditoriales anti-IA en 3-4 phrases : ton, style, exemples, patterns à éviter"
 }
 
-IMPORTANT : génère exactement 40 articles dans le tableau "articles". Les IDs vont de 1 à 40. Les priorités vont de 1 (le plus urgent) à 40.`;
+IMPORTANT : génère exactement 40 articles. IDs de 1 à 40. Priorités de 1 (urgent) à 40. Sois concis dans chaque champ — la qualité stratégique prime sur la longueur.`;
 
     const msg = await client.messages.create({
       model: "claude-opus-4-6",
-      max_tokens: 16000,
+      max_tokens: 8000,
       messages: [{ role: "user", content: prompt }],
     });
 
@@ -152,7 +152,13 @@ IMPORTANT : génère exactement 40 articles dans le tableau "articles". Les IDs 
       return Response.json({ error: "Réponse Claude invalide" }, { status: 500 });
     }
 
-    const data = JSON.parse(raw.slice(start, end + 1));
+    let data: unknown;
+    try {
+      data = JSON.parse(raw.slice(start, end + 1));
+    } catch (parseErr) {
+      console.error("[roadmap] JSON.parse failed:", String(parseErr), "raw slice:", raw.slice(start, start + 200));
+      return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
+    }
 
     // Delete old roadmap for this user and insert new
     await supabase.from("roadmaps").delete().eq("user_id", user.id);
@@ -163,9 +169,13 @@ IMPORTANT : génère exactement 40 articles dans le tableau "articles". Les IDs 
       .select()
       .single();
 
-    if (saveError) return Response.json({ error: saveError.message }, { status: 500 });
+    if (saveError) {
+      console.error("[roadmap] Supabase insert error:", saveError.message);
+      return Response.json({ error: saveError.message }, { status: 500 });
+    }
     return Response.json({ roadmap: saved });
   } catch (err: unknown) {
+    console.error("[roadmap] exception:", err);
     return Response.json({ error: err instanceof Error ? err.message : "Erreur inconnue" }, { status: 500 });
   }
 }
