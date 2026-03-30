@@ -35,7 +35,27 @@ type ListNode = {
   nodes: ListItemNode[];
 };
 
-type RicosNode = ParagraphNode | HeadingNode | ListNode;
+type TableCellNode = {
+  type: "TABLE_CELL";
+  id: string;
+  nodes: ParagraphNode[];
+  tableCellData: { cellStyle: { verticalAlignment: string }; borderColors: Record<string, string> };
+};
+
+type TableRowNode = {
+  type: "TABLE_ROW";
+  id: string;
+  nodes: TableCellNode[];
+};
+
+type TableNode = {
+  type: "TABLE";
+  id: string;
+  nodes: TableRowNode[];
+  tableData: { dimensions: { colsWidthRatio: number[]; rowsHeight: number[] } };
+};
+
+type RicosNode = ParagraphNode | HeadingNode | ListNode | TableNode;
 
 // ─── Convertisseur HTML → Ricos ───────────────────────────────────────────────
 
@@ -46,22 +66,29 @@ function genId() {
 
 function parseInline(html: string): TextNode[] {
   const clean = html.replace(/<br\s*\/?>/gi, " ");
-  const segments = clean.split(/(<strong>[\s\S]*?<\/strong>|<em>[\s\S]*?<\/em>)/);
+  // Support <strong> with attributes (e.g. <strong class="...">)
+  const segments = clean.split(/(<strong[^>]*>[\s\S]*?<\/strong>|<em[^>]*>[\s\S]*?<\/em>)/);
   const result: TextNode[] = [];
 
   for (const seg of segments) {
     if (!seg) continue;
-    const boldMatch = seg.match(/^<strong>([\s\S]*?)<\/strong>$/);
-    const italicMatch = seg.match(/^<em>([\s\S]*?)<\/em>$/);
+    const boldMatch = seg.match(/^<strong[^>]*>([\s\S]*?)<\/strong>$/);
+    const italicMatch = seg.match(/^<em[^>]*>([\s\S]*?)<\/em>$/);
     const inner = boldMatch?.[1] ?? italicMatch?.[1] ?? seg;
-    const text = inner.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").trim();
-    if (!text) continue;
+    // Preserve spaces — don't trim, only skip purely empty nodes
+    const text = inner
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&nbsp;/g, "\u00a0");
+    if (!text.trim()) continue;
     result.push({
       type: "TEXT",
       id: "",
       nodes: [],
       textData: {
-        text,
+        text, // spaces preserved
         decorations: boldMatch ? [{ type: "BOLD" }] : italicMatch ? [{ type: "ITALIC" }] : [],
       },
     });
@@ -71,7 +98,12 @@ function parseInline(html: string): TextNode[] {
 }
 
 function makeParagraph(html: string): ParagraphNode {
-  return { type: "PARAGRAPH", id: genId(), nodes: parseInline(html), paragraphData: {} };
+  return {
+    type: "PARAGRAPH",
+    id: genId(),
+    nodes: parseInline(html),
+    paragraphData: { textStyle: { lineHeight: "1.8" } },
+  };
 }
 
 function makeHeading(html: string, level: number): HeadingNode {
@@ -96,13 +128,74 @@ function makeList(html: string, ordered: boolean): ListNode {
   };
 }
 
+function makeTable(html: string): TableNode {
+  const rows: TableRowNode[] = [];
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let rowMatch;
+  while ((rowMatch = rowRegex.exec(html)) !== null) {
+    const cells: TableCellNode[] = [];
+    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(rowMatch[1])) !== null) {
+      cells.push({
+        type: "TABLE_CELL",
+        id: genId(),
+        nodes: [makeParagraph(cellMatch[1])],
+        tableCellData: {
+          cellStyle: { verticalAlignment: "TOP" },
+          borderColors: {},
+        },
+      });
+    }
+    if (cells.length > 0) {
+      rows.push({ type: "TABLE_ROW", id: genId(), nodes: cells });
+    }
+  }
+  const colCount = rows[0]?.nodes.length ?? 1;
+  return {
+    type: "TABLE",
+    id: genId(),
+    nodes: rows,
+    tableData: {
+      dimensions: {
+        colsWidthRatio: Array(colCount).fill(1),
+        rowsHeight: Array(rows.length).fill(44),
+      },
+    },
+  };
+}
+
 export function htmlToRicos(html: string): object {
   _idCounter = 0;
   const nodes: RicosNode[] = [];
-  const blockRegex = /<(h2|h3|h4|p|ul|ol)([^>]*)>([\s\S]*?)<\/\1>/gi;
+
+  // Tables first (before generic block regex since they span multiple lines with nested tags)
+  const tableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi;
+  const tables: { index: number; length: number; node: TableNode }[] = [];
+  let tableMatch;
+  while ((tableMatch = tableRegex.exec(html)) !== null) {
+    tables.push({
+      index: tableMatch.index,
+      length: tableMatch[0].length,
+      node: makeTable(tableMatch[1]),
+    });
+  }
+
+  // Remove tables from html before processing blocks
+  let htmlWithoutTables = html;
+  for (const t of [...tables].reverse()) {
+    htmlWithoutTables = htmlWithoutTables.slice(0, t.index) + `<TABLE_PLACEHOLDER_${tables.indexOf(t)}>` + htmlWithoutTables.slice(t.index + t.length);
+  }
+
+  const blockRegex = /<(h2|h3|h4|p|ul|ol)([^>]*)>([\s\S]*?)<\/\1>|<TABLE_PLACEHOLDER_(\d+)>/gi;
   let match;
 
-  while ((match = blockRegex.exec(html)) !== null) {
+  while ((match = blockRegex.exec(htmlWithoutTables)) !== null) {
+    if (match[4] !== undefined) {
+      // Table placeholder
+      nodes.push(tables[parseInt(match[4])].node);
+      continue;
+    }
     const tag = match[1].toLowerCase();
     const inner = match[3].trim();
     if (tag === "h2") nodes.push(makeHeading(inner, 2));
@@ -140,6 +233,69 @@ function wixHeaders(apiKey: string, siteId: string) {
     "wix-site-id": siteId,
   };
 }
+
+// ─── Image cover via Pexels ───────────────────────────────────────────────────
+
+async function fetchPexelsImage(query: string): Promise<{ url: string; width: number; height: number; alt: string } | null> {
+  const key = process.env.PEXELS_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch(
+      `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`,
+      { headers: { Authorization: key } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json() as {
+      photos: { src: { large2x: string }; width: number; height: number; alt: string }[];
+    };
+    const photo = data.photos?.[0];
+    if (!photo) return null;
+    return { url: photo.src.large2x, width: photo.width, height: photo.height, alt: photo.alt };
+  } catch {
+    return null;
+  }
+}
+
+async function importImageToWix(
+  apiKey: string,
+  siteId: string,
+  imageUrl: string,
+  displayName: string
+): Promise<{ id: string; url: string; width: number; height: number } | null> {
+  try {
+    const res = await fetch("https://www.wixapis.com/site-media/v1/files/import", {
+      method: "POST",
+      headers: wixHeaders(apiKey, siteId),
+      body: JSON.stringify({
+        importFileRequest: {
+          url: imageUrl,
+          displayName: displayName.slice(0, 60),
+          mimeType: "image/jpeg",
+          mediaType: "IMAGE",
+        },
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as {
+      file?: {
+        id?: string;
+        media?: { image?: { image?: { id?: string; url?: string; height?: number; width?: number } } };
+      };
+    };
+    const img = data.file?.media?.image?.image;
+    if (!img?.id) return null;
+    return {
+      id: img.id,
+      url: img.url ?? "",
+      width: img.width ?? 1200,
+      height: img.height ?? 630,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Résolution memberId ──────────────────────────────────────────────────────
 
 async function getWixMemberId(apiKey: string, siteId: string): Promise<string | null> {
   // Stratégie 1 : lire le memberId depuis un post existant
@@ -184,7 +340,9 @@ export async function publishToWix(
   content: string,
   metaDescription: string,
   siteUrl?: string,
-  storedMemberId?: string | null
+  storedMemberId?: string | null,
+  imageQuery?: string | null,
+  imageAlt?: string | null
 ): Promise<string> {
   const richContent = htmlToRicos(content);
   const headers = wixHeaders(apiKey, siteId);
@@ -195,7 +353,32 @@ export async function publishToWix(
     throw new Error("Impossible de récupérer l'identifiant du propriétaire du site Wix. Vérifiez que votre clé API a les permissions 'Membres' en lecture, ou publiez au moins un article manuellement sur votre blog Wix.");
   }
 
-  // Étape 1 : créer le brouillon via l'API drafts
+  // Image de couverture (optionnelle)
+  let mediaData: Record<string, unknown> | undefined;
+  if (imageQuery) {
+    const pexelsImg = await fetchPexelsImage(imageQuery);
+    if (pexelsImg) {
+      const wixImg = await importImageToWix(apiKey, siteId, pexelsImg.url, imageAlt || title);
+      if (wixImg) {
+        mediaData = {
+          wixMedia: {
+            image: {
+              imageInfo: {
+                id: wixImg.id,
+                url: wixImg.url,
+                height: wixImg.height,
+                width: wixImg.width,
+                altText: imageAlt || title,
+              },
+            },
+          },
+          displayed: true,
+        };
+      }
+    }
+  }
+
+  // Étape 1 : créer le brouillon
   const createRes = await fetch(WIX_DRAFTS_API, {
     method: "POST",
     headers,
@@ -205,6 +388,14 @@ export async function publishToWix(
         richContent,
         excerpt: metaDescription,
         memberId,
+        ...(mediaData ? { media: mediaData } : {}),
+        seoData: {
+          tags: [
+            { type: "title", children: title },
+            { type: "meta", props: { name: "description", content: metaDescription } },
+            ...(imageAlt ? [{ type: "meta", props: { property: "og:image:alt", content: imageAlt } }] : []),
+          ],
+        },
       },
     }),
   });
@@ -212,15 +403,15 @@ export async function publishToWix(
   if (!createRes.ok) {
     const body = await createRes.text();
     if (createRes.status === 404) {
-      throw new Error("Site ID Wix invalide — vérifiez le Site ID dans l'URL de votre dashboard Wix : manage.wix.com/dashboard/VOTRE-SITE-ID/home");
+      throw new Error("Site ID Wix invalide — vérifiez le Site ID dans le dashboard Wix : manage.wix.com/account/api-keys");
     }
     if (createRes.status === 401 || createRes.status === 403) {
-      throw new Error("Clé API Wix invalide ou permissions insuffisantes — vérifiez que la clé a les permissions Blog (lecture + écriture)");
+      throw new Error("Clé API Wix invalide ou permissions insuffisantes — vérifiez les permissions Blog (lecture + écriture)");
     }
     throw new Error(`Wix création (${createRes.status}): ${body || "réponse vide"}`);
   }
 
-  const createData = await createRes.json() as { draftPost: { id: string; slug: string } };
+  const createData = await createRes.json() as { draftPost: { id: string; seoSlug?: string } };
   const draftId = createData.draftPost?.id;
   if (!draftId) throw new Error("Wix: ID du brouillon introuvable dans la réponse");
 
@@ -235,10 +426,19 @@ export async function publishToWix(
     throw new Error(`Wix publication (${publishRes.status}): ${body || "réponse vide"}`);
   }
 
-  const publishData = await publishRes.json() as { post?: { id: string; slug: string } };
-  const slug = publishData.post?.slug ?? createData.draftPost?.slug ?? draftId;
+  const publishData = await publishRes.json() as {
+    post?: { id: string; slug?: string; url?: { base: string; path: string } };
+  };
+
+  // Utiliser l'URL complète retournée par Wix (contient /post/slug)
+  if (publishData.post?.url?.base && publishData.post?.url?.path) {
+    return `${publishData.post.url.base}${publishData.post.url.path}`;
+  }
+
+  // Fallback : construire l'URL manuellement avec /post/ (pas /blog/)
+  const slug = publishData.post?.slug ?? createData.draftPost?.seoSlug ?? draftId;
   const base = siteUrl ? siteUrl.replace(/\/$/, "") : "https://www.wix.com";
-  return `${base}/blog/${slug}`;
+  return `${base}/post/${slug}`;
 }
 
 // ─── Analyse DA Wix ───────────────────────────────────────────────────────────
@@ -250,11 +450,10 @@ export async function analyzeWixSite(apiKey: string, siteId: string) {
     });
     if (!res.ok) return { existingTitles: [], styleGuide: "" };
 
-    const data = await res.json() as { posts: { title: string; richContent?: { nodes: { textData?: { text: string } }[] } }[] };
+    const data = await res.json() as { posts: { title: string }[] };
     const posts = data.posts ?? [];
-
     const existingTitles = posts.map((p) => p.title);
-    return { existingTitles, styleGuide: "" }; // DA Wix : pas de HTML accessible facilement
+    return { existingTitles, styleGuide: "" };
   } catch {
     return { existingTitles: [], styleGuide: "" };
   }
@@ -274,11 +473,8 @@ export async function testWixConnection(apiKey: string, siteId: string): Promise
       return { ok: false, reason: `Erreur ${res.status}${body ? ` : ${body.slice(0, 120)}` : ""}` };
     }
 
-    // Connexion OK — résoudre le memberId maintenant pour le stocker en base
     const data = await res.json() as { posts?: { memberId?: string }[] };
     const memberIdFromPost = data.posts?.[0]?.memberId ?? null;
-
-    // Si pas de posts existants, interroger l'API membres
     const memberId = memberIdFromPost ?? await getWixMemberId(apiKey, siteId);
 
     return { ok: true, ...(memberId ? { memberId } : {}) };

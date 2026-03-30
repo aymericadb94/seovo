@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const { title, content, meta_description = "", keyword = "" } = await request.json();
+    const { title, content, meta_description = "", keyword = "", cover_image_query = null, cover_alt_text = null } = await request.json();
 
     // Lire la config du site de l'utilisateur
     const { data: site, error: siteError } = await supabase
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       if (!site.wix_api_key || !site.wix_site_id) {
         return Response.json({ error: "Clé API ou Site ID Wix manquants dans la configuration." }, { status: 400 });
       }
-      url = await publishToWix(site.wix_api_key, site.wix_site_id, title, content, meta_description, site.site_url, site.wix_member_id);
+      url = await publishToWix(site.wix_api_key, site.wix_site_id, title, content, meta_description, site.site_url, site.wix_member_id, cover_image_query, cover_alt_text);
     } else if (site.cms === "custom") {
       if (!site.custom_api_url) {
         return Response.json({ error: "URL de l'endpoint API manquante dans la configuration." }, { status: 400 });

@@ -151,7 +151,7 @@ QUALITY REQUIREMENTS (premium SEO agency level):
 
 RESPONSE FORMAT: Valid JSON only, no text before or after.
 
-{"title": "The optimized H1 title", "meta_description": "The 150-160 character meta description", "content": "The complete HTML content"}
+{"title": "The optimized H1 title", "meta_description": "The 150-160 character meta description", "content": "The complete HTML content", "cover_image_query": "3-5 english keywords for a relevant stock photo (e.g. 'vintage clothing warehouse wholesale')", "cover_alt_text": "SEO-optimized alt text for the cover image, 8-12 words, includes main keyword, written in the article language"}
 
 HTML must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. No <html>, <body>, <head>.`,
         },
@@ -159,7 +159,7 @@ HTML must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thea
     });
 
     const raw = message.content[0].type === "text" ? message.content[0].text : "";
-    let parsed: { title: string; content: string; meta_description: string };
+    let parsed: { title: string; content: string; meta_description: string; cover_image_query?: string; cover_alt_text?: string };
     try {
       const start = raw.indexOf("{");
       const end = raw.lastIndexOf("}");
@@ -174,6 +174,8 @@ HTML must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thea
       title: parsed.title,
       content: parsed.content,
       meta_description: parsed.meta_description,
+      cover_image_query: parsed.cover_image_query ?? null,
+      cover_alt_text: parsed.cover_alt_text ?? null,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erreur inconnue";

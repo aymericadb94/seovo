@@ -15,6 +15,8 @@ type GeneratedArticle = {
   title: string;
   content: string;
   meta_description: string;
+  cover_image_query?: string | null;
+  cover_alt_text?: string | null;
 };
 
 const STEPS = [
@@ -175,6 +177,8 @@ export default function GeneratePage() {
           content: article.content,
           meta_description: article.meta_description,
           keyword: activeKeyword,
+          cover_image_query: article.cover_image_query ?? null,
+          cover_alt_text: article.cover_alt_text ?? null,
         }),
       });
 

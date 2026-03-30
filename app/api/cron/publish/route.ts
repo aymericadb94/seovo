@@ -391,7 +391,8 @@ export async function GET(request: Request) {
           } else if (site.cms === "wix") {
             publishedUrl = await publishToWix(
               site.wix_api_key, site.wix_site_id,
-              title, content, meta_description, site.site_url, site.wix_member_id
+              title, content, meta_description, site.site_url, site.wix_member_id,
+              keyword, keyword
             );
           } else if (site.cms === "custom") {
             publishedUrl = await publishToCustomApi(
