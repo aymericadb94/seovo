@@ -326,11 +326,29 @@ export async function GET(request: Request) {
           continue;
         }
 
-        // Compter les publications précédentes pour varier les formats
+        // Compter les publications précédentes pour la rotation des mots-clés
         const { count: publicationsCount } = await supabase
           .from("publications")
           .select("*", { count: "exact", head: true })
           .eq("site_id", site.id);
+
+        const totalPublished = publicationsCount ?? 0;
+
+        // Garde anti-doublon : vérifier si on a déjà publié aujourd'hui (heure Paris)
+        // Exception : mode userId manuel depuis le dashboard, on laisse passer
+        if (!userId) {
+          const todayParis = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" });
+          const { data: todayPubs } = await supabase
+            .from("publications")
+            .select("id")
+            .eq("site_id", site.id)
+            .gte("published_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+            .limit(1);
+          if (todayPubs && todayPubs.length > 0) {
+            results.push({ site: site.site_url, cms: site.cms, status: "skip", error: `Déjà publié aujourd'hui (${todayParis})` });
+            continue;
+          }
+        }
 
         // Analyser le site pour éviter les répétitions et extraire la DA
         let existingTitles: string[] = [];
@@ -360,7 +378,7 @@ export async function GET(request: Request) {
 
         // Générer N articles (selon fréquence), chacun dans toutes les langues
         for (let f = 0; f < frequency; f++) {
-        const keywordIndex = ((publicationsCount ?? 0) + f) % keywords.length;
+        const keywordIndex = (totalPublished + f) % keywords.length;
         const keyword = keywords[keywordIndex];
 
         for (const language of targetLanguages) {
@@ -370,7 +388,7 @@ export async function GET(request: Request) {
             businessName: site.business_name,
             industry: site.industry,
             existingTitles,
-            publicationsCount: publicationsCount ?? 0,
+            publicationsCount: totalPublished,
             language,
             styleGuide,
           });
