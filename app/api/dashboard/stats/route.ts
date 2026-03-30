@@ -166,14 +166,11 @@ export async function GET() {
     });
 
     // ── Prochaine publication ────────────────────────────────────────────────
+    // Prochaine publication à 12h00 heure de Paris = 11h00 UTC
     const lastPub = pubs[0] ? new Date(pubs[0].published_at) : null;
     const nextDate = lastPub ? new Date(lastPub) : new Date(now);
-    if (lastPub) {
-      nextDate.setDate(nextDate.getDate() + 1);
-    } else {
-      nextDate.setDate(nextDate.getDate() + 1);
-    }
-    nextDate.setHours(8, 0, 0, 0);
+    nextDate.setDate(nextDate.getDate() + 1);
+    nextDate.setUTCHours(11, 0, 0, 0);
     const nextPublicationAt: string = nextDate.toISOString();
 
     // ── Streak de publication ────────────────────────────────────────────────
