@@ -150,7 +150,7 @@ QUALITY REQUIREMENTS (premium SEO agency level):
 
 RESPONSE FORMAT: Valid JSON only, no text before or after.
 
-{"title": "The optimized H1 title", "meta_description": "The 150-160 character meta description", "content": "The complete HTML content", "cover_image_query": "3-5 english keywords for a relevant stock photo (e.g. 'vintage clothing warehouse wholesale')", "cover_alt_text": "SEO-optimized alt text for the cover image, 8-12 words, includes main keyword, written in the article language"}
+{"title": "The optimized H1 title", "meta_description": "The 150-160 character meta description", "cover_image_query": "3-5 english keywords for a relevant stock photo (e.g. 'vintage clothing warehouse wholesale')", "cover_alt_text": "SEO-optimized alt text for the cover image, 8-12 words, includes main keyword, written in the article language", "content": "The complete HTML content"}
 
 HTML must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. No <html>, <body>, <head>.`,
         },
