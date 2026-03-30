@@ -101,8 +101,7 @@ RÉPONSE : JSON uniquement, sans texte avant ou après. Structure exacte :
       "objective": "trafic|autorité|conversion",
       "role": "pilier|cluster|support",
       "related": [2, 5],
-      "summary": "Résumé en 1 phrase percutante",
-      "key_points": ["point 1", "point 2"],
+      "summary": "1 phrase max",
       "priority": 1
     }
   ],
@@ -137,11 +136,14 @@ RÉPONSE : JSON uniquement, sans texte avant ou après. Structure exacte :
   "editorial_guidelines": "Directives éditoriales anti-IA en 3-4 phrases : ton, style, exemples, patterns à éviter"
 }
 
-IMPORTANT : génère exactement 40 articles. IDs de 1 à 40. Priorités de 1 (urgent) à 40. Sois concis dans chaque champ — la qualité stratégique prime sur la longueur.`;
+IMPORTANT :
+- Génère exactement 40 articles. IDs de 1 à 40. Priorités de 1 (urgent) à 40.
+- Chaque champ texte = 1 phrase courte maximum (pas de paragraphes).
+- Réponds avec du JSON brut uniquement — aucun bloc markdown, aucun texte avant ou après l'accolade ouvrante.`;
 
     const msg = await client.messages.create({
       model: "claude-opus-4-6",
-      max_tokens: 8000,
+      max_tokens: 12000,
       messages: [{ role: "user", content: prompt }],
     });
 

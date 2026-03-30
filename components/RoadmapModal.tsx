@@ -24,7 +24,7 @@ type Article = {
   role: "pilier" | "cluster" | "support";
   related: number[];
   summary: string;
-  key_points: string[];
+  key_points?: string[];
   priority: number;
 };
 
