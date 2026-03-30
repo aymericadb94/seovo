@@ -125,15 +125,14 @@ QUALITY REQUIREMENTS (premium SEO agency level):
 
 2. META DESCRIPTION: 150-160 characters, compelling, contains the keyword.
 
-3. INTRODUCTION (150-200 words): Strong hook, states the problem or opportunity.
+3. FEATURED SNIPPET BLOCK (this is the FIRST element in the content, immediately after H1 — critical for Google position 0 and LLMs like ChatGPT/Perplexity):
+   - Start with an H2 containing the main keyword phrased as a question (e.g. "Qu'est-ce que X ?" / "Comment X ?" / "Pourquoi X ?")
+   - Immediately follow with a <p> of exactly 40-60 words: direct, complete answer. No filler, no "in this article", no "we will see".
+   - If steps implied (how to, guide, tutorial): add a <ol> with 4-8 concise steps right after the paragraph.
+   - If comparison implied: add a <table> with 2-4 columns and 3-6 rows right after the paragraph.
+   - If definition implied: start the paragraph with "[Keyword] est..." followed by the definition.
 
-4. FEATURED SNIPPET BLOCK (immediately after introduction — critical for Google position 0):
-   Write a block specifically designed to capture the Google featured snippet:
-   - Start with an H2 containing the main keyword phrased as a question (e.g. "What is X?" / "How to X?" / "Why X?")
-   - Immediately follow with a <p> of exactly 40-60 words giving a direct, complete answer. No filler, no "in this article".
-   - If the keyword implies steps (how to, guide, tutorial): use a <ol> with 4-8 concise numbered steps right after the H2.
-   - If the keyword implies comparison: add a <table> with 2-4 columns and 3-6 rows with relevant data.
-   - If the keyword implies a definition: start the paragraph with "[Keyword] is/are..." followed by the definition.
+4. INTRODUCTION (150-200 words): Strong hook after the featured snippet. States the problem or opportunity. Announces what the reader will learn.
 
 5. ARTICLE BODY (1200-1800 words):
    - 4 to 6 well-structured H2 sections
