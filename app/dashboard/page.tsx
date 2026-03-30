@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import SeoAnalysisModal from "@/components/SeoAnalysisModal";
 import AuditModal, { type AuditData } from "@/components/AuditModal";
+import RoadmapModal, { type RoadmapData } from "@/components/RoadmapModal";
 import Footer from "@/components/Footer";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -385,6 +386,26 @@ export default function Dashboard() {
     await loadAudit();
   }
 
+  // Roadmap SEO
+  type RoadmapRecord = { id: string; created_at: string; data: RoadmapData };
+  const [roadmapRecord, setRoadmapRecord] = useState<RoadmapRecord | null>(null);
+  const [showRoadmapModal, setShowRoadmapModal] = useState(false);
+
+  async function loadRoadmap() {
+    try {
+      const res = await fetch("/api/roadmap");
+      const json = await res.json();
+      if (!json.error) setRoadmapRecord(json.roadmap);
+    } catch { /* ignore */ }
+  }
+
+  async function generateRoadmap() {
+    const res = await fetch("/api/roadmap", { method: "POST" });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+    setRoadmapRecord(json.roadmap);
+  }
+
   async function loadData() {
     const res = await fetch("/api/dashboard/stats");
     const json = await res.json();
@@ -400,6 +421,7 @@ export default function Dashboard() {
   useEffect(() => {
     loadData();
     loadAudit();
+    loadRoadmap();
     window.addEventListener("focus", loadData);
     return () => window.removeEventListener("focus", loadData);
   }, []);
@@ -489,6 +511,25 @@ export default function Dashboard() {
       {/* SEO Analysis Modal — s'affiche uniquement quand showSeoModal est explicitement true */}
       {showSeoModal === true && (
         <SeoAnalysisModal onComplete={() => { setShowSeoModal(false); loadData(); }} />
+      )}
+
+      {/* Audit mensuel */}
+      {showAuditReport && (
+        <AuditModal
+          auditRecord={latestAudit}
+          isAvailable={auditAvailable}
+          onClose={() => setShowAuditReport(false)}
+          onGenerate={async () => { await generateAudit(); }}
+        />
+      )}
+
+      {/* Roadmap SEO 40 articles */}
+      {showRoadmapModal && (
+        <RoadmapModal
+          roadmapRecord={roadmapRecord}
+          onClose={() => setShowRoadmapModal(false)}
+          onGenerate={generateRoadmap}
+        />
       )}
 
       {/* Modale limite journalière */}
@@ -855,6 +896,60 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
+
+                {/* ── Outils SEO ───────────────────────────────────────── */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-150">
+
+                  {/* Audit mensuel */}
+                  <button
+                    onClick={() => setShowAuditReport(true)}
+                    className="relative group bg-white/[0.03] border border-white/[0.07] hover:border-orange-500/30 rounded-2xl p-5 text-left transition-all duration-300 overflow-hidden"
+                  >
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                      style={{ background: "radial-gradient(ellipse at top left, rgba(249,115,22,0.06), transparent 60%)" }} />
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                          <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                        </svg>
+                      </div>
+                      {auditAvailable && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500/15 text-orange-400 border border-orange-500/25">Nouveau</span>
+                      )}
+                    </div>
+                    <p className="text-white font-bold text-sm mb-1">Audit SEO mensuel</p>
+                    <p className="text-white/40 text-xs leading-relaxed">
+                      {latestAudit
+                        ? `Dernier audit : ${latestAudit.data.month_label} — Score ${latestAudit.data.overall_score}/100`
+                        : "Générez votre premier audit SEO mensuel"}
+                    </p>
+                  </button>
+
+                  {/* Roadmap 40 articles */}
+                  <button
+                    onClick={() => setShowRoadmapModal(true)}
+                    className="relative group bg-white/[0.03] border border-white/[0.07] hover:border-violet-500/30 rounded-2xl p-5 text-left transition-all duration-300 overflow-hidden"
+                  >
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                      style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.06), transparent 60%)" }} />
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(167,139,250,0.12)", color: "#a78bfa" }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                          <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                        </svg>
+                      </div>
+                      {!roadmapRecord && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-violet-500/15 text-violet-400 border border-violet-500/25">À générer</span>
+                      )}
+                    </div>
+                    <p className="text-white font-bold text-sm mb-1">Roadmap SEO — 40 articles</p>
+                    <p className="text-white/40 text-xs leading-relaxed">
+                      {roadmapRecord
+                        ? `Générée le ${new Date(roadmapRecord.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} — ${roadmapRecord.data.articles?.length ?? 0} articles planifiés`
+                        : "Plan éditorial stratégique personnalisé pour dominer Google"}
+                    </p>
+                  </button>
+                </div>
 
                 {/* ── Row 2 : Graphique publications ───────────────────── */}
                 <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up delay-200 overflow-hidden">
