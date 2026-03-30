@@ -534,42 +534,66 @@ export default function Dashboard() {
 
       {/* Modale limite journalière */}
       {showDailyLimitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="relative w-full max-w-md bg-[#111] border border-orange-500/30 rounded-2xl p-6 shadow-2xl">
-            {/* Icône */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center flex-shrink-0">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-orange-400">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-white font-bold text-base">Limite journalière atteinte</h3>
-                <p className="text-orange-400 text-xs font-medium">3/3 articles publiés aujourd'hui</p>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in-up" style={{ animationDuration: "200ms" }}>
+          <div className="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ animation: "modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1) both" }}>
+            {/* Gradient de fond */}
+            <div className="absolute inset-0 rounded-2xl" style={{ background: "linear-gradient(135deg, #1a0e00 0%, #120800 40%, #0e0e0e 100%)" }} />
+            {/* Bordure gradient animée */}
+            <div className="absolute inset-0 rounded-2xl p-px" style={{ background: "linear-gradient(135deg, rgba(251,146,60,0.5), rgba(239,68,68,0.3), rgba(251,146,60,0.1))" }}>
+              <div className="absolute inset-0 rounded-2xl" style={{ background: "linear-gradient(135deg, #1a0e00 0%, #120800 40%, #0e0e0e 100%)" }} />
             </div>
+            {/* Halo orange radial */}
+            <div className="absolute top-0 left-0 w-64 h-64 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(251,146,60,0.15) 0%, transparent 65%)" }} />
+            <div className="absolute bottom-0 right-0 w-48 h-48 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(239,68,68,0.08) 0%, transparent 65%)" }} />
 
-            <p className="text-gray-400 text-sm leading-relaxed mb-2">
-              Vous avez atteint la limite recommandée de <span className="text-white font-semibold">3 publications par jour</span>. Publier davantage peut nuire à votre référencement naturel.
-            </p>
-            <p className="text-gray-500 text-xs mb-6">
-              Google peut interpréter un volume excessif de publications comme du spam. Il est conseillé d'attendre demain pour maintenir une croissance organique optimale.
-            </p>
+            <div className="relative p-7">
+              {/* Badge + icône */}
+              <div className="flex items-start gap-4 mb-5">
+                <div className="relative flex-shrink-0">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(251,146,60,0.2), rgba(239,68,68,0.15))", border: "1px solid rgba(251,146,60,0.3)" }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-orange-400">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                  </div>
+                  {/* Pulse ring */}
+                  <div className="absolute inset-0 rounded-2xl animate-ping opacity-20" style={{ background: "rgba(251,146,60,0.4)", animationDuration: "2s" }} />
+                </div>
+                <div>
+                  <h3 className="text-white font-black text-lg leading-tight">Limite journalière<br/>atteinte</h3>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="w-5 h-1.5 rounded-full" style={{ background: "linear-gradient(90deg, #fb923c, #ef4444)" }} />
+                    ))}
+                    <span className="text-orange-400 text-xs font-bold ml-1">3/3</span>
+                  </div>
+                </div>
+              </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDailyLimitModal(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all text-sm font-medium"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => handleManualPublish(true)}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-orange-500/20 border border-orange-500/40 hover:bg-orange-500/30 text-orange-300 hover:text-orange-200 transition-all text-sm font-bold"
-              >
-                Générer quand même
-              </button>
+              <p className="text-white/70 text-sm leading-relaxed mb-2">
+                Vous avez atteint la limite recommandée de <span className="font-bold" style={{ background: "linear-gradient(90deg, #fb923c, #f97316)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>3 publications par jour</span>. Publier davantage peut nuire à votre référencement.
+              </p>
+              <p className="text-white/35 text-xs leading-relaxed mb-7">
+                Google peut interpréter un volume excessif comme du spam. Attendez demain pour maintenir une croissance organique optimale.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDailyLimitModal(false)}
+                  className="flex-1 px-4 py-3 rounded-xl text-white/50 hover:text-white/80 transition-all text-sm font-medium"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => handleManualPublish(true)}
+                  className="flex-1 px-4 py-3 rounded-xl text-white font-bold text-sm transition-all hover:opacity-90 active:scale-95 relative overflow-hidden"
+                  style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 4px 24px rgba(249,115,22,0.35)" }}
+                >
+                  <span className="relative z-10">Générer quand même</span>
+                  <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity" style={{ background: "linear-gradient(135deg, #fb923c, #f87171)" }} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
