@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     }
 
     const origin = new URL(request.url).origin;
-    const res = await fetch(`${origin}/api/cron/publish?userId=${user.id}`, {
+    const res = await fetch(`${origin}/api/cron/publish?userId=${user.id}&manual=1`, {
       headers: { Authorization: `Bearer ${secret}` },
     });
 

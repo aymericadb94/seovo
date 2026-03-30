@@ -304,6 +304,7 @@ export async function GET(request: Request) {
   // Mode manuel : userId passé en query param → ne traite que ce site
   const url = new URL(request.url);
   const userId = url.searchParams.get("userId");
+  const isManual = url.searchParams.get("manual") === "1";
 
   const supabase = createAdminClient();
   const results: { site: string; cms: string; status: string; title?: string; error?: string }[] = [];
@@ -373,8 +374,8 @@ export async function GET(request: Request) {
           ? site.target_languages
           : ["fr"];
 
-        // Fréquence : nombre d'articles à publier par run (1 ou 2)
-        const frequency = Math.max(1, site.frequency ?? 1);
+        // Fréquence : 1 en mode manuel, sinon selon config du site
+        const frequency = isManual ? 1 : Math.max(1, site.frequency ?? 1);
 
         // Générer N articles (selon fréquence), chacun dans toutes les langues
         for (let f = 0; f < frequency; f++) {
