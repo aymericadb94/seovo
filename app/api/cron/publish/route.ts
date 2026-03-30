@@ -409,6 +409,7 @@ export async function GET(request: Request) {
             title,
             keyword,
             wordpress_url: publishedUrl,
+            published_at: new Date().toISOString(),
           });
           if (insertError) {
             console.error("[cron/publish] failed to record publication:", insertError.message);

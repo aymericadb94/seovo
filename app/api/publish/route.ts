@@ -124,13 +124,19 @@ export async function POST(request: Request) {
     }
 
     // Enregistrer la publication en base
-    await supabase.from("publications").insert({
+    const { error: insertError } = await supabase.from("publications").insert({
       site_id: site.id,
       user_id: user.id,
       title,
       keyword,
       wordpress_url: url,
+      published_at: new Date().toISOString(),
     });
+
+    if (insertError) {
+      console.error("[publish] failed to record publication:", insertError.message);
+      // On retourne quand même l'URL — l'article est publié même si l'enregistrement échoue
+    }
 
     return Response.json({ url });
   } catch (err: unknown) {
