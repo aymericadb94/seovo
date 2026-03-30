@@ -280,7 +280,7 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
                               <div>
                                 <p className="text-xs text-violet-400 font-medium mb-1">Points clés à traiter</p>
                                 <ul className="space-y-1">
-                                  {article.key_points.map((pt, i) => (
+                                  {article.key_points?.map((pt, i) => (
                                     <li key={i} className="flex items-start gap-2 text-sm text-white/60">
                                       <span className="text-violet-500 mt-0.5">›</span>
                                       {pt}
