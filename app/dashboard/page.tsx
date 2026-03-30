@@ -844,15 +844,24 @@ export default function Dashboard() {
 
                           {total > 0 ? (
                             <>
-                              <div className="relative space-y-2 flex-1">
+                              <div className="relative flex-1 space-y-1">
                                 {nextArticles.length > 0 ? nextArticles.map((a, i) => (
-                                  <div key={a.id} className="flex items-center gap-2.5"
-                                    style={{ opacity: 1 - i * 0.28, transition: `all 0.4s ease ${i * 80}ms` }}>
-                                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black flex-shrink-0"
-                                      style={{ background: i === 0 ? "linear-gradient(135deg, #a78bfa, #60a5fa)" : "rgba(167,139,250,0.15)", color: i === 0 ? "white" : "#a78bfa", border: i > 0 ? "1px solid rgba(167,139,250,0.2)" : "none" }}>
-                                      {a.priority}
+                                  <div key={a.id}
+                                    className="relative rounded-lg px-2.5 py-1.5 overflow-hidden"
+                                    style={{
+                                      opacity: 1 - i * 0.3,
+                                      transition: `all 0.4s ease ${i * 70}ms`,
+                                      background: i === 0 ? "linear-gradient(90deg, rgba(167,139,250,0.12), rgba(96,165,250,0.06) 70%, transparent)" : "transparent",
+                                      borderLeft: i === 0 ? "2px solid rgba(167,139,250,0.6)" : "2px solid rgba(167,139,250,0.12)",
+                                    }}>
+                                    {i === 0 && (
+                                      <div className="absolute inset-0 pointer-events-none animate-[sweep_3s_ease-in-out_infinite]"
+                                        style={{ background: "linear-gradient(90deg, transparent, rgba(167,139,250,0.08), transparent)" }} />
+                                    )}
+                                    <span className="relative text-xs truncate block"
+                                      style={{ color: i === 0 ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)", fontWeight: i === 0 ? 600 : 400, letterSpacing: i === 0 ? "-0.01em" : "normal" }}>
+                                      {a.title}
                                     </span>
-                                    <span className="text-xs truncate" style={{ color: i === 0 ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.45)", fontWeight: i === 0 ? 500 : 400 }}>{a.title}</span>
                                   </div>
                                 )) : (
                                   <p className="text-white/40 text-xs">Tous les articles publiés !</p>
