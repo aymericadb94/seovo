@@ -803,22 +803,39 @@ export default function Dashboard() {
                         .slice(0, 3);
                       const total = roadmapRecord?.data?.articles?.length ?? 0;
                       const done = (data?.kpis.totalArticles ?? 0);
+                      const pct = Math.round((done / Math.max(total, 1)) * 100);
                       return (
                         <button
                           onClick={() => setShowRoadmapModal(true)}
-                          className="relative bg-white/[0.03] border border-white/[0.07] hover:border-violet-500/30 rounded-2xl p-5 flex flex-col justify-between min-h-[140px] overflow-hidden group text-left animate-fade-in-up"
-                          style={{ animationDelay: "100ms" }}
+                          className="relative rounded-2xl p-5 flex flex-col justify-between min-h-[140px] overflow-hidden group text-left animate-fade-in-up"
+                          style={{
+                            animationDelay: "100ms",
+                            background: "linear-gradient(145deg, #100d1a 0%, #0d0d14 60%, #090910 100%)",
+                            border: "1px solid rgba(167,139,250,0.18)",
+                          }}
                         >
-                          {/* Gradient animé */}
-                          <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-60"
-                            style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.07) 0%, rgba(96,165,250,0.05) 50%, transparent 100%)" }} />
+                          {/* Halos de fond */}
+                          <div className="absolute top-0 left-0 w-40 h-40 pointer-events-none"
+                            style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.13) 0%, transparent 70%)" }} />
+                          <div className="absolute bottom-0 right-0 w-32 h-32 pointer-events-none"
+                            style={{ background: "radial-gradient(ellipse at bottom right, rgba(96,165,250,0.07) 0%, transparent 70%)" }} />
+                          {/* Hover glow */}
                           <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                            style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.12), transparent 65%)" }} />
+                            style={{ background: "radial-gradient(ellipse at 30% 20%, rgba(167,139,250,0.1), transparent 60%)", border: "1px solid rgba(167,139,250,0.3)" }} />
 
-                          <div className="flex items-center justify-between mb-2 relative">
-                            <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Roadmap SEO</p>
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110"
-                              style={{ background: "rgba(167,139,250,0.12)", color: "#a78bfa" }}>
+                          {/* Header */}
+                          <div className="flex items-center justify-between mb-3 relative">
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-[0.15em]"
+                                style={{ background: "linear-gradient(90deg, #a78bfa, #818cf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                                Roadmap SEO
+                              </p>
+                              {total > 0 && (
+                                <p className="text-white/25 text-[10px] mt-0.5">{total} articles planifiés</p>
+                              )}
+                            </div>
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6"
+                              style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.2), rgba(96,165,250,0.12))", border: "1px solid rgba(167,139,250,0.2)", color: "#c4b5fd" }}>
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
                                 <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
                               </svg>
@@ -827,34 +844,42 @@ export default function Dashboard() {
 
                           {total > 0 ? (
                             <>
-                              <div className="relative space-y-1.5 flex-1">
+                              <div className="relative space-y-2 flex-1">
                                 {nextArticles.length > 0 ? nextArticles.map((a, i) => (
-                                  <div key={a.id} className="flex items-center gap-2"
-                                    style={{ opacity: 1 - i * 0.25, transform: `translateX(${i * 4}px)`, transition: `all 0.4s ease ${i * 80}ms` }}>
-                                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black flex-shrink-0"
-                                      style={{ background: "linear-gradient(135deg, #a78bfa, #60a5fa)", color: "white" }}>
+                                  <div key={a.id} className="flex items-center gap-2.5"
+                                    style={{ opacity: 1 - i * 0.28, transition: `all 0.4s ease ${i * 80}ms` }}>
+                                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black flex-shrink-0"
+                                      style={{ background: i === 0 ? "linear-gradient(135deg, #a78bfa, #60a5fa)" : "rgba(167,139,250,0.15)", color: i === 0 ? "white" : "#a78bfa", border: i > 0 ? "1px solid rgba(167,139,250,0.2)" : "none" }}>
                                       {a.priority}
                                     </span>
-                                    <span className="text-white/70 text-xs truncate">{a.title}</span>
+                                    <span className="text-xs truncate" style={{ color: i === 0 ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.45)", fontWeight: i === 0 ? 500 : 400 }}>{a.title}</span>
                                   </div>
                                 )) : (
                                   <p className="text-white/40 text-xs">Tous les articles publiés !</p>
                                 )}
                               </div>
                               <div className="mt-3 relative">
-                                <div className="flex justify-between text-xs mb-1">
-                                  <span className="text-violet-400 font-medium">{done}/{total} publiés</span>
-                                  <span className="text-white/30">{Math.round((done / Math.max(total, 1)) * 100)}%</span>
+                                <div className="flex justify-between items-baseline mb-1.5">
+                                  <span className="text-xs font-bold" style={{ background: "linear-gradient(90deg, #a78bfa, #60a5fa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                                    {done}/{total} publiés
+                                  </span>
+                                  <span className="text-[10px] font-bold text-white/25">{pct}%</span>
                                 </div>
-                                <div className="h-1 bg-white/[0.05] rounded-full overflow-hidden">
-                                  <div className="h-full rounded-full transition-all duration-1000"
-                                    style={{ width: `${Math.round((done / Math.max(total, 1)) * 100)}%`, background: "linear-gradient(90deg, #a78bfa, #60a5fa)" }} />
+                                <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(167,139,250,0.08)" }}>
+                                  <div className="h-full rounded-full transition-all duration-1000 relative overflow-hidden"
+                                    style={{ width: `${pct}%`, background: "linear-gradient(90deg, #7c3aed, #a78bfa, #60a5fa)" }}>
+                                    <div className="absolute inset-0 animate-[sweep_2s_ease-in-out_infinite]"
+                                      style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)" }} />
+                                  </div>
                                 </div>
                               </div>
                             </>
                           ) : (
-                            <div className="flex-1 flex items-center">
+                            <div className="flex-1 flex flex-col justify-center gap-2">
                               <p className="text-white/40 text-xs leading-relaxed">Générez votre roadmap pour voir les prochains articles à publier</p>
+                              <span className="text-[10px] font-bold" style={{ background: "linear-gradient(90deg, #a78bfa, #60a5fa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                                Générer →
+                              </span>
                             </div>
                           )}
                         </button>
