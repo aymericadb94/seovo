@@ -276,7 +276,7 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
                               <p className="text-xs text-violet-400 font-medium mb-1">Résumé stratégique</p>
                               <p className="text-sm text-white/60 leading-relaxed">{article.summary}</p>
                             </div>
-                            {article.key_points?.length > 0 && (
+                            {(article.key_points?.length ?? 0) > 0 && (
                               <div>
                                 <p className="text-xs text-violet-400 font-medium mb-1">Points clés à traiter</p>
                                 <ul className="space-y-1">
