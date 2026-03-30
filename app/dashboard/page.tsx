@@ -34,6 +34,7 @@ type DashboardData = {
     totalKeywords: number;
     seoScore: number;
     nextPublicationAt: string | null;
+    pubsToday: number;
     streak: number;
     bestStreak: number;
   };
@@ -511,12 +512,16 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-2.5">
             {/* Bouton Auto-publier */}
+            {(() => {
+              const pubsToday = data?.kpis.pubsToday ?? 0;
+              const dailyMax = 3;
+              const limitReached = pubsToday >= dailyMax;
+              return (
             <button
               onClick={handleManualPublish}
-              disabled={cronRunning}
+              disabled={cronRunning || limitReached}
               className="group relative flex items-center gap-2 px-4 py-2 rounded-xl border border-orange-500/25 bg-orange-500/[0.06] hover:bg-orange-500/[0.12] hover:border-orange-500/50 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {/* Pulse ring quand en cours */}
               {cronRunning && (
                 <span className="absolute inset-0 rounded-xl border border-orange-500/40 animate-ping" />
               )}
@@ -532,14 +537,17 @@ export default function Dashboard() {
                     className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors flex-shrink-0">
                     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" stroke="none"/>
                   </svg>
-                  <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300 transition-colors">Auto</span>
-                  {/* Tooltip au hover */}
+                  <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300 transition-colors">
+                    {limitReached ? "3/3" : `${pubsToday + 1}/3`}
+                  </span>
                   <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1a1a1a] border border-white/10 text-gray-400 text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
-                    Publie automatiquement le prochain mot-clé
+                    {limitReached ? "Limite journalière atteinte (3/3)" : "Publie automatiquement le prochain mot-clé"}
                   </span>
                 </>
               )}
             </button>
+            );
+            })()}
 
             {/* Bouton Créer un article */}
             <Link
@@ -1183,11 +1191,13 @@ export default function Dashboard() {
                   </Link>
                   <button
                     onClick={handleManualPublish}
-                    disabled={cronRunning}
+                    disabled={cronRunning || (data?.kpis.pubsToday ?? 0) >= 3}
                     className="flex-1 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 hover:border-orange-500/40 rounded-xl p-4 text-center transition-colors disabled:opacity-40"
                   >
-                    <p className="text-orange-400 font-bold">{cronRunning ? "⏳ En cours..." : "▶ Générer un article maintenant"}</p>
-                    <p className="text-gray-600 text-xs mt-1">Couvre le prochain mot-clé non traité</p>
+                    <p className="text-orange-400 font-bold">
+                      {cronRunning ? "⏳ En cours..." : (data?.kpis.pubsToday ?? 0) >= 3 ? "✓ Limite journalière atteinte" : "▶ Générer un article maintenant"}
+                    </p>
+                    <p className="text-gray-600 text-xs mt-1">{(data?.kpis.pubsToday ?? 0) >= 3 ? "3/3 articles publiés aujourd'hui" : "Couvre le prochain mot-clé non traité"}</p>
                   </button>
                 </div>
               </div>

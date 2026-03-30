@@ -335,20 +335,26 @@ export async function GET(request: Request) {
 
         const totalPublished = publicationsCount ?? 0;
 
-        // Garde anti-doublon : vérifier si on a déjà publié aujourd'hui (heure Paris)
-        // Exception : mode userId manuel depuis le dashboard, on laisse passer
-        if (!userId) {
-          const todayParis = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" });
-          const { data: todayPubs } = await supabase
-            .from("publications")
-            .select("id")
-            .eq("site_id", site.id)
-            .gte("published_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
-            .limit(1);
-          if (todayPubs && todayPubs.length > 0) {
-            results.push({ site: site.site_url, cms: site.cms, status: "skip", error: `Déjà publié aujourd'hui (${todayParis})` });
-            continue;
-          }
+        // Limite journalière : max 3 articles/jour par site
+        const dailyMax = 3;
+        const startOfTodayUtc = new Date();
+        startOfTodayUtc.setUTCHours(0, 0, 0, 0);
+        const { count: pubsTodayCount } = await supabase
+          .from("publications")
+          .select("*", { count: "exact", head: true })
+          .eq("site_id", site.id)
+          .gte("published_at", startOfTodayUtc.toISOString());
+        const pubsToday = pubsTodayCount ?? 0;
+
+        if (pubsToday >= dailyMax) {
+          results.push({ site: site.site_url, cms: site.cms, status: "skip", error: `Limite journalière atteinte (${pubsToday}/${dailyMax})` });
+          continue;
+        }
+
+        // En mode automatique (pas manuel), vérifier qu'on n'a pas déjà publié aujourd'hui via le cron
+        if (!userId && pubsToday > 0) {
+          results.push({ site: site.site_url, cms: site.cms, status: "skip", error: `Déjà publié aujourd'hui automatiquement` });
+          continue;
         }
 
         // Analyser le site pour éviter les répétitions et extraire la DA
@@ -374,8 +380,9 @@ export async function GET(request: Request) {
           ? site.target_languages
           : ["fr"];
 
-        // Fréquence : 1 en mode manuel, sinon selon config du site
-        const frequency = isManual ? 1 : Math.max(1, site.frequency ?? 1);
+        // Fréquence : 1 en mode manuel, sinon selon config du site (plafonné à la limite restante)
+        const remaining = dailyMax - pubsToday;
+        const frequency = isManual ? 1 : Math.min(Math.max(1, site.frequency ?? 1), remaining);
 
         // Générer N articles (selon fréquence), chacun dans toutes les langues
         for (let f = 0; f < frequency; f++) {

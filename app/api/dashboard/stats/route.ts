@@ -34,6 +34,8 @@ export async function GET() {
     const totalArticles = pubs.length;
     const articlesThisMonth = pubs.filter(p => new Date(p.published_at) >= startOfMonth).length;
     const articlesThisWeek = pubs.filter(p => new Date(p.published_at) >= startOfWeek).length;
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const pubsToday = pubs.filter(p => new Date(p.published_at) >= startOfToday).length;
 
     // Mots-clés uniques couverts
     const coveredKeywords = [...new Set(pubs.map(p => p.keyword).filter(Boolean))];
@@ -237,6 +239,7 @@ export async function GET() {
         totalArticles,
         articlesThisMonth,
         articlesThisWeek,
+        pubsToday,
         coveredKeywords: coveredKeywords.length,
         totalKeywords: allKeywords.length,
         seoScore,
