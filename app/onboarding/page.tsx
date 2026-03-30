@@ -107,7 +107,8 @@ const WIX_TUTORIAL = {
     { num: "03", title: "Créez une nouvelle clé API", detail: "Cliquez sur \"Générer une clé API\". Donnez-lui le nom :", code: "RankPill" },
     { num: "04", title: "Accordez les permissions Blog", detail: "Activez les permissions : Blog (lecture + écriture). Puis cliquez sur \"Générer\"." },
     { num: "05", title: "Copiez la clé API", detail: "La clé ne s'affiche qu'une seule fois. Copiez-la immédiatement et collez-la dans le champ à gauche." },
-    { num: "06", title: "Trouvez votre Site ID", detail: "Sur la page de votre clé API (étape précédente), le Site ID est affiché directement sous la clé. Vous pouvez aussi le trouver dans l'URL : c'est l'UUID entre /dashboard/ et /home :", code: "manage.wix.com/dashboard/XXXXXXXX-XXXX-XXXX-XXXX/home" },
+    { num: "06", title: "Trouvez votre Site ID dans l'URL", detail: "Retournez sur votre dashboard Wix. Regardez l'URL dans votre navigateur — elle ressemble à :", code: "manage.wix.com/dashboard/XXXXXXXX-XXXX-XXXX-XXXX/home" },
+    { num: "07", title: "Copiez uniquement l'UUID", detail: "Le Site ID est la suite de chiffres et lettres entre \"/dashboard/\" et \"/home\". Exemple : si l'URL est manage.wix.com/dashboard/a1b2c3d4-1234-5678-abcd-ef1234567890/home, votre Site ID est :", code: "a1b2c3d4-1234-5678-abcd-ef1234567890" },
   ],
   warning: "La clé API Wix ne s'affiche qu'une seule fois à la création. Si vous l'avez manquée, supprimez-la et générez-en une nouvelle.",
 };
