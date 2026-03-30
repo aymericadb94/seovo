@@ -433,10 +433,56 @@ export async function GET(request: Request) {
         const remaining = dailyMax - pubsToday;
         const frequency = isManual ? 1 : Math.min(Math.max(1, site.frequency ?? 1), remaining);
 
+        // Roadmap : récupérer les articles ordonnés par priorité
+        const { data: roadmapRow } = await supabase
+          .from("roadmaps")
+          .select("data")
+          .eq("user_id", site.user_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        // Mots-clés déjà publiés (pour éviter les doublons)
+        const { data: publishedPubs } = await supabase
+          .from("publications")
+          .select("keyword")
+          .eq("site_id", site.id);
+        const publishedKeywords = new Set(
+          (publishedPubs ?? []).map(p => p.keyword?.toLowerCase()).filter(Boolean)
+        );
+
+        // Construire la file d'attente : roadmap en priorité, sinon rotation classique
+        function getNextKeywords(count: number): string[] {
+          const result: string[] = [];
+          if ((roadmapRow?.data?.articles?.length ?? 0) > 0) {
+            const roadmapArticles = ((roadmapRow?.data?.articles ?? []) as { keyword: string; priority: number }[])
+              .filter(a => a.keyword && !publishedKeywords.has(a.keyword.toLowerCase()))
+              .sort((a, b) => a.priority - b.priority);
+            for (const a of roadmapArticles) {
+              if (result.length >= count) break;
+              result.push(a.keyword);
+              publishedKeywords.add(a.keyword.toLowerCase()); // éviter doublons dans la même session
+            }
+          }
+          // Compléter avec la rotation classique si pas assez d'articles dans la roadmap
+          if (result.length < count) {
+            for (let i = 0; result.length < count; i++) {
+              const kw = keywords[(totalPublished + i) % keywords.length];
+              if (!publishedKeywords.has(kw.toLowerCase())) {
+                result.push(kw);
+                publishedKeywords.add(kw.toLowerCase());
+              }
+              if (i >= keywords.length) break; // sécurité boucle infinie
+            }
+          }
+          return result;
+        }
+
+        const keywordsToPublish = getNextKeywords(frequency);
+
         // Générer N articles (selon fréquence), chacun dans toutes les langues
         for (let f = 0; f < frequency; f++) {
-        const keywordIndex = (totalPublished + f) % keywords.length;
-        const keyword = keywords[keywordIndex];
+        const keyword = keywordsToPublish[f] ?? keywords[totalPublished % keywords.length];
 
         for (const language of targetLanguages) {
           const { title, content, meta_description, cover_image_query, cover_alt_text } = await generateArticle({
