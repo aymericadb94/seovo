@@ -105,29 +105,43 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-8 bg-black/80 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-8 bg-black/80 backdrop-blur-md overflow-y-auto"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative w-full max-w-5xl bg-[#0e0e0e] border border-white/10 rounded-2xl shadow-2xl mb-8">
+      <div className="relative w-full max-w-5xl rounded-2xl shadow-2xl mb-8 overflow-hidden"
+        style={{ background: "linear-gradient(160deg, #100d1a 0%, #0d0b15 40%, #0a0a0f 100%)", border: "1px solid rgba(167,139,250,0.15)" }}>
+
+        {/* Orbes de fond */}
+        <div className="absolute top-0 left-0 w-[500px] h-[300px] pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at top left, rgba(124,58,237,0.12) 0%, transparent 65%)" }} />
+        <div className="absolute bottom-0 right-0 w-[400px] h-[300px] pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at bottom right, rgba(96,165,250,0.06) 0%, transparent 65%)" }} />
+
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/8">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-violet-400">
-                <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+        <div className="relative flex items-center justify-between px-7 py-5" style={{ borderBottom: "1px solid rgba(167,139,250,0.1)" }}>
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.2), rgba(96,165,250,0.12))", border: "1px solid rgba(167,139,250,0.25)" }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5" style={{ color: "#c4b5fd" }}>
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Roadmap SEO — 40 articles</h2>
+              <h2 className="text-lg font-black tracking-tight"
+                style={{ background: "linear-gradient(90deg, #e9d5ff, #c4b5fd, #a5b4fc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                Roadmap SEO — 40 articles
+              </h2>
               {roadmapRecord && (
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-white/30 mt-0.5">
                   Généré le {new Date(roadmapRecord.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
                 </p>
               )}
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-white/50">
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/8"
+            style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-white/40">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
@@ -165,19 +179,28 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
         {data && (
           <>
             {/* Business analysis banner */}
-            <div className="p-5 border-b border-white/8 bg-violet-500/5">
-              <div className="flex items-start gap-4">
+            <div className="relative px-7 py-4" style={{ borderBottom: "1px solid rgba(167,139,250,0.08)", background: "rgba(124,58,237,0.04)" }}>
+              <div className="flex items-start gap-5">
                 <div className="flex-1">
-                  <p className="text-white/70 text-sm leading-relaxed">{data.business_analysis.summary}</p>
-                  <p className="text-white/40 text-xs mt-1">
-                    <span className="text-violet-400 font-medium">Positionnement :</span> {data.business_analysis.positioning} —
-                    <span className="text-violet-400 font-medium ml-2">Maturité SEO :</span> <span className="capitalize">{data.business_analysis.seo_maturity}</span>
-                  </p>
+                  <p className="text-white/65 text-sm leading-relaxed">{data.business_analysis.summary}</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                    <span className="text-xs">
+                      <span className="font-semibold" style={{ color: "#a78bfa" }}>Positionnement</span>
+                      <span className="text-white/30 mx-1">·</span>
+                      <span className="text-white/40">{data.business_analysis.positioning}</span>
+                    </span>
+                    <span className="text-xs">
+                      <span className="font-semibold" style={{ color: "#a78bfa" }}>Maturité SEO</span>
+                      <span className="text-white/30 mx-1">·</span>
+                      <span className="text-white/40 capitalize">{data.business_analysis.seo_maturity}</span>
+                    </span>
+                  </div>
                 </div>
                 <button
                   onClick={handleGenerate}
                   disabled={generating}
-                  className="flex-shrink-0 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 text-xs rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all disabled:opacity-40 hover:bg-white/8"
+                  style={{ border: "1px solid rgba(167,139,250,0.2)", color: "rgba(196,181,253,0.7)" }}
                 >
                   {generating ? "En cours..." : "Regénérer"}
                 </button>
@@ -185,16 +208,16 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-white/8">
+            <div className="flex" style={{ borderBottom: "1px solid rgba(167,139,250,0.08)" }}>
               {(["articles", "phases", "strategy"] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 -mb-px capitalize ${
-                    activeTab === tab
-                      ? "border-violet-500 text-violet-400"
-                      : "border-transparent text-white/40 hover:text-white/60"
-                  }`}
+                  className="px-5 py-3.5 text-sm font-medium transition-all border-b-2 -mb-px"
+                  style={{
+                    borderBottomColor: activeTab === tab ? "#a78bfa" : "transparent",
+                    color: activeTab === tab ? "#c4b5fd" : "rgba(255,255,255,0.3)",
+                  }}
                 >
                   {tab === "articles" ? `40 Articles (${articles.length})` : tab === "phases" ? "Plan de publication" : "Stratégie éditoriale"}
                 </button>
@@ -210,11 +233,16 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
                     <button
                       key={f}
                       onClick={() => setFilter(f)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
-                        filter === f
-                          ? "bg-violet-600 border-violet-500 text-white"
-                          : "bg-white/5 border-white/10 text-white/40 hover:text-white/60"
-                      }`}
+                      className="px-3 py-1 rounded-full text-xs font-medium transition-all"
+                      style={filter === f ? {
+                        background: "linear-gradient(135deg, rgba(124,58,237,0.4), rgba(109,40,217,0.3))",
+                        border: "1px solid rgba(167,139,250,0.4)",
+                        color: "#e9d5ff",
+                      } : {
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "rgba(255,255,255,0.35)",
+                      }}
                     >
                       {f === "all" ? `Tous (${articles.length})` : f.charAt(0).toUpperCase() + f.slice(1)}
                     </button>
