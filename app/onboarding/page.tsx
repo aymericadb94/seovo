@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
@@ -18,8 +18,17 @@ type FormData = {
   wix_site_id: string;
   custom_api_url: string;
   custom_api_key: string;
+  // Strategic fields
+  objective: "acquisition" | "notoriete" | "conversion" | "fidelisation" | "";
+  main_offer: string;
+  target_customer: string;
+  geography: "local" | "national" | "international" | "";
+  geography_detail: string;
+  editorial_tone: "expert" | "accessible" | "humoristique" | "inspirant" | "professionnel" | "";
+  automation_level: "full" | "semi" | "manual" | "";
   keywords: string;
-  frequency: number;
+  competitors: string;
+  constraints: string;
 };
 
 const industries = [
@@ -108,7 +117,7 @@ const WIX_TUTORIAL = {
     { num: "04", title: "Accordez les permissions Blog", detail: "Activez les permissions : Blog (lecture + écriture). Puis cliquez sur \"Générer\"." },
     { num: "05", title: "Copiez la clé API", detail: "La clé ne s'affiche qu'une seule fois. Copiez-la immédiatement et collez-la dans le champ à gauche." },
     { num: "06", title: "Trouvez votre Site ID dans l'URL", detail: "Retournez sur votre dashboard Wix. Regardez l'URL dans votre navigateur — elle ressemble à :", code: "manage.wix.com/dashboard/XXXXXXXX-XXXX-XXXX-XXXX/home" },
-    { num: "07", title: "Copiez uniquement l'UUID", detail: "Le Site ID est la suite de chiffres et lettres entre \"/dashboard/\" et \"/home\". Exemple : si l'URL est manage.wix.com/dashboard/a1b2c3d4-1234-5678-abcd-ef1234567890/home, votre Site ID est :", code: "a1b2c3d4-1234-5678-abcd-ef1234567890" },
+    { num: "07", title: "Copiez uniquement l'UUID", detail: "Le Site ID est la suite de chiffres et lettres entre \"/dashboard/\" et \"/home\".", code: "a1b2c3d4-1234-5678-abcd-ef1234567890" },
   ],
   warning: "La clé API Wix ne s'affiche qu'une seule fois à la création. Si vous l'avez manquée, supprimez-la et générez-en une nouvelle.",
 };
@@ -120,7 +129,7 @@ const CUSTOM_TUTORIAL = {
     { num: "01", title: "Créez un endpoint POST sur votre site", detail: "Votre site doit exposer un endpoint qui accepte les requêtes POST avec le body :", code: '{ "title": "...", "content": "...", "meta_description": "..." }' },
     { num: "02", title: "Sécurisez avec un Bearer token", detail: "L'endpoint doit vérifier le header d'autorisation :", code: "Authorization: Bearer VOTRE_CLÉ_API" },
     { num: "03", title: "Retournez l'URL publiée", detail: "Après publication, retournez une réponse JSON avec l'URL de l'article :", code: '{ "url": "https://votresite.com/articles/mon-article" }' },
-    { num: "04", title: "Renseignez l'URL de l'endpoint", detail: "Entrez l'URL complète de votre endpoint dans le champ \"Endpoint URL\" à gauche.", code: "https://votresite.com/api/publish" },
+    { num: "04", title: "Renseignez l'URL de l'endpoint", detail: "Entrez l'URL complète de votre endpoint dans le champ à gauche.", code: "https://votresite.com/api/publish" },
     { num: "05", title: "Renseignez votre clé API", detail: "Entrez la clé secrète que votre endpoint vérifie. RankPill l'enverra dans le header Authorization." },
   ],
   warning: "Ne partagez jamais votre clé API. Elle donne accès à la publication de contenu sur votre site.",
@@ -241,6 +250,58 @@ function Tutorial({ cms, shopifyPermissions, requiredPermissionsLabel, attention
   );
 }
 
+// ─── Composants UI step 2 ─────────────────────────────────────────────────────
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <div className="h-px flex-1 bg-gradient-to-r from-violet-500/30 to-transparent" />
+      <span className="text-xs font-black uppercase tracking-widest text-violet-400/70">{children}</span>
+      <div className="h-px flex-1 bg-gradient-to-l from-violet-500/30 to-transparent" />
+    </div>
+  );
+}
+
+function ChoiceCard({
+  selected, onClick, icon, label, sub
+}: {
+  selected: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  sub?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative text-left px-4 py-3 rounded-xl border transition-all duration-200 overflow-hidden group flex items-start gap-3 ${
+        selected
+          ? "bg-violet-500/10 border-violet-500/40 shadow-[0_0_20px_rgba(139,92,246,0.12)]"
+          : "bg-white/[0.03] border-white/[0.08] hover:border-violet-500/30 hover:bg-violet-500/5"
+      }`}
+    >
+      {selected && (
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[sweep_2.5s_ease-in-out_infinite]" />
+      )}
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+        selected ? "bg-violet-500/20 text-violet-300" : "bg-white/[0.06] text-gray-400 group-hover:text-violet-400"
+      }`}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-bold transition-colors ${selected ? "text-violet-300" : "text-white"}`}>{label}</p>
+        {sub && <p className="text-xs text-gray-500 mt-0.5 leading-snug">{sub}</p>}
+      </div>
+      {selected && (
+        <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5">
+          <path d="M3 8l3.5 3.5 6.5-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+    </button>
+  );
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
@@ -255,7 +316,10 @@ export default function OnboardingPage() {
     wp_username: "", wp_app_password: "", shopify_api_key: "",
     wix_api_key: "", wix_site_id: "",
     custom_api_url: "", custom_api_key: "",
-    keywords: "", frequency: 1,
+    objective: "", main_offer: "", target_customer: "",
+    geography: "", geography_detail: "",
+    editorial_tone: "", automation_level: "",
+    keywords: "", competitors: "", constraints: "",
   });
 
   function update(key: keyof FormData, value: string | number) {
@@ -266,6 +330,7 @@ export default function OnboardingPage() {
     setStep(n);
     setAnimKey(k => k + 1);
     setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function canProceed() {
@@ -277,7 +342,17 @@ export default function OnboardingPage() {
       if (form.cms === "wix") return form.wix_api_key.trim() && form.wix_site_id.trim();
       if (form.cms === "custom") return form.custom_api_url.trim();
     }
-    if (step === 2) return form.keywords.trim().length > 0;
+    if (step === 2) {
+      return (
+        form.objective &&
+        form.main_offer.trim() &&
+        form.target_customer.trim() &&
+        form.geography &&
+        form.editorial_tone &&
+        form.automation_level &&
+        form.keywords.trim()
+      );
+    }
     return false;
   }
 
@@ -286,23 +361,48 @@ export default function OnboardingPage() {
     setLoading(true);
     setError("");
     const keywords = form.keywords.split(",").map((k) => k.trim()).filter(Boolean);
+    const automationToFrequency: Record<string, number> = { full: 1, semi: 1, manual: 1 };
+    const frequency = automationToFrequency[form.automation_level] ?? 1;
+
+    const seo_context = {
+      objective: form.objective,
+      main_offer: form.main_offer,
+      target_customer: form.target_customer,
+      geography: form.geography,
+      geography_detail: form.geography_detail,
+      editorial_tone: form.editorial_tone,
+      automation_level: form.automation_level,
+      competitors: form.competitors ? form.competitors.split(",").map(c => c.trim()).filter(Boolean) : [],
+      constraints: form.constraints,
+    };
+
     const res = await fetch("/api/onboarding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, keywords }),
+      body: JSON.stringify({
+        business_name: form.business_name,
+        industry: form.industry,
+        cms: form.cms,
+        site_url: form.site_url,
+        wp_username: form.wp_username,
+        wp_app_password: form.wp_app_password,
+        shopify_api_key: form.shopify_api_key,
+        wix_api_key: form.wix_api_key,
+        wix_site_id: form.wix_site_id,
+        custom_api_url: form.custom_api_url,
+        custom_api_key: form.custom_api_key,
+        keywords,
+        frequency,
+        seo_context,
+      }),
     });
     const data = await res.json();
     if (!res.ok) { setError(data.error || t.onboarding.error); setLoading(false); }
     else router.push("/onboarding/success");
   }
 
-  const STEPS = t.onboarding.steps;
+  const STEPS = ["Activité", "Site", "Stratégie"];
   const isWide = step === 1 && form.cms !== "";
-
-  const freqOptions = [
-    { value: 1, label: t.onboarding.freq1Label, sub: t.onboarding.freq1Sub },
-    { value: 2, label: t.onboarding.freq2Label, sub: t.onboarding.freq2Sub },
-  ];
 
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 relative overflow-hidden">
@@ -312,13 +412,16 @@ export default function OnboardingPage() {
         <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-orange-600/6 rounded-full blur-3xl animate-[orb_8s_ease-in-out_infinite]" />
         <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-red-600/5 rounded-full blur-3xl animate-[orb_10s_ease-in-out_infinite_reverse]" style={{ animationDelay: "-3s" }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-orange-500/4 rounded-full blur-2xl animate-[orb_6s_ease-in-out_infinite]" style={{ animationDelay: "-1.5s" }} />
+        {step === 2 && (
+          <div className="absolute top-1/3 right-1/3 w-[400px] h-[400px] bg-violet-600/5 rounded-full blur-3xl animate-[orb_9s_ease-in-out_infinite]" style={{ animationDelay: "-2s" }} />
+        )}
       </div>
 
       <div className="absolute top-4 right-4 z-10">
         <LanguageSwitcher />
       </div>
 
-      <div className={`relative w-full transition-all duration-500 ${isWide ? "max-w-5xl" : "max-w-xl"}`}>
+      <div className={`relative w-full transition-all duration-500 ${isWide ? "max-w-5xl" : step === 2 ? "max-w-2xl" : "max-w-xl"}`}>
 
         {/* Logo */}
         <div className="text-center mb-8 animate-[fadeInUp_0.5s_ease-out_both]">
@@ -336,19 +439,30 @@ export default function OnboardingPage() {
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black transition-all duration-500 relative ${
                   i < step
                     ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30"
-                    : i === step
+                    : i === step && step < 2
                     ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-xl shadow-orange-500/40 scale-110"
+                    : i === step && step === 2
+                    ? "text-white shadow-xl scale-110"
                     : "bg-white/[0.06] text-gray-500 border border-white/10"
-                }`}>
-                  {i === step && (
+                }`}
+                style={i === step && step === 2 ? { background: "linear-gradient(135deg, #7c3aed, #6d28d9)" } : {}}>
+                  {i === step && step < 2 && (
                     <div className="absolute inset-0 rounded-full bg-orange-500/20 animate-ping" />
+                  )}
+                  {i === step && step === 2 && (
+                    <div className="absolute inset-0 rounded-full bg-violet-500/20 animate-ping" />
                   )}
                   {i < step
                     ? <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5"><path d="M2 7l3.5 3.5 6.5-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     : <span>{i + 1}</span>
                   }
                 </div>
-                <span className={`text-xs font-bold uppercase tracking-wide transition-colors duration-300 ${i === step ? "text-orange-400" : i < step ? "text-orange-500/60" : "text-gray-600"}`}>
+                <span className={`text-xs font-bold uppercase tracking-wide transition-colors duration-300 ${
+                  i === step && step < 2 ? "text-orange-400"
+                  : i === step && step === 2 ? "text-violet-400"
+                  : i < step ? "text-orange-500/60"
+                  : "text-gray-600"
+                }`}>
                   {label}
                 </span>
               </div>
@@ -367,7 +481,9 @@ export default function OnboardingPage() {
           {/* ── Card formulaire ─────────────────────────────────────── */}
           <div
             key={animKey}
-            className={`bg-white/[0.03] border border-white/[0.07] rounded-2xl p-8 flex flex-col gap-5 animate-[fadeInUp_0.4s_ease-out_both] ${isWide ? "w-[420px] flex-shrink-0" : "w-full"}`}
+            className={`bg-white/[0.03] border rounded-2xl p-8 flex flex-col gap-5 animate-[fadeInUp_0.4s_ease-out_both] ${
+              isWide ? "w-[420px] flex-shrink-0" : "w-full"
+            } ${step === 2 ? "border-violet-500/15" : "border-white/[0.07]"}`}
           >
 
             {/* Step 0 : Activité */}
@@ -553,44 +669,218 @@ export default function OnboardingPage() {
               </>
             )}
 
-            {/* Step 2 : Mots-clés */}
+            {/* Step 2 : Stratégie intelligente */}
             {step === 2 && (
               <>
                 <div>
-                  <h2 className="text-xl font-black mb-1">{t.onboarding.step2Title}</h2>
-                  <p className="text-gray-500 text-sm">{t.onboarding.step2Subtitle}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(109,40,217,0.1))", border: "1px solid rgba(139,92,246,0.3)" }}>
+                      <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-violet-400">
+                        <path d="M8 1.5L9.5 6h4.5L10.5 9l1.5 4.5L8 11l-4 2.5L5.5 9 2 6h4.5L8 1.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <h2 className="text-xl font-black">Stratégie SEO</h2>
+                  </div>
+                  <p className="text-gray-500 text-sm">Ces réponses permettent à RankPill de personnaliser entièrement votre automatisation.</p>
                 </div>
+
+                {/* ── Objectif principal ── */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.keywords}</label>
-                  <textarea
-                    value={form.keywords}
-                    onChange={(e) => update("keywords", e.target.value)}
-                    placeholder={t.onboarding.keywordsPlaceholder}
-                    rows={4}
-                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all resize-none"
-                  />
-                  <p className="text-gray-600 text-xs mt-1.5">{t.onboarding.keywordsHint}</p>
+                  <SectionLabel>Objectif business</SectionLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    <ChoiceCard
+                      selected={form.objective === "acquisition"}
+                      onClick={() => update("objective", "acquisition")}
+                      icon={<svg viewBox="0 0 16 16" fill="none" className="w-4 h-4"><path d="M8 2v4M8 10v4M2 8h4M10 8h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="8" cy="8" r="2" fill="currentColor" opacity=".3"/></svg>}
+                      label="Acquisition"
+                      sub="Attirer de nouveaux visiteurs"
+                    />
+                    <ChoiceCard
+                      selected={form.objective === "conversion"}
+                      onClick={() => update("objective", "conversion")}
+                      icon={<svg viewBox="0 0 16 16" fill="none" className="w-4 h-4"><path d="M3 13l4-6 3 3 3-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="13" cy="4" r="1.5" fill="currentColor"/></svg>}
+                      label="Conversion"
+                      sub="Transformer les visiteurs en clients"
+                    />
+                    <ChoiceCard
+                      selected={form.objective === "notoriete"}
+                      onClick={() => update("objective", "notoriete")}
+                      icon={<svg viewBox="0 0 16 16" fill="none" className="w-4 h-4"><path d="M8 3l1.5 3 3.5.5-2.5 2.5.5 3.5L8 11l-3 1.5.5-3.5L3 6.5l3.5-.5L8 3z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>}
+                      label="Notoriété"
+                      sub="Asseoir l'autorité de la marque"
+                    />
+                    <ChoiceCard
+                      selected={form.objective === "fidelisation"}
+                      onClick={() => update("objective", "fidelisation")}
+                      icon={<svg viewBox="0 0 16 16" fill="none" className="w-4 h-4"><path d="M8 13s-5-3-5-7a3 3 0 0 1 5-2.24A3 3 0 0 1 13 6c0 4-5 7-5 7z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>}
+                      label="Fidélisation"
+                      sub="Engager et retenir les clients"
+                    />
+                  </div>
                 </div>
+
+                {/* ── Offre & cible ── */}
+                <div className="flex flex-col gap-4">
+                  <SectionLabel>Offre & audience</SectionLabel>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Offre / service prioritaire <span className="text-red-400">*</span></label>
+                    <input
+                      type="text"
+                      value={form.main_offer}
+                      onChange={(e) => update("main_offer", e.target.value)}
+                      placeholder="ex: Logiciel de gestion RH pour PME"
+                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.08)] transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Cible client <span className="text-red-400">*</span></label>
+                    <input
+                      type="text"
+                      value={form.target_customer}
+                      onChange={(e) => update("target_customer", e.target.value)}
+                      placeholder="ex: DRH de PME 50-500 salariés, secteur industrie"
+                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.08)] transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* ── Zone géographique ── */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">{t.onboarding.frequency}</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {freqOptions.map((opt, idx) => (
-                      <button key={opt.value} type="button" onClick={() => update("frequency", opt.value)}
-                        style={{ animationDelay: `${idx * 60}ms` }}
-                        className={`relative p-4 rounded-xl border text-left transition-all duration-200 overflow-hidden group animate-[fadeInUp_0.3s_ease-out_both] ${
-                          form.frequency === opt.value
-                            ? "bg-orange-500/10 border-orange-500/40 shadow-[0_0_20px_rgba(249,115,22,0.1)]"
-                            : "bg-white/[0.03] border-white/[0.08] hover:border-orange-500/30"
-                        }`}>
-                        {form.frequency === opt.value && (
+                  <SectionLabel>Zone géographique</SectionLabel>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {([
+                      { val: "local", label: "Locale", icon: "📍" },
+                      { val: "national", label: "Nationale", icon: "🇫🇷" },
+                      { val: "international", label: "Internationale", icon: "🌍" },
+                    ] as const).map(({ val, label, icon }) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => update("geography", val)}
+                        className={`relative py-3 px-2 rounded-xl border text-center text-sm font-bold transition-all duration-200 overflow-hidden ${
+                          form.geography === val
+                            ? "bg-violet-500/10 border-violet-500/40 text-violet-300 shadow-[0_0_15px_rgba(139,92,246,0.12)]"
+                            : "bg-white/[0.03] border-white/[0.08] text-gray-400 hover:border-violet-500/30 hover:text-white"
+                        }`}
+                      >
+                        {form.geography === val && (
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[sweep_2.5s_ease-in-out_infinite]" />
                         )}
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                          style={{ background: "radial-gradient(circle at 50% 50%, rgba(249,115,22,0.06) 0%, transparent 70%)" }} />
-                        <p className={`font-bold text-sm ${form.frequency === opt.value ? "text-orange-400" : "text-white"}`}>{opt.label}</p>
-                        <p className="text-gray-500 text-xs mt-0.5">{opt.sub}</p>
+                        <div className="text-base mb-0.5">{icon}</div>
+                        <div className="text-xs">{label}</div>
                       </button>
                     ))}
+                  </div>
+                  {form.geography === "local" && (
+                    <input
+                      type="text"
+                      value={form.geography_detail}
+                      onChange={(e) => update("geography_detail", e.target.value)}
+                      placeholder="ex: Lyon, Rhône-Alpes, Grand Ouest..."
+                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition-all animate-[fadeInUp_0.2s_ease-out_both]"
+                    />
+                  )}
+                </div>
+
+                {/* ── Ton éditorial ── */}
+                <div>
+                  <SectionLabel>Ton éditorial</SectionLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { val: "expert", label: "Expert", desc: "Précis, technique, autorité" },
+                      { val: "accessible", label: "Accessible", desc: "Clair, pédagogique, sans jargon" },
+                      { val: "inspirant", label: "Inspirant", desc: "Storytelling, émotionnel, vision" },
+                      { val: "professionnel", label: "Professionnel", desc: "Neutre, sérieux, B2B" },
+                      { val: "humoristique", label: "Décalé", desc: "Ton léger, proximité, créatif" },
+                    ] as const).map(({ val, label, desc }) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => update("editorial_tone", val)}
+                        title={desc}
+                        className={`relative px-4 py-2 rounded-xl border text-sm font-bold transition-all duration-200 overflow-hidden ${
+                          form.editorial_tone === val
+                            ? "bg-violet-500/15 border-violet-500/50 text-violet-300 shadow-[0_0_12px_rgba(139,92,246,0.15)]"
+                            : "bg-white/[0.03] border-white/[0.08] text-gray-400 hover:border-violet-500/30 hover:text-white"
+                        }`}
+                      >
+                        {form.editorial_tone === val && (
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[sweep_2.5s_ease-in-out_infinite]" />
+                        )}
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Automatisation ── */}
+                <div>
+                  <SectionLabel>Niveau d&apos;automatisation</SectionLabel>
+                  <div className="flex flex-col gap-2">
+                    <ChoiceCard
+                      selected={form.automation_level === "full"}
+                      onClick={() => update("automation_level", "full")}
+                      icon={<svg viewBox="0 0 16 16" fill="none" className="w-4 h-4"><path d="M2 8a6 6 0 1 0 12 0A6 6 0 0 0 2 8z" stroke="currentColor" strokeWidth="1.2"/><path d="M8 5v3l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      label="Tout automatique"
+                      sub="RankPill publie chaque jour sans intervention"
+                    />
+                    <ChoiceCard
+                      selected={form.automation_level === "semi"}
+                      onClick={() => update("automation_level", "semi")}
+                      icon={<svg viewBox="0 0 16 16" fill="none" className="w-4 h-4"><path d="M3 8h5m0 0l-2-2m2 2l-2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="8" r="2" stroke="currentColor" strokeWidth="1.2"/></svg>}
+                      label="Semi-automatique"
+                      sub="Génération auto, vous validez avant publication"
+                    />
+                    <ChoiceCard
+                      selected={form.automation_level === "manual"}
+                      onClick={() => update("automation_level", "manual")}
+                      icon={<svg viewBox="0 0 16 16" fill="none" className="w-4 h-4"><path d="M8 2v12M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      label="Manuel"
+                      sub="Vous déclenchez chaque publication vous-même"
+                    />
+                  </div>
+                </div>
+
+                {/* ── Mots-clés ── */}
+                <div>
+                  <SectionLabel>Mots-clés & SEO</SectionLabel>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Mots-clés prioritaires <span className="text-red-400">*</span></label>
+                    <textarea
+                      value={form.keywords}
+                      onChange={(e) => update("keywords", e.target.value)}
+                      placeholder="ex: logiciel RH, gestion des congés, paie en ligne, SIRH PME"
+                      rows={3}
+                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.08)] transition-all resize-none text-sm"
+                    />
+                    <p className="text-gray-600 text-xs mt-1.5">Séparés par des virgules — utilisés pour guider la génération d&apos;articles</p>
+                  </div>
+                </div>
+
+                {/* ── Optionnel ── */}
+                <div>
+                  <SectionLabel>Paramètres avancés <span className="text-gray-600 font-normal normal-case">(optionnel)</span></SectionLabel>
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Concurrents principaux</label>
+                      <input
+                        type="text"
+                        value={form.competitors}
+                        onChange={(e) => update("competitors", e.target.value)}
+                        placeholder="ex: concurrent1.com, concurrent2.fr"
+                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition-all text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Contraintes business / légales</label>
+                      <input
+                        type="text"
+                        value={form.constraints}
+                        onChange={(e) => update("constraints", e.target.value)}
+                        placeholder="ex: ne pas mentionner les prix, marché réglementé"
+                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition-all text-sm"
+                      />
+                    </div>
                   </div>
                 </div>
               </>
@@ -619,7 +909,11 @@ export default function OnboardingPage() {
                 <button
                   onClick={() => canProceed() && goToStep(step + 1)}
                   disabled={!canProceed()}
-                  className="relative overflow-hidden bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg shadow-orange-500/20 group"
+                  className={`relative overflow-hidden disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg group ${
+                    step === 1
+                      ? "bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-orange-500/20"
+                      : "bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-orange-500/20"
+                  }`}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
                   <span className="flex items-center gap-2">
@@ -633,7 +927,8 @@ export default function OnboardingPage() {
                 <button
                   onClick={handleSubmit}
                   disabled={!canProceed() || loading}
-                  className="relative overflow-hidden bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg shadow-orange-500/20 group"
+                  className="relative overflow-hidden disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg group"
+                  style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 8px 24px rgba(139,92,246,0.25)" }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
                   <span className="flex items-center gap-2">
@@ -643,13 +938,13 @@ export default function OnboardingPage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                         </svg>
-                        {t.onboarding.saving}
+                        Lancement...
                       </>
                     ) : (
                       <>
-                        {t.onboarding.finish}
+                        Lancer RankPill
                         <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4">
-                          <path d="M3 8l3.5 3.5 6.5-7" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M8 2l6 6-6 6M2 8h12" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </>
                     )}
@@ -657,6 +952,7 @@ export default function OnboardingPage() {
                 </button>
               )}
             </div>
+
           </div>
 
           {/* ── Tutoriel (colonne droite) ────────────────────────────── */}
@@ -670,8 +966,8 @@ export default function OnboardingPage() {
               />
             </div>
           )}
-        </div>
 
+        </div>
       </div>
     </main>
   );

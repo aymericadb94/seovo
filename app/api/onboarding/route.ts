@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const { error } = await supabase.from("sites").insert({
+    const insertData: Record<string, unknown> = {
       user_id: user.id,
       business_name: body.business_name,
       industry: body.industry,
@@ -77,7 +77,13 @@ export async function POST(request: Request) {
       custom_api_key: body.custom_api_key || null,
       keywords: body.keywords,
       frequency: body.frequency,
-    });
+    };
+
+    if (body.seo_context) {
+      insertData.seo_context = body.seo_context;
+    }
+
+    const { error } = await supabase.from("sites").insert(insertData);
 
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
