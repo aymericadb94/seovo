@@ -25,7 +25,6 @@ type FormData = {
   geography: "local" | "national" | "international" | "";
   geography_detail: string;
   editorial_tone: "expert" | "accessible" | "humoristique" | "inspirant" | "professionnel" | "";
-  automation_level: "full" | "semi" | "manual" | "";
   keywords: string;
   competitors: string;
   constraints: string;
@@ -318,7 +317,7 @@ export default function OnboardingPage() {
     custom_api_url: "", custom_api_key: "",
     objective: "", main_offer: "", target_customer: "",
     geography: "", geography_detail: "",
-    editorial_tone: "", automation_level: "",
+    editorial_tone: "",
     keywords: "", competitors: "", constraints: "",
   });
 
@@ -349,7 +348,6 @@ export default function OnboardingPage() {
         form.target_customer.trim() &&
         form.geography &&
         form.editorial_tone &&
-        form.automation_level &&
         form.keywords.trim()
       );
     }
@@ -361,8 +359,7 @@ export default function OnboardingPage() {
     setLoading(true);
     setError("");
     const keywords = form.keywords.split(",").map((k) => k.trim()).filter(Boolean);
-    const automationToFrequency: Record<string, number> = { full: 1, semi: 1, manual: 1 };
-    const frequency = automationToFrequency[form.automation_level] ?? 1;
+    const frequency = 1;
 
     const seo_context = {
       objective: form.objective,
@@ -371,7 +368,6 @@ export default function OnboardingPage() {
       geography: form.geography,
       geography_detail: form.geography_detail,
       editorial_tone: form.editorial_tone,
-      automation_level: form.automation_level,
       competitors: form.competitors ? form.competitors.split(",").map(c => c.trim()).filter(Boolean) : [],
       constraints: form.constraints,
     };
@@ -810,34 +806,6 @@ export default function OnboardingPage() {
                         {label}
                       </button>
                     ))}
-                  </div>
-                </div>
-
-                {/* ── Automatisation ── */}
-                <div>
-                  <SectionLabel>Niveau d&apos;automatisation</SectionLabel>
-                  <div className="flex flex-col gap-2">
-                    <ChoiceCard
-                      selected={form.automation_level === "full"}
-                      onClick={() => update("automation_level", "full")}
-                      icon={<svg viewBox="0 0 16 16" fill="none" className="w-4 h-4"><path d="M2 8a6 6 0 1 0 12 0A6 6 0 0 0 2 8z" stroke="currentColor" strokeWidth="1.2"/><path d="M8 5v3l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                      label="Tout automatique"
-                      sub="RankPill publie chaque jour sans intervention"
-                    />
-                    <ChoiceCard
-                      selected={form.automation_level === "semi"}
-                      onClick={() => update("automation_level", "semi")}
-                      icon={<svg viewBox="0 0 16 16" fill="none" className="w-4 h-4"><path d="M3 8h5m0 0l-2-2m2 2l-2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="8" r="2" stroke="currentColor" strokeWidth="1.2"/></svg>}
-                      label="Semi-automatique"
-                      sub="Génération auto, vous validez avant publication"
-                    />
-                    <ChoiceCard
-                      selected={form.automation_level === "manual"}
-                      onClick={() => update("automation_level", "manual")}
-                      icon={<svg viewBox="0 0 16 16" fill="none" className="w-4 h-4"><path d="M8 2v12M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                      label="Manuel"
-                      sub="Vous déclenchez chaque publication vous-même"
-                    />
                   </div>
                 </div>
 
