@@ -510,6 +510,7 @@ export default function Dashboard() {
   }
 
   const kpis = data?.kpis;
+  const showRoadmapCTA = !!data?.site?.seo_analysis_done && !roadmapRecord;
   const animScore = useCounter(kpis?.seoScore ?? 0);
   const animTotal = useCounter(kpis?.totalArticles ?? 0);
   const animMonth = useCounter(kpis?.articlesThisMonth ?? 0);
@@ -1054,29 +1055,58 @@ export default function Dashboard() {
                   </button>
 
                   {/* Roadmap 40 articles */}
-                  <button
-                    onClick={() => setShowRoadmapModal(true)}
-                    className="relative group bg-white/[0.03] border border-white/[0.07] hover:border-violet-500/30 rounded-2xl p-5 text-left transition-all duration-300 overflow-hidden"
-                  >
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                      style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.06), transparent 60%)" }} />
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(167,139,250,0.12)", color: "#a78bfa" }}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                          <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                  <div className="flex flex-col gap-2">
+                    {/* Callout "première fois" */}
+                    {showRoadmapCTA && (
+                      <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_both]"
+                        style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.12), rgba(139,92,246,0.08))", border: "1px solid rgba(167,139,250,0.3)" }}>
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "rgba(167,139,250,0.2)" }}>
+                          <span className="text-violet-300 text-xs">✦</span>
+                        </span>
+                        <p className="text-violet-300 text-xs font-bold flex-1">
+                          Votre analyse est prête — générez votre roadmap SEO pour démarrer
+                        </p>
+                        <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3 flex-shrink-0 text-violet-400" style={{ animation: "bounceDown 1.2s ease-in-out infinite" }}>
+                          <path d="M6 1v8M2.5 6.5L6 10l3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </div>
-                      {!roadmapRecord && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-violet-500/15 text-violet-400 border border-violet-500/25">À générer</span>
+                    )}
+                    <button
+                      onClick={() => setShowRoadmapModal(true)}
+                      className="relative group bg-white/[0.03] border rounded-2xl p-5 text-left transition-all duration-300 overflow-hidden"
+                      style={showRoadmapCTA ? { animation: "borderGlowViolet 2.2s ease-in-out infinite" } : { borderColor: "rgba(255,255,255,0.07)" }}
+                    >
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                        style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.06), transparent 60%)" }} />
+                      {showRoadmapCTA && (
+                        <div className="absolute inset-0 pointer-events-none rounded-2xl"
+                          style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.05), transparent 60%)" }} />
                       )}
-                    </div>
-                    <p className="text-white font-bold text-sm mb-1">Roadmap SEO — 40 articles</p>
-                    <p className="text-white/40 text-xs leading-relaxed">
-                      {roadmapRecord
-                        ? `Générée le ${new Date(roadmapRecord.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} — ${roadmapRecord.data.articles?.length ?? 0} articles planifiés`
-                        : "Plan éditorial stratégique personnalisé pour dominer Google"}
-                    </p>
-                  </button>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(167,139,250,0.12)", color: "#a78bfa" }}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                          </svg>
+                        </div>
+                        {!roadmapRecord && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold border"
+                            style={showRoadmapCTA
+                              ? { background: "rgba(167,139,250,0.15)", color: "#c4b5fd", borderColor: "rgba(167,139,250,0.4)" }
+                              : { background: "rgba(167,139,250,0.1)", color: "#a78bfa", borderColor: "rgba(167,139,250,0.25)" }}>
+                            {showRoadmapCTA ? "⚡ À générer maintenant" : "À générer"}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-white font-bold text-sm mb-1">Roadmap SEO — 40 articles</p>
+                      <p className="text-white/40 text-xs leading-relaxed">
+                        {roadmapRecord
+                          ? `Générée le ${new Date(roadmapRecord.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} — ${roadmapRecord.data.articles?.length ?? 0} articles planifiés`
+                          : showRoadmapCTA
+                            ? "Cliquez pour générer votre plan éditorial basé sur votre analyse SEO"
+                            : "Plan éditorial stratégique personnalisé pour dominer Google"}
+                      </p>
+                    </button>
+                  </div>
                 </div>
 
                 {/* ── Row 2 : Graphique publications ───────────────────── */}
