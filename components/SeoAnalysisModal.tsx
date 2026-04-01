@@ -297,13 +297,26 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
               {STEPS.slice(0, 5).map((s, i) => (
                 <div
                   key={s.id}
-                  className="h-1 flex-1 rounded-full transition-all duration-500"
-                  style={{
-                    background: i <= step
-                      ? "linear-gradient(90deg, #f97316, #ef4444)"
-                      : "rgba(255,255,255,0.06)",
-                  }}
-                />
+                  className="h-1 flex-1 rounded-full overflow-hidden relative transition-all duration-500"
+                  style={{ background: "rgba(255,255,255,0.06)" }}
+                >
+                  {i <= step && (
+                    <div
+                      className="absolute inset-0 rounded-full"
+                      style={{
+                        background: "linear-gradient(90deg, #f97316, #ef4444)",
+                        animation: i === step ? "none" : undefined,
+                      }}
+                    />
+                  )}
+                  {/* Beam on active segment */}
+                  {i === step && (
+                    <>
+                      <div className="absolute inset-0 rounded-full" style={{ background: "linear-gradient(90deg, #f97316, #ef4444)" }} />
+                      <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)", animation: "lineBeam 1.8s ease-in-out infinite" }} />
+                    </>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -314,37 +327,113 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
           {/* ── Step 0: Intro ─────────────────────────────────── */}
           {step === 0 && (
             <div className="text-center py-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/20 mb-6">
-                <span className="text-3xl">✦</span>
+
+              {/* Icône animée */}
+              <div className="relative inline-flex items-center justify-center mb-7 animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_both]" style={{ width: 80, height: 80 }}>
+                {/* Anneaux pulsants */}
+                <div className="absolute rounded-full" style={{ inset: -10, border: "1px solid rgba(249,115,22,0.2)", animation: "ringPulse 2.4s ease-out infinite" }} />
+                <div className="absolute rounded-full" style={{ inset: -4, border: "1px solid rgba(249,115,22,0.15)", animation: "ringPulse 2.4s ease-out infinite 0.9s" }} />
+                {/* Rayons */}
+                <div className="absolute inset-0 flex items-center justify-center" style={{ animation: "spin 10s linear infinite" }}>
+                  {[0,60,120,180,240,300].map((deg) => (
+                    <div key={deg} className="absolute" style={{
+                      width: 1,
+                      height: 14,
+                      background: "linear-gradient(to top, rgba(249,115,22,0.5), transparent)",
+                      transformOrigin: "bottom center",
+                      bottom: "50%",
+                      left: "calc(50% - 0.5px)",
+                      transform: `rotate(${deg}deg) translateY(calc(-50% - 44px))`,
+                    }} />
+                  ))}
+                </div>
+                {/* Centre */}
+                <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center overflow-hidden" style={{
+                  background: "linear-gradient(135deg, rgba(249,115,22,0.18), rgba(239,68,68,0.1))",
+                  border: "1px solid rgba(249,115,22,0.35)",
+                  boxShadow: "0 0 28px rgba(249,115,22,0.22), inset 0 1px 0 rgba(255,255,255,0.08)",
+                }}>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/12 to-transparent animate-[sweep_3s_ease-in-out_infinite]" />
+                  <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 relative z-10" style={{ filter: "drop-shadow(0 0 8px rgba(249,115,22,0.9))" }}>
+                    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" fill="url(#sg)" />
+                    <defs>
+                      <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#fbbf24" />
+                        <stop offset="100%" stopColor="#f97316" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
               </div>
-              <h2 className="text-2xl font-black text-white mb-3">
+
+              {/* Titre */}
+              <h2 className="text-2xl font-black text-white mb-3 animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_0.1s_both]">
                 Analyse SEO de votre site
               </h2>
-              <p className="text-gray-400 text-sm leading-relaxed max-w-md mx-auto mb-2">
+              <p className="text-gray-400 text-sm leading-relaxed max-w-md mx-auto mb-2 animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_0.18s_both]">
                 Bienvenue ! Pour maximiser vos résultats SEO, nous allons analyser votre site et créer une stratégie sur-mesure.
               </p>
-              <p className="text-gray-600 text-xs mb-8">
+              <p className="text-gray-600 text-xs mb-8 animate-[fadeIn_0.5s_ease_0.26s_both]">
                 3 minutes · Gratuit · Résultats immédiats
               </p>
+
+              {/* Feature cards */}
               <div className="grid grid-cols-3 gap-3 mb-8 text-left">
                 {[
-                  { icon: "🔍", label: "Analyse de votre site", desc: "Scraping de la homepage" },
-                  { icon: "🧠", label: "Cocon sémantique", desc: "Structure thématique complète" },
-                  { icon: "🎯", label: "25 mots-clés priorisés", desc: "Classés par potentiel SEO" },
-                ].map(item => (
-                  <div key={item.label} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
-                    <p className="text-lg mb-1">{item.icon}</p>
-                    <p className="text-white text-xs font-bold">{item.label}</p>
-                    <p className="text-gray-600 text-xs mt-0.5">{item.desc}</p>
+                  {
+                    icon: <svg viewBox="0 0 20 20" fill="none" className="w-5 h-5"><circle cx="9" cy="9" r="5.5" stroke="#f97316" strokeWidth="1.5"/><path d="M13.5 13.5L17 17" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+                    label: "Analyse du site",
+                    desc: "Signaux techniques réels",
+                    delay: "0.28s",
+                  },
+                  {
+                    icon: <svg viewBox="0 0 20 20" fill="none" className="w-5 h-5"><circle cx="10" cy="5.5" r="2" stroke="#fb923c" strokeWidth="1.4"/><circle cx="4" cy="14.5" r="2" stroke="#fb923c" strokeWidth="1.4"/><circle cx="16" cy="14.5" r="2" stroke="#fb923c" strokeWidth="1.4"/><path d="M10 7.5v4M10 11.5l-4.5 1.5M10 11.5l4.5 1.5" stroke="#fb923c" strokeWidth="1.2" strokeLinecap="round"/></svg>,
+                    label: "Cocon sémantique",
+                    desc: "Structure thématique complète",
+                    delay: "0.36s",
+                  },
+                  {
+                    icon: <svg viewBox="0 0 20 20" fill="none" className="w-5 h-5"><path d="M10 2l1.8 5.5H18l-4.7 3.4 1.8 5.5L10 13l-5.1 3.4 1.8-5.5L2 7.5h6.2L10 2z" stroke="#ef4444" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
+                    label: "25 mots-clés",
+                    desc: "Classés par potentiel SEO",
+                    delay: "0.44s",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className="relative bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 overflow-hidden group transition-all duration-300 hover:border-orange-500/25 hover:bg-orange-500/[0.04] hover:-translate-y-0.5 animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_both]"
+                    style={{ animationDelay: item.delay }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                    <div className="mb-2">{item.icon}</div>
+                    <p className="text-white text-xs font-bold mb-0.5">{item.label}</p>
+                    <p className="text-gray-600 text-xs leading-snug">{item.desc}</p>
                   </div>
                 ))}
               </div>
-              <button
-                onClick={() => setStep(1)}
-                className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black rounded-xl text-sm uppercase tracking-wide shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 transition-shadow"
-              >
-                Lancer l&apos;analyse →
-              </button>
+
+              {/* CTA */}
+              <div className="animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_0.5s_both]">
+                <button
+                  onClick={() => setStep(1)}
+                  className="relative w-full py-4 text-white font-black rounded-xl text-sm uppercase tracking-widest overflow-hidden group"
+                  style={{
+                    background: "linear-gradient(135deg, #f97316 0%, #ef4444 100%)",
+                    boxShadow: "0 8px 32px rgba(249,115,22,0.35), 0 0 0 1px rgba(249,115,22,0.25)",
+                    transition: "box-shadow 0.3s ease, transform 0.2s ease",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 12px 40px rgba(249,115,22,0.5), 0 0 0 1px rgba(249,115,22,0.35)"; (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 32px rgba(249,115,22,0.35), 0 0 0 1px rgba(249,115,22,0.25)"; (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                  <span className="relative flex items-center justify-center gap-2">
+                    Lancer l&apos;analyse
+                    <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300">
+                      <path d="M3 8h10M9 4l4 4-4 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </span>
+                </button>
+              </div>
             </div>
           )}
 
