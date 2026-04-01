@@ -429,46 +429,132 @@ export default function OnboardingPage() {
 
         {/* Stepper */}
         <div className="flex items-center justify-center gap-0 mb-10 animate-[fadeInUp_0.5s_ease-out_0.1s_both]">
-          {STEPS.map((label, i) => (
-            <div key={label} className="flex items-center">
-              <div className="flex flex-col items-center gap-1.5">
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black transition-all duration-500 relative ${
-                  i < step
-                    ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30"
-                    : i === step && step < 2
-                    ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-xl shadow-orange-500/40 scale-110"
-                    : i === step && step === 2
-                    ? "text-white shadow-xl scale-110"
-                    : "bg-white/[0.06] text-gray-500 border border-white/10"
-                }`}
-                style={i === step && step === 2 ? { background: "linear-gradient(135deg, #7c3aed, #6d28d9)" } : {}}>
-                  {i === step && step < 2 && (
-                    <div className="absolute inset-0 rounded-full bg-orange-500/20 animate-ping" />
-                  )}
-                  {i === step && step === 2 && (
-                    <div className="absolute inset-0 rounded-full bg-violet-500/20 animate-ping" />
-                  )}
-                  {i < step
-                    ? <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5"><path d="M2 7l3.5 3.5 6.5-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    : <span>{i + 1}</span>
-                  }
+          {STEPS.map((label, i) => {
+            const isActive = i === step;
+            const isDone = i < step;
+            const isViolet = isActive && step === 2;
+            const activeColor = isViolet ? "#7c3aed" : "#f97316";
+            const activeShadow = isViolet
+              ? "0 0 0 1px rgba(139,92,246,0.4), 0 0 24px rgba(139,92,246,0.35), 0 0 48px rgba(139,92,246,0.15)"
+              : "0 0 0 1px rgba(249,115,22,0.4), 0 0 24px rgba(249,115,22,0.35), 0 0 48px rgba(249,115,22,0.15)";
+            const doneShadow = "0 0 12px rgba(249,115,22,0.2)";
+
+            return (
+              <div key={label} className="flex items-center">
+                <div className="flex flex-col items-center gap-2">
+
+                  {/* Bubble */}
+                  <div className="relative flex items-center justify-center" style={{ width: 44, height: 44 }}>
+
+                    {/* Outer glow rings (active only) */}
+                    {isActive && (
+                      <>
+                        <div
+                          className="absolute rounded-full"
+                          style={{
+                            inset: -6,
+                            border: `1px solid ${activeColor}`,
+                            opacity: 0.5,
+                            animation: "ringPulse 2s cubic-bezier(0.4,0,0.6,1) infinite",
+                          }}
+                        />
+                        <div
+                          className="absolute rounded-full"
+                          style={{
+                            inset: -2,
+                            border: `1px solid ${activeColor}`,
+                            opacity: 0.35,
+                            animation: "ringPulse 2s cubic-bezier(0.4,0,0.6,1) infinite 0.7s",
+                          }}
+                        />
+                      </>
+                    )}
+
+                    {/* Main circle */}
+                    <div
+                      className="relative w-10 h-10 rounded-full flex items-center justify-center text-xs font-black text-white overflow-hidden transition-all duration-500"
+                      style={{
+                        background: isDone
+                          ? "linear-gradient(135deg, #f97316, #ef4444)"
+                          : isViolet
+                          ? "linear-gradient(135deg, #7c3aed, #4f46e5)"
+                          : isActive
+                          ? "linear-gradient(135deg, #f97316, #ef4444)"
+                          : "rgba(255,255,255,0.06)",
+                        boxShadow: isDone ? doneShadow : isActive ? activeShadow : "none",
+                        animation: isActive ? "stepActivate 0.5s cubic-bezier(0.16,1,0.3,1) both" : "none",
+                        border: !isDone && !isActive ? "1px solid rgba(255,255,255,0.1)" : "none",
+                      }}
+                    >
+                      {/* Shimmer sweep on active */}
+                      {isActive && (
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[sweep_3s_ease-in-out_infinite]" />
+                      )}
+
+                      {/* Content */}
+                      {isDone ? (
+                        <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5 relative z-10">
+                          <path
+                            d="M2 7l3.5 3.5 6.5-7"
+                            stroke="white"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeDasharray="20"
+                            style={{ animation: "checkDraw 0.4s ease-out both" }}
+                          />
+                        </svg>
+                      ) : (
+                        <span className="relative z-10 font-black">{i + 1}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Label */}
+                  <span
+                    className="text-xs font-black uppercase tracking-widest transition-all duration-400"
+                    style={{
+                      color: isActive && !isViolet ? "#fb923c"
+                        : isActive && isViolet ? "#a78bfa"
+                        : isDone ? "rgba(249,115,22,0.5)"
+                        : "rgba(107,114,128,1)",
+                      letterSpacing: isActive ? "0.14em" : "0.1em",
+                    }}
+                  >
+                    {label}
+                  </span>
                 </div>
-                <span className={`text-xs font-bold uppercase tracking-wide transition-colors duration-300 ${
-                  i === step && step < 2 ? "text-orange-400"
-                  : i === step && step === 2 ? "text-violet-400"
-                  : i < step ? "text-orange-500/60"
-                  : "text-gray-600"
-                }`}>
-                  {label}
-                </span>
+
+                {/* Connector line */}
+                {i < STEPS.length - 1 && (
+                  <div
+                    className="relative mx-3 mb-6 overflow-hidden"
+                    style={{ width: 72, height: 2, borderRadius: 2, background: "rgba(255,255,255,0.07)" }}
+                  >
+                    {/* Filled portion */}
+                    <div
+                      className="absolute inset-y-0 left-0 transition-all duration-700 ease-out"
+                      style={{
+                        width: i < step ? "100%" : "0%",
+                        background: "linear-gradient(90deg, #f97316, #ef4444)",
+                        borderRadius: 2,
+                      }}
+                    />
+                    {/* Beam that travels on filled line */}
+                    {i < step && (
+                      <div
+                        className="absolute inset-y-0 w-8"
+                        style={{
+                          background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)",
+                          animation: "lineBeam 2.5s ease-in-out infinite 0.8s",
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
-              {i < STEPS.length - 1 && (
-                <div className="relative w-20 h-px mx-2 mb-5 bg-white/[0.08] overflow-hidden">
-                  <div className={`absolute inset-0 bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-700 ${i < step ? "translate-x-0" : "-translate-x-full"}`} />
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Layout */}
