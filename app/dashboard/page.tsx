@@ -26,6 +26,7 @@ type DashboardData = {
     seo_analysis_done: boolean;
     gsc_connected: boolean;
     gsc_site_url: string | null;
+    seo_context: { strengths?: string; differentiators?: string } | null;
   } | null;
   kpis: {
     totalArticles: number;
@@ -351,6 +352,16 @@ function CountdownTimer({ targetIso }: { targetIso: string | null }) {
   );
 }
 
+function cmsLabel(cms: string | null | undefined): string {
+  switch (cms) {
+    case "wordpress": return "WordPress";
+    case "shopify":   return "Shopify";
+    case "wix":       return "Wix";
+    case "custom":    return "API custom";
+    default:          return cms ?? "Inconnu";
+  }
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -510,7 +521,11 @@ export default function Dashboard() {
     <main className="min-h-screen bg-[#080808] text-white overflow-x-hidden">
       {/* SEO Analysis Modal — s'affiche uniquement quand showSeoModal est explicitement true */}
       {showSeoModal === true && (
-        <SeoAnalysisModal onComplete={() => { setShowSeoModal(false); loadData(); }} />
+        <SeoAnalysisModal
+          onComplete={() => { setShowSeoModal(false); loadData(); }}
+          prefilledStrengths={data?.site?.seo_context?.strengths ?? ""}
+          prefilledDifferentiators={data?.site?.seo_context?.differentiators ?? ""}
+        />
       )}
 
       {/* Audit mensuel */}
@@ -1157,7 +1172,7 @@ export default function Dashboard() {
                       <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4">Statut de la connexion</p>
                       <div className="flex flex-col gap-3">
                         {[
-                          { label: "CMS connecté", ok: !!data.site, value: data.site?.cms === "wordpress" ? "WordPress" : "Shopify" },
+                          { label: "CMS connecté", ok: !!data.site, value: cmsLabel(data.site?.cms) },
                           { label: "Site URL", ok: !!data.site?.site_url, value: data.site?.site_url ? "Configuré" : "Non défini" },
                           { label: "Automatisation SEO", ok: true, value: "Active" },
                           { label: "Publication auto", ok: true, value: `${data.site?.frequency ?? 1}×/jour` },
@@ -1181,7 +1196,7 @@ export default function Dashboard() {
                         <p className="text-gray-400 text-sm mt-1">{data.site.industry}</p>
                         <div className="mt-3 flex items-center gap-2">
                           <span className="bg-orange-500/10 text-orange-400 text-xs font-bold px-3 py-1 rounded-full">
-                            {data.site.cms === "wordpress" ? "WordPress" : "Shopify"}
+                            {cmsLabel(data.site.cms)}
                           </span>
                           <span className="bg-white/[0.05] text-gray-400 text-xs px-3 py-1 rounded-full">
                             {data.site.frequency} article{(data.site.frequency ?? 1) > 1 ? "s" : ""}/jour

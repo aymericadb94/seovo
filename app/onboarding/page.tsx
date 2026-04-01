@@ -25,6 +25,8 @@ type FormData = {
   geography: "local" | "national" | "international" | "";
   geography_detail: string;
   editorial_tone: "expert" | "accessible" | "humoristique" | "inspirant" | "professionnel" | "";
+  strengths: string;
+  differentiators: string;
   keywords: string;
   competitors: string;
   constraints: string;
@@ -318,6 +320,7 @@ export default function OnboardingPage() {
     objective: "", main_offer: "", target_customer: "",
     geography: "", geography_detail: "",
     editorial_tone: "",
+    strengths: "", differentiators: "",
     keywords: "", competitors: "", constraints: "",
   });
 
@@ -348,6 +351,7 @@ export default function OnboardingPage() {
         form.target_customer.trim() &&
         form.geography &&
         form.editorial_tone &&
+        form.strengths.trim() &&
         form.keywords.trim()
       );
     }
@@ -368,6 +372,8 @@ export default function OnboardingPage() {
       geography: form.geography,
       geography_detail: form.geography_detail,
       editorial_tone: form.editorial_tone,
+      strengths: form.strengths,
+      differentiators: form.differentiators,
       competitors: form.competitors ? form.competitors.split(",").map(c => c.trim()).filter(Boolean) : [],
       constraints: form.constraints,
     };
@@ -908,6 +914,33 @@ export default function OnboardingPage() {
                       className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.08)] transition-all resize-none text-sm"
                     />
                     <p className="text-gray-600 text-xs mt-1.5">Séparés par des virgules — utilisés pour guider la génération d&apos;articles</p>
+                  </div>
+                </div>
+
+                {/* ── Points forts ── */}
+                <div>
+                  <SectionLabel>Points forts & différenciateurs</SectionLabel>
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Ce qui vous rend unique <span className="text-red-400">*</span></label>
+                      <textarea
+                        value={form.strengths}
+                        onChange={(e) => update("strengths", e.target.value)}
+                        placeholder="ex: livraison 24h, fabrication française, SAV 7j/7, garantie 5 ans"
+                        rows={2}
+                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.08)] transition-all resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Différenciateurs <span className="text-gray-600 font-normal normal-case">(optionnel)</span></label>
+                      <textarea
+                        value={form.differentiators}
+                        onChange={(e) => update("differentiators", e.target.value)}
+                        placeholder="ex: technologie propriétaire, 15 ans d'expertise, certifications, labels"
+                        rows={2}
+                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition-all resize-none text-sm"
+                      />
+                    </div>
                   </div>
                 </div>
 

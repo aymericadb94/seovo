@@ -33,6 +33,8 @@ type AnalysisResult = {
 
 type Props = {
   onComplete: () => void;
+  prefilledStrengths?: string;
+  prefilledDifferentiators?: string;
 };
 
 const STEPS = [
@@ -182,12 +184,13 @@ function BreakdownBar({ label, score }: { label: string; score: number }) {
   );
 }
 
-export default function SeoAnalysisModal({ onComplete }: Props) {
+export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", prefilledDifferentiators = "" }: Props) {
+  const hasPrefilled = prefilledStrengths.trim().length > 0;
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
   const [answers, setAnswers] = useState({
-    strengths: "",
-    differentiators: "",
+    strengths: prefilledStrengths,
+    differentiators: prefilledDifferentiators,
   });
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -214,13 +217,15 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
       "Priorisation des mots-clés...",
       "Génération de la stratégie...",
     ];
+    // Étaler les lignes sur ~28s pour couvrir la durée réelle de l'API
     let i = 0;
+    const INTERVAL_MS = 3500;
     const interval = setInterval(() => {
       if (i < lines.length) {
         setScanLines(prev => [...prev, lines[i]]);
         i++;
       }
-    }, 800);
+    }, INTERVAL_MS);
 
     try {
       const res = await fetch("/api/seo-analysis", {
@@ -230,12 +235,19 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
       });
       const json = await res.json();
       clearInterval(interval);
-      setScanLines(lines); // show all lines before transitioning
+
+      // Afficher rapidement les lignes restantes avant de transitionner
+      const remaining = lines.slice(i);
+      for (let j = 0; j < remaining.length; j++) {
+        await new Promise(r => setTimeout(r, 120));
+        setScanLines(prev => [...prev, remaining[j]]);
+      }
+
       if (json.error) {
         setError(json.error);
         setStep(1);
       } else {
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 700));
         setResult(json.analysis);
         setStep(3);
       }
@@ -403,10 +415,20 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
                 ))}
               </div>
 
+              {/* Badge données importées */}
+              {hasPrefilled && (
+                <div className="flex items-center justify-center gap-2 mb-4 animate-[fadeIn_0.4s_ease_0.45s_both]">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold" style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", color: "#4ade80" }}>
+                    <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    Points forts importés depuis l&apos;onboarding
+                  </div>
+                </div>
+              )}
+
               {/* CTA */}
               <div className="animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_0.5s_both]">
                 <button
-                  onClick={() => setStep(1)}
+                  onClick={() => hasPrefilled ? runAnalysis() : setStep(1)}
                   className="relative w-full py-4 text-white font-black rounded-xl text-sm uppercase tracking-widest overflow-hidden group"
                   style={{
                     background: "linear-gradient(135deg, #f97316 0%, #ef4444 100%)",
