@@ -38,9 +38,6 @@ type Props = {
 const STEPS = [
   { id: "intro", label: "Bienvenue" },
   { id: "strengths", label: "Points forts" },
-  { id: "audience", label: "Audience" },
-  { id: "geo", label: "Portée" },
-  { id: "competitors", label: "Concurrents" },
   { id: "analyzing", label: "Analyse" },
   { id: "results", label: "Stratégie" },
 ];
@@ -191,9 +188,6 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
   const [answers, setAnswers] = useState({
     strengths: "",
     differentiators: "",
-    targetAudience: "",
-    geoScope: "national",
-    competitors: "",
   });
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -206,7 +200,7 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
   }, []);
 
   async function runAnalysis() {
-    setStep(5);
+    setStep(2);
     setAnalyzing(true);
     setError(null);
     setScanLines([]);
@@ -239,11 +233,11 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
       setScanLines(lines); // show all lines before transitioning
       if (json.error) {
         setError(json.error);
-        setStep(4);
+        setStep(1);
       } else {
         await new Promise(r => setTimeout(r, 600));
         setResult(json.analysis);
-        setStep(6);
+        setStep(3);
       }
     } catch {
       clearInterval(interval);
@@ -260,9 +254,6 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
 
   const canNext = () => {
     if (step === 1) return answers.strengths.trim().length > 10;
-    if (step === 2) return answers.targetAudience.trim().length > 5;
-    if (step === 3) return true;
-    if (step === 4) return answers.competitors.trim().length > 3;
     return true;
   };
 
@@ -291,10 +282,10 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
         <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-red-500 to-orange-400" />
 
         {/* Progress bar */}
-        {step < 5 && (
+        {step < 2 && (
           <div className="px-8 pt-6 pb-0">
             <div className="flex items-center gap-1.5 mb-6">
-              {STEPS.slice(0, 5).map((s, i) => (
+              {STEPS.slice(0, 2).map((s, i) => (
                 <div
                   key={s.id}
                   className="h-1 flex-1 rounded-full overflow-hidden relative transition-all duration-500"
@@ -437,12 +428,17 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
             </div>
           )}
 
-          {/* ── Step 1: Strengths ─────────────────────────────── */}
+          {/* ── Step 1: Points forts ──────────────────────────── */}
           {step === 1 && (
             <div>
-              <p className="text-orange-400 text-xs font-bold uppercase tracking-widest mb-2">Étape 1 / 4</p>
+              <p className="text-orange-400 text-xs font-bold uppercase tracking-widest mb-2">Étape 1 / 1</p>
               <h2 className="text-xl font-black text-white mb-1">Vos points forts</h2>
               <p className="text-gray-500 text-sm mb-5">Qu&apos;est-ce qui vous rend unique ? Pourquoi choisir votre marque ?</p>
+              {error && (
+                <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+                  <p className="text-red-400 text-sm">⚠ {error}</p>
+                </div>
+              )}
               <div className="space-y-3 mb-5">
                 <div>
                   <label className="text-xs text-gray-500 uppercase tracking-wide font-bold mb-1.5 block">
@@ -474,119 +470,6 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
                   ← Retour
                 </button>
                 <button
-                  onClick={() => setStep(2)}
-                  disabled={!canNext()}
-                  className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-                >
-                  Continuer →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Step 2: Audience ──────────────────────────────── */}
-          {step === 2 && (
-            <div>
-              <p className="text-orange-400 text-xs font-bold uppercase tracking-widest mb-2">Étape 2 / 4</p>
-              <h2 className="text-xl font-black text-white mb-1">Votre audience cible</h2>
-              <p className="text-gray-500 text-sm mb-5">Qui sont vos clients idéaux ? Quels sont leurs besoins ?</p>
-              <div className="mb-5">
-                <label className="text-xs text-gray-500 uppercase tracking-wide font-bold mb-1.5 block">
-                  Décrivez votre client type *
-                </label>
-                <textarea
-                  rows={4}
-                  placeholder="Ex: Femmes 25-45 ans, sportives, cherchent des équipements premium. Ou: TPE/PME du secteur retail, besoin de digitalisation rapide..."
-                  value={answers.targetAudience}
-                  onChange={e => setAnswers(a => ({ ...a, targetAudience: e.target.value }))}
-                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl p-3.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500/50 resize-none"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => setStep(1)} className="px-4 py-3 text-gray-500 hover:text-white text-sm border border-white/10 rounded-xl transition-colors">
-                  ← Retour
-                </button>
-                <button
-                  onClick={() => setStep(3)}
-                  disabled={!canNext()}
-                  className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-                >
-                  Continuer →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Step 3: Geo scope ─────────────────────────────── */}
-          {step === 3 && (
-            <div>
-              <p className="text-orange-400 text-xs font-bold uppercase tracking-widest mb-2">Étape 3 / 4</p>
-              <h2 className="text-xl font-black text-white mb-1">Portée géographique</h2>
-              <p className="text-gray-500 text-sm mb-5">Sur quelle zone votre SEO doit-il cibler en priorité ?</p>
-              <div className="grid grid-cols-2 gap-3 mb-5">
-                {[
-                  { value: "local", label: "Local", desc: "Ville / région spécifique", icon: "📍" },
-                  { value: "national", label: "National", desc: "Tout le territoire français", icon: "🇫🇷" },
-                  { value: "european", label: "Européen", desc: "France + pays voisins", icon: "🇪🇺" },
-                  { value: "international", label: "International", desc: "Monde entier", icon: "🌍" },
-                ].map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setAnswers(a => ({ ...a, geoScope: opt.value }))}
-                    className={`p-4 rounded-xl border text-left transition-all ${
-                      answers.geoScope === opt.value
-                        ? "border-orange-500/60 bg-orange-500/10"
-                        : "border-white/[0.08] bg-white/[0.03] hover:border-white/20"
-                    }`}
-                  >
-                    <p className="text-xl mb-1">{opt.icon}</p>
-                    <p className="text-white text-sm font-bold">{opt.label}</p>
-                    <p className="text-gray-600 text-xs mt-0.5">{opt.desc}</p>
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => setStep(2)} className="px-4 py-3 text-gray-500 hover:text-white text-sm border border-white/10 rounded-xl transition-colors">
-                  ← Retour
-                </button>
-                <button
-                  onClick={() => setStep(4)}
-                  className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black rounded-xl text-sm transition-opacity"
-                >
-                  Continuer →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Step 4: Competitors ───────────────────────────── */}
-          {step === 4 && (
-            <div>
-              <p className="text-orange-400 text-xs font-bold uppercase tracking-widest mb-2">Étape 4 / 4</p>
-              <h2 className="text-xl font-black text-white mb-1">Vos concurrents</h2>
-              <p className="text-gray-500 text-sm mb-5">Qui sont vos principaux concurrents sur le web ?</p>
-              {error && (
-                <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-                  <p className="text-red-400 text-sm">⚠ {error}</p>
-                </div>
-              )}
-              <div className="mb-5">
-                <label className="text-xs text-gray-500 uppercase tracking-wide font-bold mb-1.5 block">
-                  Noms ou URLs de vos concurrents *
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Ex: concurrent1.fr, Marque X, site-concurrent.com..."
-                  value={answers.competitors}
-                  onChange={e => setAnswers(a => ({ ...a, competitors: e.target.value }))}
-                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl p-3.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500/50 resize-none"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => setStep(3)} className="px-4 py-3 text-gray-500 hover:text-white text-sm border border-white/10 rounded-xl transition-colors">
-                  ← Retour
-                </button>
-                <button
                   onClick={runAnalysis}
                   disabled={!canNext() || analyzing}
                   className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
@@ -597,8 +480,8 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
             </div>
           )}
 
-          {/* ── Step 5: Analyzing ─────────────────────────────── */}
-          {step === 5 && (
+          {/* ── Step 2: Analyzing ─────────────────────────────── */}
+          {step === 2 && (
             <div className="py-2">
               <div className="text-center mb-6">
                 {/* Animated logo */}
@@ -689,7 +572,7 @@ export default function SeoAnalysisModal({ onComplete }: Props) {
           )}
 
           {/* ── Step 6: Results ───────────────────────────────── */}
-          {step === 6 && result && (
+          {step === 3 && result && (
             <div>
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/20 flex items-center justify-center text-sm">

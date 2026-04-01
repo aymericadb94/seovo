@@ -58,15 +58,12 @@ export async function POST(request: Request) {
       answers: {
         strengths: string;
         differentiators: string;
-        targetAudience: string;
-        geoScope: string;
-        competitors: string;
       };
     };
 
     const { data: site } = await supabase
       .from("sites")
-      .select("business_name, industry, site_url, keywords")
+      .select("business_name, industry, site_url, keywords, seo_context")
       .eq("user_id", user.id)
       .single();
 
@@ -92,9 +89,9 @@ IMPORTANT : Pour déterminer le secteur d'activité, base-toi UNIQUEMENT sur le 
 RÉPONSES DU PROPRIÉTAIRE :
 - Points forts : ${answers.strengths}
 - Différenciateurs : ${answers.differentiators}
-- Audience cible : ${answers.targetAudience}
-- Portée géographique : ${answers.geoScope}
-- Concurrents principaux : ${answers.competitors}
+- Audience cible : ${(site.seo_context as Record<string, string> | null)?.target_customer ?? "non renseigné"}
+- Portée géographique : ${(site.seo_context as Record<string, string> | null)?.geography ?? "national"}
+- Concurrents principaux : ${(site.seo_context as Record<string, unknown> | null)?.competitors ? ((site.seo_context as Record<string, unknown>).competitors as string[]).join(", ") : "non renseignés"}
 
 MISSION : Génère un score SEO réel basé sur les signaux observés + une stratégie SEO complète.
 
