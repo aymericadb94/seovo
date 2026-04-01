@@ -33,47 +33,114 @@ export async function POST() {
 
     const { data: site } = await supabase
       .from("sites")
-      .select("id, business_name, industry, site_url, keywords")
+      .select("id, business_name, industry, site_url, keywords, seo_context")
       .eq("user_id", user.id)
       .single();
 
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
-    const { data: pubs } = await supabase
-      .from("publications")
-      .select("title, keyword")
-      .eq("user_id", user.id)
-      .order("published_at", { ascending: false })
-      .limit(20);
+    const [pubsResult, engineResult] = await Promise.all([
+      supabase
+        .from("publications")
+        .select("title, keyword")
+        .eq("user_id", user.id)
+        .order("published_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("seo_engine_results")
+        .select("data")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    const existingTitles = (pubs ?? []).map(p => p.title);
+    const existingTitles = (pubsResult.data ?? []).map(p => p.title);
     const keywords = (site.keywords ?? []).join(", ") || "non configurés";
+    const seoCtx = (site.seo_context ?? {}) as Record<string, unknown>;
+
+    // Extract SEO engine data if available
+    type EngineData = {
+      seo_understanding?: { current_seo_state?: string; main_seo_gap?: string; estimated_traffic_potential?: string };
+      editorial_strategy?: { semantic_pillars?: string[]; content_gaps?: string[]; recommended_topics?: string[]; next_5_articles?: { title: string; keyword: string; reason: string }[] };
+      opportunities?: { type?: string; title?: string; target_keyword?: string; score?: number }[];
+      gsc_insights?: { type?: string; query?: string; position?: number; insight?: string }[];
+      has_gsc_data?: boolean;
+    };
+    const engine = (engineResult.data?.data ?? null) as EngineData | null;
+
+    const engineSection = engine ? `
+---
+
+ANALYSE SEO RÉELLE DU SITE (données moteur RankPill) :
+
+État SEO actuel : ${engine.seo_understanding?.current_seo_state ?? "inconnu"}
+Problème SEO principal identifié : ${engine.seo_understanding?.main_seo_gap ?? "non analysé"}
+Potentiel trafic estimé : ${engine.seo_understanding?.estimated_traffic_potential ?? "non estimé"}
+Données GSC disponibles : ${engine.has_gsc_data ? "OUI — insights basés sur données réelles" : "NON — analyse basée sur crawl uniquement"}
+
+PILIERS SÉMANTIQUES DÉTECTÉS :
+${(engine.editorial_strategy?.semantic_pillars ?? []).map(p => `- ${p}`).join("\n") || "- Non détectés"}
+
+GAPS DE CONTENU IDENTIFIÉS (sujets non couverts par le site) :
+${(engine.editorial_strategy?.content_gaps ?? []).map(g => `- ${g}`).join("\n") || "- Non détectés"}
+
+SUJETS RECOMMANDÉS PAR LE MOTEUR :
+${(engine.editorial_strategy?.recommended_topics ?? []).map(t => `- ${t}`).join("\n") || "- Non détectés"}
+
+QUICK WINS GSC (requêtes en position 5-20 à exploiter en priorité) :
+${(engine.gsc_insights ?? []).filter(i => i.type === "quick_win").slice(0, 10).map(i => `- "${i.query}" (pos. ${i.position}) — ${i.insight}`).join("\n") || "- Aucun (GSC non connectée)"}
+
+OPPORTUNITÉS DE CRÉATION DÉTECTÉES :
+${(engine.opportunities ?? []).filter(o => o.type === "content_creation").slice(0, 8).map(o => `- ${o.title} (kw: "${o.target_keyword}", score: ${o.score})`).join("\n") || "- Aucune détectée"}
+
+5 PROCHAINS ARTICLES RECOMMANDÉS PAR LE MOTEUR :
+${(engine.editorial_strategy?.next_5_articles ?? []).map((a, i) => `${i + 1}. "${a.title}" (kw: ${a.keyword}) — ${a.reason}`).join("\n") || "- Non disponibles"}
+
+CONTRAINTE SUPPLÉMENTAIRE : La roadmap doit intégrer et développer les gaps, piliers et opportunités ci-dessus. Les articles identifiés par le moteur comme quick wins ou opportunités doivent apparaître dans la PHASE 1 ou PHASE 2.
+` : `
+---
+
+ANALYSE SEO : Moteur SEO non encore exécuté — génère la roadmap à partir des mots-clés configurés et de l'analyse du secteur.
+`;
+
+    const intentSection = (seoCtx.objective || seoCtx.main_offer || seoCtx.target_customer) ? `
+INTENTION STRATÉGIQUE (onboarding) :
+- Objectif business : ${seoCtx.objective ?? "non renseigné"}
+- Offre prioritaire : ${seoCtx.main_offer ?? "non renseigné"}
+- Cible client : ${seoCtx.target_customer ?? "non renseigné"}
+- Zone géographique : ${seoCtx.geography ?? "national"}${seoCtx.geography_detail ? ` — ${seoCtx.geography_detail}` : ""}
+- Ton éditorial : ${seoCtx.editorial_tone ?? "professionnel"}
+- Concurrents : ${Array.isArray(seoCtx.competitors) ? (seoCtx.competitors as string[]).join(", ") || "non renseignés" : "non renseignés"}
+- Contraintes : ${seoCtx.constraints ?? "aucune"}
+` : "";
 
     const prompt = `Tu es un expert SEO senior spécialisé en stratégie de contenu avancée et en domination des résultats Google en 2026.
 
-Ta mission est de réaliser une analyse stratégique complète pour ce site web et de générer une roadmap éditoriale de 40 articles de blog.
+Ta mission est de générer une roadmap éditoriale de 40 articles raccord avec l'analyse SEO réelle du site.
 
 SITE : ${site.business_name}
 SECTEUR : ${site.industry}
 URL : ${site.site_url}
 MOTS-CLÉS CONFIGURÉS : ${keywords}
 ARTICLES DÉJÀ PUBLIÉS : ${existingTitles.length > 0 ? existingTitles.slice(0, 10).map(t => `"${t}"`).join(", ") : "aucun"}
-
+${intentSection}${engineSection}
 ---
 
 OBJECTIFS :
-- Identifier les opportunités SEO à fort potentiel
-- Construire un cocon sémantique puissant
-- Générer 40 articles utiles, différenciants et stratégiques
-- Attirer du trafic qualifié et convertir les visiteurs en clients
+- Construire un cocon sémantique ancré dans les piliers détectés par le moteur SEO
+- Exploiter les quick wins GSC identifiés (articles qui peuvent ranker vite)
+- Couvrir les gaps de contenu détectés par le moteur
+- Générer 40 articles différenciants, utiles, et directement actionnables
+- Attirer du trafic qualifié aligné avec l'offre et la cible déclarées
 - Respecter les critères EEAT
-- Ne jamais dupliquer les articles déjà publiés listés ci-dessus
+- Ne jamais dupliquer les articles déjà publiés
 
 CONTRAINTES CRITIQUES :
-- Aucun contenu générique ou déjà vu
+- Les articles PHASE 1 doivent inclure les quick wins GSC et les 5 articles recommandés par le moteur
+- Les piliers sémantiques identifiés doivent guider la structure du cocon
 - Chaque article doit répondre à une intention de recherche précise
-- Chaque article doit mériter d'être premier sur Google (si ce n'est pas clair, ne pas le proposer)
-- Les articles en pilier doivent couvrir des thèmes larges ; les clusters des angles spécifiques
+- Aucun contenu générique — chaque titre doit être spécifique à CE business
 
 ---
 
