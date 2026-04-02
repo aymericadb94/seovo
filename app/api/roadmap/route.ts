@@ -39,7 +39,7 @@ export async function POST() {
 
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
-    const [pubsResult, engineResult] = await Promise.all([
+    const [pubsResult, engineResult, projectionsResult] = await Promise.all([
       supabase
         .from("publications")
         .select("title, keyword")
@@ -53,11 +53,37 @@ export async function POST() {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from("seo_projections")
+        .select("data")
+        .eq("user_id", user.id)
+        .maybeSingle(),
     ]);
 
     const existingTitles = (pubsResult.data ?? []).map(p => p.title);
     const keywords = (site.keywords ?? []).join(", ") || "non configurés";
     const seoCtx = (site.seo_context ?? {}) as Record<string, unknown>;
+
+    // Extract projections data if available
+    type ProjItem = { keyword: string; estimated_gain: number; difficulty: string; action: string; target_position: number; timeframe: string };
+    type ProjData = { estimated_results?: ProjItem[]; total_estimated_gain?: { low: number; high: number }; has_gsc_data?: boolean };
+    const proj = (projectionsResult.data?.data ?? null) as ProjData | null;
+    const topOpportunities = (proj?.estimated_results ?? [])
+      .filter(p => p.estimated_gain > 0)
+      .slice(0, 12);
+
+    const projectionsSection = topOpportunities.length > 0 ? `
+---
+
+POTENTIEL DE CROISSANCE SEO (moteur de projections RankPill) :
+Gain total estimé : +${proj?.total_estimated_gain?.low ?? 0} à +${proj?.total_estimated_gain?.high ?? 0} clics/mois supplémentaires
+Données GSC : ${proj?.has_gsc_data ? "OUI — projections basées sur données réelles" : "NON — estimations conservatrices"}
+
+TOP OPPORTUNITÉS CLASSÉES PAR GAIN (à prioriser dans la roadmap) :
+${topOpportunities.map((p, i) => `${i + 1}. "${p.keyword}" — +${p.estimated_gain} clics/mois estimés | Action: ${p.action} | Difficulté: ${p.difficulty} | Délai: ${p.timeframe}`).join("\n")}
+
+CONTRAINTE CRITIQUE : Les mots-clés ci-dessus classés "Facile" ou avec le plus fort gain estimé DOIVENT apparaître dans la PHASE 1 de la roadmap. C'est le chemin le plus direct vers la croissance organique.
+` : "";
 
     // Extract SEO engine data if available
     type EngineData = {
@@ -124,7 +150,7 @@ SECTEUR : ${site.industry}
 URL : ${site.site_url}
 MOTS-CLÉS CONFIGURÉS : ${keywords}
 ARTICLES DÉJÀ PUBLIÉS : ${existingTitles.length > 0 ? existingTitles.slice(0, 10).map(t => `"${t}"`).join(", ") : "aucun"}
-${intentSection}${engineSection}
+${intentSection}${projectionsSection}${engineSection}
 ---
 
 OBJECTIFS :

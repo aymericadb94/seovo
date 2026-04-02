@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { computeProjections } from "@/lib/seo-projections";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -183,6 +184,26 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
 
     if (updateError) {
       return Response.json({ error: "Analyse générée mais sauvegarde échouée : " + updateError.message }, { status: 500 });
+    }
+
+    // Calcul automatique des projections SEO (sans GSC à ce stade)
+    try {
+      const seoScore = analysis.seo_score?.overall ?? 35;
+      const projections = computeProjections(
+        uniqueKeywords,
+        [], // pas de données GSC au moment de l'analyse initiale
+        seoScore,
+        (site.seo_context as Record<string, unknown> | null),
+        site.site_url
+      );
+      await supabase
+        .from("seo_projections")
+        .upsert(
+          { user_id: user.id, data: projections, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        );
+    } catch {
+      // Non-fatal : l'analyse est déjà sauvegardée, les projections seront calculées au prochain chargement
     }
 
     return Response.json({ analysis });
