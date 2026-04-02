@@ -265,7 +265,9 @@ function CountdownTimer({ targetIso }: { targetIso: string | null }) {
   }, [targetIso]);
 
   const hasTime = time.ms > 0 && targetIso;
-  const progress = targetIso ? Math.max(0, Math.min(100, 100 - (time.ms / 86400000) * 100)) : 0;
+  // Fenêtre glissante : on affiche la progression dans la dernière heure avant publication
+  const windowMs = Math.min(time.ms, 3600000);
+  const progress = targetIso && time.ms > 0 ? Math.max(2, Math.min(100, 100 - (windowMs / 3600000) * 100)) : 0;
 
   return (
     <div className="flex flex-col gap-4 w-full">
