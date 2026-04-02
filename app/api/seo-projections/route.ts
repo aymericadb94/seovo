@@ -67,12 +67,13 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
 
-    const { data: site } = await supabase
+    const { data: site, error: siteError } = await supabase
       .from("sites")
       .select("keywords, seo_context, seo_score_initial, site_url, gsc_site_url, google_refresh_token")
       .eq("user_id", user.id)
-      .single() as { data: SiteData | null };
+      .maybeSingle() as { data: SiteData | null; error: { message: string } | null };
 
+    if (siteError) return Response.json({ error: siteError.message }, { status: 500 });
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
     const keywords: string[] = site.keywords ?? [];
@@ -92,12 +93,17 @@ export async function POST() {
       site.site_url
     );
 
-    await supabase
+    const { error: upsertError } = await supabase
       .from("seo_projections")
       .upsert(
         { user_id: user.id, data: result, updated_at: new Date().toISOString() },
         { onConflict: "user_id" }
       );
+
+    if (upsertError) {
+      console.error("[seo-projections] upsert failed:", upsertError.message);
+      return Response.json({ error: "Projections calculées mais non sauvegardées : " + upsertError.message }, { status: 500 });
+    }
 
     return Response.json({ projections: result });
   } catch (err: unknown) {

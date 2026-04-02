@@ -408,6 +408,7 @@ export default function Dashboard() {
   const [tutorialPopup, setTutorialPopup] = useState<1 | 2 | 3 | null>(null);
   const [popup1Loading, setPopup1Loading] = useState(false);
   const [popup2Loading, setPopup2Loading] = useState(false);
+  const tutorialChecked = useRef(false);
 
   // SEO Projections
   type ProjectionItem = {
@@ -497,6 +498,32 @@ export default function Dashboard() {
     setShowAuditReport(true);
   }, [auditAvailable]);
 
+  // Reprendre le tutorial au bon popup si l'utilisateur a rechargé la page en cours de flow
+  useEffect(() => {
+    if (loading || !data || tutorialChecked.current) return;
+    if (!data.site?.seo_analysis_done) return;
+    tutorialChecked.current = true;
+
+    // Migration depuis l'ancien système (rankpill_guided_step >= 3 = tutoriel déjà complété)
+    const oldStep = parseInt(localStorage.getItem("rankpill_guided_step") ?? "0");
+    if (oldStep >= 3) {
+      localStorage.setItem("rankpill_onboarding_popup", "done");
+      return;
+    }
+
+    const popupState = localStorage.getItem("rankpill_onboarding_popup");
+    if (popupState === "done") return;
+
+    if (popupState === "1") {
+      setTutorialPopup(2);
+    } else if (popupState === "2") {
+      setTutorialPopup(3);
+    } else if (!popupState && oldStep === 0) {
+      // Nouveau utilisateur : popup 1 (projections déjà calculées par l'analyse, on recharge)
+      setTutorialPopup(1);
+    }
+  }, [loading, data]);
+
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -576,7 +603,10 @@ export default function Dashboard() {
           onComplete={() => {
             setShowSeoModal(false);
             loadData();
-            if (localStorage.getItem("rankpill_onboarding_popup") !== "done") {
+            const popupState = localStorage.getItem("rankpill_onboarding_popup");
+            if (!popupState) {
+              // Première analyse : démarrer le tutoriel depuis le début
+              tutorialChecked.current = true; // éviter double-trigger par le useEffect
               setTutorialPopup(1);
             }
           }}

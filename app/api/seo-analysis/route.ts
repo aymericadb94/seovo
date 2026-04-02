@@ -63,12 +63,13 @@ export async function POST(request: Request) {
       };
     };
 
-    const { data: site } = await supabase
+    const { data: site, error: siteError } = await supabase
       .from("sites")
       .select("business_name, industry, site_url, keywords, seo_context, gsc_site_url")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
+    if (siteError) return Response.json({ error: siteError.message }, { status: 500 });
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
     const page = await scrapeHomepage(site.site_url);

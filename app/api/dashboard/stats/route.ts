@@ -14,7 +14,7 @@ export async function GET() {
       .from("sites")
       .select("*")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
     // ── Récupérer toutes les publications ───────────────────────────────────
     const { data: publications } = await supabase

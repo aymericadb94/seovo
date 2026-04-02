@@ -31,12 +31,13 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
 
-    const { data: site } = await supabase
+    const { data: site, error: siteError } = await supabase
       .from("sites")
       .select("id, business_name, industry, site_url, keywords, seo_context")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
+    if (siteError) return Response.json({ error: siteError.message }, { status: 500 });
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
     const [pubsResult, engineResult, projectionsResult] = await Promise.all([
