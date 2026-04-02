@@ -405,6 +405,11 @@ export default function Dashboard() {
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
   const [roadmapLoading, setRoadmapLoading] = useState(false);
 
+  // Guided onboarding (phases 1-3)
+  const [onboardingPhase, setOnboardingPhase] = useState<1 | 2 | 3 | null>(null);
+  const projectionsRef = useRef<HTMLDivElement>(null);
+  const roadmapRef = useRef<HTMLDivElement>(null);
+
   // SEO Projections
   type ProjectionItem = {
     keyword: string; action: string; current_position: number | null;
@@ -482,6 +487,49 @@ export default function Dashboard() {
     return () => window.removeEventListener("focus", loadData);
   }, []);
 
+  // Guided onboarding phase detection
+  useEffect(() => {
+    if (loading || !data?.site?.seo_analysis_done) return;
+    const done = parseInt(localStorage.getItem("rankpill_guided_step") ?? "0");
+    if (done >= 3) return;
+    if (done < 1 && projections) {
+      setOnboardingPhase(1);
+    } else if (done < 2 && projections && !roadmapRecord) {
+      setOnboardingPhase(2);
+    } else if (done < 3 && projections && roadmapRecord && (data?.kpis?.totalArticles ?? 0) === 0) {
+      setOnboardingPhase(3);
+    }
+  }, [loading, data, projections, roadmapRecord]);
+
+  // Auto-advance phase 2 → 3 when roadmap is generated
+  useEffect(() => {
+    if (onboardingPhase === 2 && roadmapRecord) {
+      localStorage.setItem("rankpill_guided_step", "2");
+      if ((data?.kpis?.totalArticles ?? 0) === 0) setOnboardingPhase(3);
+      else setOnboardingPhase(null);
+    }
+  }, [roadmapRecord]);
+
+  // Scroll to highlighted section
+  useEffect(() => {
+    if (onboardingPhase === 1) {
+      setTimeout(() => projectionsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 500);
+    } else if (onboardingPhase === 2) {
+      setTimeout(() => roadmapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 500);
+    }
+  }, [onboardingPhase]);
+
+  function advanceOnboarding(from: 1 | 2 | 3) {
+    localStorage.setItem("rankpill_guided_step", String(from));
+    if (from === 1) {
+      if (!roadmapRecord) { setOnboardingPhase(2); return; }
+      if ((data?.kpis?.totalArticles ?? 0) === 0) { setOnboardingPhase(3); return; }
+    } else if (from === 2) {
+      if ((data?.kpis?.totalArticles ?? 0) === 0) { setOnboardingPhase(3); return; }
+    }
+    setOnboardingPhase(null);
+  }
+
   // Popup audit : uniquement à partir de la 2ème connexion
   useEffect(() => {
     if (!auditAvailable) return;
@@ -544,7 +592,8 @@ export default function Dashboard() {
         return;
       }
       const detail = (json.results as {status: string; title?: string; error?: string}[] | undefined)
-        ?.map((r) => r.status === "error" ? `❌ ${r.error}` : `✓ ${r.title}`)
+        ?.map((r) => r.status === "ok" ? `✓ ${r.title}` : r.status === "error" ? `❌ ${r.error}` : null)
+        .filter(Boolean)
         .join(" | ") ?? "";
       setCronResult(((json.message ?? json.error ?? "Terminé") as string) + (detail ? ` — ${detail}` : ""));
       await loadData();
@@ -591,6 +640,151 @@ export default function Dashboard() {
           onClose={() => setShowRoadmapModal(false)}
           onGenerate={generateRoadmap}
         />
+      )}
+
+      {/* ── Guided onboarding overlay ─────────────────────────────────── */}
+      {(onboardingPhase === 1 || onboardingPhase === 2) && (
+        <>
+          {/* Backdrop */}
+          <div className="fixed inset-0 z-40 pointer-events-none" style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(2px)" }} />
+
+          {/* Bottom callout */}
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_both]">
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl" style={{ background: "linear-gradient(135deg, #111 0%, #0d0d0d 100%)", border: "1px solid rgba(249,115,22,0.25)" }}>
+              {/* Halo */}
+              <div className="absolute top-0 left-0 w-64 h-32 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(249,115,22,0.12) 0%, transparent 70%)" }} />
+
+              <div className="relative p-6">
+                {/* Progress dots */}
+                <div className="flex items-center gap-2 mb-4">
+                  {[1, 2, 3].map(p => (
+                    <div key={p} className="h-1 rounded-full transition-all duration-500" style={{
+                      width: p === onboardingPhase ? "2rem" : "0.75rem",
+                      background: p < onboardingPhase! ? "linear-gradient(90deg,#f97316,#ef4444)" : p === onboardingPhase ? "linear-gradient(90deg,#f97316,#ef4444)" : "rgba(255,255,255,0.1)"
+                    }} />
+                  ))}
+                  <span className="text-xs text-gray-600 font-bold ml-1">Étape {onboardingPhase} / 3</span>
+                </div>
+
+                {onboardingPhase === 1 && (
+                  <>
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.2), rgba(239,68,68,0.1))", border: "1px solid rgba(249,115,22,0.3)" }}>
+                        <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-orange-400" stroke="currentColor" strokeWidth="1.8">
+                          <path d="M3 17l4-8 4 4 4-6 4 4" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M21 21H3" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-white font-black text-base mb-1">Voici votre potentiel SEO</p>
+                        <p className="text-gray-400 text-sm leading-relaxed">Nous avons estimé le nombre de clics supplémentaires que vous pouvez générer. Consultez les opportunités identifiées ci-dessus, puis continuez.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => advanceOnboarding(1)}
+                      className="relative w-full overflow-hidden text-white font-black px-6 py-3 rounded-xl text-sm uppercase tracking-wide group"
+                      style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 8px 24px rgba(249,115,22,0.3)" }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                      Continuer vers la Roadmap SEO →
+                    </button>
+                  </>
+                )}
+
+                {onboardingPhase === 2 && (
+                  <>
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.2), rgba(139,92,246,0.1))", border: "1px solid rgba(167,139,250,0.3)" }}>
+                        <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-violet-400" stroke="currentColor" strokeWidth="1.8">
+                          <path d="M12 2L2 7l10 5 10-5-10-5z" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-white font-black text-base mb-1">Générez votre Roadmap SEO</p>
+                        <p className="text-gray-400 text-sm leading-relaxed">Basée sur vos données réelles, votre roadmap contient 40 articles priorisés par potentiel de trafic. Cliquez sur le bouton <span className="text-violet-300 font-bold">Roadmap SEO</span> ci-dessus pour la générer.</p>
+                      </div>
+                    </div>
+                    {/* Flèche animée pointant vers le haut */}
+                    <div className="flex justify-center mb-4">
+                      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 text-violet-400" style={{ animation: "bounceDown 1.2s ease-in-out infinite", transform: "rotate(180deg)" }}>
+                        <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <button
+                      onClick={() => advanceOnboarding(2)}
+                      className="w-full text-gray-600 hover:text-gray-400 font-bold text-xs py-2 transition-colors"
+                    >
+                      Passer cette étape →
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Phase 3 : Premier article popup ───────────────────────────── */}
+      {onboardingPhase === 3 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}>
+          <div className="relative w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl animate-[modalPop_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]" style={{ background: "linear-gradient(135deg, #111 0%, #0d0d0d 100%)", border: "1px solid rgba(249,115,22,0.2)" }}>
+            {/* Halos */}
+            <div className="absolute top-0 left-0 w-72 h-48 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(249,115,22,0.12), transparent 65%)" }} />
+            <div className="absolute bottom-0 right-0 w-56 h-40 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(139,92,246,0.08), transparent 65%)" }} />
+
+            <div className="relative p-8">
+              {/* Icon */}
+              <div className="flex justify-center mb-6">
+                <div className="relative w-16 h-16">
+                  <div className="absolute inset-0 rounded-full blur-xl" style={{ background: "rgba(249,115,22,0.3)" }} />
+                  <div className="relative w-full h-full rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.2), rgba(239,68,68,0.1))", border: "1px solid rgba(249,115,22,0.4)" }}>
+                    <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 text-orange-400" stroke="currentColor" strokeWidth="1.6">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Title */}
+              <div className="text-center mb-6">
+                <p className="text-2xl font-black text-white mb-2">Votre stratégie SEO est prête !</p>
+                <p className="text-gray-400 text-sm leading-relaxed">Potentiel calculé, roadmap générée. Vous pouvez maintenant publier votre premier article SEO — automatiquement ou manuellement.</p>
+              </div>
+
+              {/* CTAs */}
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => { advanceOnboarding(3); handleManualPublish(); }}
+                  className="relative w-full overflow-hidden text-white font-black px-6 py-4 rounded-xl text-sm uppercase tracking-wide group"
+                  style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 8px 24px rgba(249,115,22,0.3)" }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                  <span className="relative flex items-center justify-center gap-2">
+                    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="2">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Générer mon premier article automatiquement
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => advanceOnboarding(3)}
+                  className="w-full bg-white/[0.04] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.07] text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-all"
+                >
+                  Créer un article manuellement →
+                </button>
+
+                <button
+                  onClick={() => advanceOnboarding(3)}
+                  className="w-full text-gray-600 hover:text-gray-400 font-medium text-xs py-2 transition-colors"
+                >
+                  Explorer le dashboard d'abord
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modale limite journalière */}
@@ -1100,7 +1294,13 @@ export default function Dashboard() {
                   </button>
 
                   {/* Roadmap 40 articles */}
-                  <div className="flex flex-col gap-2">
+                  <div
+                    ref={roadmapRef}
+                    className="flex flex-col gap-2 rounded-2xl transition-all duration-500"
+                    style={onboardingPhase === 2
+                      ? { position: "relative", zIndex: 50, boxShadow: "0 0 0 2px rgba(167,139,250,0.7), 0 0 60px rgba(167,139,250,0.2)", borderRadius: "1rem" }
+                      : {}}
+                  >
                     {/* Callout "première fois" */}
                     {showRoadmapCTA && (
                       <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_both]"
@@ -1156,7 +1356,13 @@ export default function Dashboard() {
 
                 {/* ── Projections SEO ──────────────────────────────────── */}
                 {data.site?.seo_analysis_done && (
-                  <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 animate-fade-in-up delay-200 overflow-hidden">
+                  <div
+                    ref={projectionsRef}
+                    className="relative bg-white/[0.03] border rounded-2xl p-6 animate-fade-in-up delay-200 overflow-hidden transition-all duration-500"
+                    style={onboardingPhase === 1
+                      ? { borderColor: "rgba(249,115,22,0.7)", zIndex: 50, boxShadow: "0 0 0 2px rgba(249,115,22,0.4), 0 0 60px rgba(249,115,22,0.2), 0 0 120px rgba(249,115,22,0.08)" }
+                      : { borderColor: "rgba(255,255,255,0.07)" }}
+                  >
                     {/* Halos */}
                     <div className="absolute top-0 right-0 w-80 h-40 pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(34,197,94,0.06), transparent 65%)" }} />
                     <div className="absolute bottom-0 left-0 w-64 h-32 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom left, rgba(249,115,22,0.05), transparent 65%)" }} />

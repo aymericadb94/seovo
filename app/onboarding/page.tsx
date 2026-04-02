@@ -441,7 +441,7 @@ export default function OnboardingPage() {
           <div className="absolute top-1/3 right-1/3 w-[400px] h-[400px] bg-violet-600/5 rounded-full blur-3xl animate-[orb_9s_ease-in-out_infinite]" style={{ animationDelay: "-2s" }} />
         )}
         {step === 3 && (
-          <div className="absolute top-1/3 right-1/3 w-[400px] h-[400px] bg-teal-600/5 rounded-full blur-3xl animate-[orb_9s_ease-in-out_infinite]" style={{ animationDelay: "-2s" }} />
+          <div className="absolute top-1/3 right-1/3 w-[400px] h-[400px] bg-orange-600/5 rounded-full blur-3xl animate-[orb_9s_ease-in-out_infinite]" style={{ animationDelay: "-2s" }} />
         )}
       </div>
 
@@ -465,11 +465,9 @@ export default function OnboardingPage() {
             const isActive = i === step;
             const isDone = i < step;
             const isViolet = isActive && step === 2;
-            const isTeal = isActive && step === 3;
-            const activeColor = isTeal ? "#0d9488" : isViolet ? "#7c3aed" : "#f97316";
-            const activeShadow = isTeal
-              ? "0 0 0 1px rgba(13,148,136,0.4), 0 0 24px rgba(13,148,136,0.35), 0 0 48px rgba(13,148,136,0.15)"
-              : isViolet
+            const isTeal = false;
+            const activeColor = isViolet ? "#7c3aed" : "#f97316";
+            const activeShadow = isViolet
               ? "0 0 0 1px rgba(139,92,246,0.4), 0 0 24px rgba(139,92,246,0.35), 0 0 48px rgba(139,92,246,0.15)"
               : "0 0 0 1px rgba(249,115,22,0.4), 0 0 24px rgba(249,115,22,0.35), 0 0 48px rgba(249,115,22,0.15)";
             const doneShadow = "0 0 12px rgba(249,115,22,0.2)";
@@ -511,8 +509,6 @@ export default function OnboardingPage() {
                       style={{
                         background: isDone
                           ? "linear-gradient(135deg, #f97316, #ef4444)"
-                          : isTeal
-                          ? "linear-gradient(135deg, #0d9488, #0f766e)"
                           : isViolet
                           ? "linear-gradient(135deg, #7c3aed, #4f46e5)"
                           : isActive
@@ -551,8 +547,7 @@ export default function OnboardingPage() {
                   <span
                     className="text-xs font-black uppercase tracking-widest transition-all duration-400"
                     style={{
-                      color: isTeal ? "#2dd4bf"
-                        : isActive && !isViolet ? "#fb923c"
+                      color: isActive && !isViolet ? "#fb923c"
                         : isActive && isViolet ? "#a78bfa"
                         : isDone ? "rgba(249,115,22,0.5)"
                         : "rgba(107,114,128,1)",
@@ -603,7 +598,7 @@ export default function OnboardingPage() {
             key={animKey}
             className={`bg-white/[0.03] border rounded-2xl p-8 flex flex-col gap-5 animate-[fadeInUp_0.4s_ease-out_both] ${
               isWide ? "w-[420px] flex-shrink-0" : "w-full"
-            } ${step === 2 ? "border-violet-500/15" : step === 3 ? "border-teal-500/15" : "border-white/[0.07]"}`}
+            } ${step === 2 ? "border-violet-500/15" : "border-white/[0.07]"}`}
           >
 
             {/* Step 0 : Activité */}
@@ -1010,15 +1005,15 @@ export default function OnboardingPage() {
               <>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(13,148,136,0.2), rgba(15,118,110,0.1))", border: "1px solid rgba(13,148,136,0.3)" }}>
-                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-teal-400">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.15), rgba(239,68,68,0.08))", border: "1px solid rgba(249,115,22,0.25)" }}>
+                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-orange-400">
                         <path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                         <path d="M11 8v3l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
                     <h2 className="text-xl font-black">Google Search Console</h2>
                   </div>
-                  <p className="text-gray-500 text-sm">Connectez votre GSC pour des projections de trafic basées sur vos vraies données. <span className="text-teal-400/70">Facultatif — vous pouvez le faire plus tard.</span></p>
+                  <p className="text-gray-500 text-sm">Connectez votre GSC pour des projections de trafic basées sur vos vraies données. <span className="text-orange-400/70">Facultatif — vous pouvez le faire plus tard.</span></p>
                 </div>
 
                 {/* OAuth button */}
@@ -1026,7 +1021,7 @@ export default function OnboardingPage() {
                   <div className="flex flex-col gap-3">
                     <a
                       href="/api/auth/google?from=onboarding"
-                      className="relative flex items-center gap-3 px-5 py-4 rounded-xl border border-white/[0.1] bg-white/[0.04] hover:border-teal-500/30 hover:bg-teal-500/5 transition-all group overflow-hidden"
+                      className="relative flex items-center gap-3 px-5 py-4 rounded-xl border border-white/[0.1] bg-white/[0.04] hover:border-orange-500/30 hover:bg-orange-500/5 transition-all group overflow-hidden"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
                       <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -1039,69 +1034,100 @@ export default function OnboardingPage() {
                       </div>
                       <div>
                         <p className="text-sm font-bold text-white">Connecter Google Search Console</p>
-                        <p className="text-xs text-gray-500 mt-0.5">Autorise RankPill en lecture seule sur vos données de recherche</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Autorise RankPill en lecture seule · Révocable à tout moment</p>
                       </div>
-                      <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-gray-600 ml-auto group-hover:text-teal-400 transition-colors flex-shrink-0">
+                      <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-gray-600 ml-auto group-hover:text-orange-400 transition-colors flex-shrink-0">
                         <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </a>
 
                     {/* Tutorial box */}
-                    <div className="bg-teal-500/5 border border-teal-500/15 rounded-xl p-4 flex flex-col gap-3">
-                      <p className="text-xs font-bold text-teal-400 uppercase tracking-wider">Quelle adresse saisir dans GSC ?</p>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-start gap-2.5">
-                          <div className="w-5 h-5 rounded bg-teal-500/15 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-teal-400 text-xs font-black">1</span>
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-white">Propriété domaine (recommandée)</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Couvre tous les sous-domaines et protocoles. Format :</p>
-                            <code className="block mt-1 bg-black/40 border border-white/[0.07] rounded-lg px-3 py-1.5 text-xs text-teal-300 font-mono">sc-domain:votresite.com</code>
-                          </div>
+                    <div className="bg-orange-500/5 border border-orange-500/15 rounded-xl p-4 flex flex-col gap-4">
+                      <p className="text-xs font-bold text-orange-400 uppercase tracking-wider">Comment trouver l'adresse exacte ?</p>
+
+                      {/* Étape 1 — ouvrir GSC */}
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-5 h-5 rounded bg-orange-500/15 border border-orange-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-orange-400 text-xs font-black">1</span>
                         </div>
-                        <div className="flex items-start gap-2.5">
-                          <div className="w-5 h-5 rounded bg-teal-500/15 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-teal-400 text-xs font-black">2</span>
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-white">Propriété URL (alternative)</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Si vous avez ajouté votre site en tant qu'URL. Format :</p>
-                            <code className="block mt-1 bg-black/40 border border-white/[0.07] rounded-lg px-3 py-1.5 text-xs text-teal-300 font-mono">https://www.votresite.com/</code>
+                        <div>
+                          <p className="text-xs font-bold text-white">Ouvrez Google Search Console</p>
+                          <p className="text-xs text-gray-500 mt-0.5">Allez sur :</p>
+                          <code className="block mt-1 bg-black/40 border border-white/[0.07] rounded-lg px-3 py-1.5 text-xs text-orange-300 font-mono">search.google.com/search-console</code>
+                        </div>
+                      </div>
+
+                      {/* Étape 2 — sélectionner propriété */}
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-5 h-5 rounded bg-orange-500/15 border border-orange-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-orange-400 text-xs font-black">2</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white">Cliquez sur le menu déroulant en haut à gauche</p>
+                          <p className="text-xs text-gray-500 mt-0.5">C'est le sélecteur de propriété, juste à côté du logo Google Search Console. Il affiche le nom de votre site actuel.</p>
+                        </div>
+                      </div>
+
+                      {/* Étape 3 — copier l'adresse */}
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-5 h-5 rounded bg-orange-500/15 border border-orange-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-orange-400 text-xs font-black">3</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white">Copiez l'adresse exacte affichée</p>
+                          <p className="text-xs text-gray-500 mt-0.5">Deux formats possibles selon comment vous avez ajouté votre site :</p>
+                          <div className="mt-2 flex flex-col gap-1.5">
+                            <div>
+                              <p className="text-xs text-gray-400 mb-0.5">Propriété de domaine <span className="text-orange-400/70">(recommandée — couvre www, sous-domaines, http et https)</span></p>
+                              <code className="block bg-black/40 border border-white/[0.07] rounded-lg px-3 py-1.5 text-xs text-orange-300 font-mono">sc-domain:votresite.com</code>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-0.5">Propriété d'URL <span className="text-gray-600">(couvre uniquement le préfixe exact)</span></p>
+                              <code className="block bg-black/40 border border-white/[0.07] rounded-lg px-3 py-1.5 text-xs text-orange-300 font-mono">https://www.votresite.com/</code>
+                            </div>
                           </div>
                         </div>
                       </div>
-                      <p className="text-xs text-gray-600">Retrouvez l'adresse exacte dans <span className="text-gray-400">search.google.com/search-console</span> → menu déroulant propriétés en haut à gauche.</p>
+
+                      {/* Avertissement */}
+                      <div className="flex items-start gap-2 bg-orange-500/8 border border-orange-500/20 rounded-lg px-3 py-2.5">
+                        <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-orange-400 flex-shrink-0 mt-0.5">
+                          <path d="M8 1.5L14.5 13H1.5L8 1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                          <path d="M8 6v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                          <circle cx="8" cy="10.5" r="0.5" fill="currentColor"/>
+                        </svg>
+                        <p className="text-xs text-orange-400/80 leading-relaxed">Saisissez l'adresse <span className="font-bold text-orange-300">exactement</span> telle qu'elle apparaît dans GSC — une virgule ou un slash manquant suffira à bloquer la connexion.</p>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 animate-[fadeInUp_0.4s_ease-out_both]">
                     {/* Connected badge */}
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-teal-500/10 border border-teal-500/25">
-                      <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                        <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-teal-400">
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/25">
+                      <div className="w-8 h-8 rounded-full bg-orange-500/15 flex items-center justify-center flex-shrink-0">
+                        <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-orange-400">
                           <path d="M3 8l3.5 3.5 6.5-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-teal-300">Google Search Console connecté</p>
-                        <p className="text-xs text-teal-400/60 mt-0.5">Vos tokens d'accès ont été sauvegardés</p>
+                        <p className="text-sm font-bold text-orange-300">Google Search Console connecté</p>
+                        <p className="text-xs text-orange-400/60 mt-0.5">Vos tokens d'accès ont été sauvegardés</p>
                       </div>
                     </div>
 
                     {/* GSC site URL input */}
                     <div>
                       <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
-                        Adresse de votre propriété GSC <span className="text-red-400">*</span>
+                        Adresse exacte de votre propriété GSC <span className="text-red-400">*</span>
                       </label>
                       <input
                         type="text"
                         value={form.gsc_site_url}
                         onChange={(e) => update("gsc_site_url", e.target.value)}
                         placeholder="sc-domain:votresite.com"
-                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-teal-500/50 focus:shadow-[0_0_0_3px_rgba(13,148,136,0.08)] transition-all"
+                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
                       />
-                      <p className="text-gray-600 text-xs mt-1.5">Format exact de l'adresse visible dans votre Search Console — avec le préfixe <code className="text-teal-400/70">sc-domain:</code> ou l'URL complète avec <code className="text-teal-400/70">https://</code></p>
+                      <p className="text-gray-600 text-xs mt-1.5">Copiez l'adresse telle quelle depuis le menu déroulant de Google Search Console — avec le préfixe <code className="text-orange-400/70">sc-domain:</code> ou l'URL complète avec <code className="text-orange-400/70">https://</code></p>
                     </div>
                   </div>
                 )}
@@ -1147,7 +1173,7 @@ export default function OnboardingPage() {
                     onClick={handleSubmit}
                     disabled={loading}
                     className="relative overflow-hidden disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg group"
-                    style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)", boxShadow: "0 8px 24px rgba(13,148,136,0.25)" }}
+                    style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 8px 24px rgba(249,115,22,0.25)" }}
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
                     <span className="flex items-center gap-2">
