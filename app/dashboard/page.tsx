@@ -380,7 +380,6 @@ export default function Dashboard() {
   type AuditRecord = { id: string; month: string; created_at: string; data: AuditData };
   const [latestAudit, setLatestAudit] = useState<AuditRecord | null>(null);
   const [auditAvailable, setAuditAvailable] = useState(false);
-  const [showAuditModal, setShowAuditModal] = useState(false);
   const [showAuditReport, setShowAuditReport] = useState(false);
 
   async function loadAudit() {
@@ -538,7 +537,7 @@ export default function Dashboard() {
       localStorage.setItem("rankpill_has_visited", "1");
       return; // 1ère connexion → pas de popup
     }
-    setShowAuditModal(true);
+    setShowAuditReport(true);
   }, [auditAvailable]);
 
   async function handleLogout() {
@@ -617,7 +616,7 @@ export default function Dashboard() {
       {/* SEO Analysis Modal — s'affiche uniquement quand showSeoModal est explicitement true */}
       {showSeoModal === true && (
         <SeoAnalysisModal
-          onComplete={() => { setShowSeoModal(false); loadData(); }}
+          onComplete={() => { setShowSeoModal(false); loadData(); loadProjections(); }}
           prefilledStrengths={data?.site?.seo_context?.strengths ?? ""}
           prefilledDifferentiators={data?.site?.seo_context?.differentiators ?? ""}
         />
