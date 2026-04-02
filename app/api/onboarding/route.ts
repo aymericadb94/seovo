@@ -61,6 +61,13 @@ export async function POST(request: Request) {
       }
     }
 
+    // Pick up GSC tokens temporarily stored in user metadata during onboarding OAuth
+    const gscTokens = user.user_metadata as {
+      gsc_pending_access_token?: string;
+      gsc_pending_refresh_token?: string;
+      gsc_pending_token_expiry?: number;
+    } | null;
+
     const insertData: Record<string, unknown> = {
       user_id: user.id,
       business_name: body.business_name,
@@ -77,6 +84,12 @@ export async function POST(request: Request) {
       custom_api_key: body.custom_api_key || null,
       keywords: body.keywords,
       frequency: body.frequency,
+      gsc_site_url: body.gsc_site_url || null,
+      ...(gscTokens?.gsc_pending_access_token ? {
+        google_access_token: gscTokens.gsc_pending_access_token,
+        google_refresh_token: gscTokens.gsc_pending_refresh_token ?? null,
+        google_token_expiry: gscTokens.gsc_pending_token_expiry ?? null,
+      } : {}),
     };
 
     if (body.seo_context) {
@@ -84,6 +97,15 @@ export async function POST(request: Request) {
     }
 
     const { error } = await supabase.from("sites").insert(insertData);
+
+    // Clear pending GSC tokens from user metadata (non-fatal)
+    if (gscTokens?.gsc_pending_access_token) {
+      supabase.auth.updateUser({ data: {
+        gsc_pending_access_token: null,
+        gsc_pending_refresh_token: null,
+        gsc_pending_token_expiry: null,
+      } }).catch(() => {});
+    }
 
     if (error) return Response.json({ error: error.message }, { status: 500 });
 

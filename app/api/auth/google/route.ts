@@ -1,4 +1,7 @@
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const from = searchParams.get("from") ?? "settings";
+
   const scopes = [
     "https://www.googleapis.com/auth/webmasters.readonly",
   ].join(" ");
@@ -10,6 +13,7 @@ export async function GET() {
   url.searchParams.set("scope", scopes);
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("prompt", "consent");
+  url.searchParams.set("state", from);
 
   return Response.redirect(url.toString());
 }

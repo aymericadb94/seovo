@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
@@ -30,6 +30,8 @@ type FormData = {
   keywords: string;
   competitors: string;
   constraints: string;
+  // GSC
+  gsc_site_url: string;
 };
 
 const industries = [
@@ -312,6 +314,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [animKey, setAnimKey] = useState(0);
+  const [gscConnected, setGscConnected] = useState(false);
   const [form, setForm] = useState<FormData>({
     business_name: "", industry: "", cms: "", site_url: "",
     wp_username: "", wp_app_password: "", shopify_api_key: "",
@@ -322,7 +325,25 @@ export default function OnboardingPage() {
     editorial_tone: "",
     strengths: "", differentiators: "",
     keywords: "", competitors: "", constraints: "",
+    gsc_site_url: "",
   });
+
+  // Detect GSC OAuth return
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gsc = params.get("gsc");
+    if (gsc === "connected") {
+      setGscConnected(true);
+      setStep(3);
+      setAnimKey(k => k + 1);
+      window.history.replaceState({}, "", "/onboarding");
+    } else if (gsc === "error") {
+      setStep(3);
+      setAnimKey(k => k + 1);
+      setError("La connexion Google Search Console a échoué. Vous pouvez réessayer ou passer cette étape.");
+      window.history.replaceState({}, "", "/onboarding");
+    }
+  }, []);
 
   function update(key: keyof FormData, value: string | number) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -355,6 +376,7 @@ export default function OnboardingPage() {
         form.keywords.trim()
       );
     }
+    if (step === 3) return true; // GSC is optional
     return false;
   }
 
@@ -393,6 +415,7 @@ export default function OnboardingPage() {
         wix_site_id: form.wix_site_id,
         custom_api_url: form.custom_api_url,
         custom_api_key: form.custom_api_key,
+        gsc_site_url: form.gsc_site_url || null,
         keywords,
         frequency,
         seo_context,
@@ -403,7 +426,7 @@ export default function OnboardingPage() {
     else router.push("/onboarding/success");
   }
 
-  const STEPS = ["Activité", "Site", "Stratégie"];
+  const STEPS = ["Activité", "Site", "Stratégie", "Google"];
   const isWide = step === 1 && form.cms !== "";
 
   return (
@@ -416,6 +439,9 @@ export default function OnboardingPage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-orange-500/4 rounded-full blur-2xl animate-[orb_6s_ease-in-out_infinite]" style={{ animationDelay: "-1.5s" }} />
         {step === 2 && (
           <div className="absolute top-1/3 right-1/3 w-[400px] h-[400px] bg-violet-600/5 rounded-full blur-3xl animate-[orb_9s_ease-in-out_infinite]" style={{ animationDelay: "-2s" }} />
+        )}
+        {step === 3 && (
+          <div className="absolute top-1/3 right-1/3 w-[400px] h-[400px] bg-teal-600/5 rounded-full blur-3xl animate-[orb_9s_ease-in-out_infinite]" style={{ animationDelay: "-2s" }} />
         )}
       </div>
 
@@ -439,8 +465,11 @@ export default function OnboardingPage() {
             const isActive = i === step;
             const isDone = i < step;
             const isViolet = isActive && step === 2;
-            const activeColor = isViolet ? "#7c3aed" : "#f97316";
-            const activeShadow = isViolet
+            const isTeal = isActive && step === 3;
+            const activeColor = isTeal ? "#0d9488" : isViolet ? "#7c3aed" : "#f97316";
+            const activeShadow = isTeal
+              ? "0 0 0 1px rgba(13,148,136,0.4), 0 0 24px rgba(13,148,136,0.35), 0 0 48px rgba(13,148,136,0.15)"
+              : isViolet
               ? "0 0 0 1px rgba(139,92,246,0.4), 0 0 24px rgba(139,92,246,0.35), 0 0 48px rgba(139,92,246,0.15)"
               : "0 0 0 1px rgba(249,115,22,0.4), 0 0 24px rgba(249,115,22,0.35), 0 0 48px rgba(249,115,22,0.15)";
             const doneShadow = "0 0 12px rgba(249,115,22,0.2)";
@@ -482,6 +511,8 @@ export default function OnboardingPage() {
                       style={{
                         background: isDone
                           ? "linear-gradient(135deg, #f97316, #ef4444)"
+                          : isTeal
+                          ? "linear-gradient(135deg, #0d9488, #0f766e)"
                           : isViolet
                           ? "linear-gradient(135deg, #7c3aed, #4f46e5)"
                           : isActive
@@ -520,7 +551,8 @@ export default function OnboardingPage() {
                   <span
                     className="text-xs font-black uppercase tracking-widest transition-all duration-400"
                     style={{
-                      color: isActive && !isViolet ? "#fb923c"
+                      color: isTeal ? "#2dd4bf"
+                        : isActive && !isViolet ? "#fb923c"
                         : isActive && isViolet ? "#a78bfa"
                         : isDone ? "rgba(249,115,22,0.5)"
                         : "rgba(107,114,128,1)",
@@ -571,7 +603,7 @@ export default function OnboardingPage() {
             key={animKey}
             className={`bg-white/[0.03] border rounded-2xl p-8 flex flex-col gap-5 animate-[fadeInUp_0.4s_ease-out_both] ${
               isWide ? "w-[420px] flex-shrink-0" : "w-full"
-            } ${step === 2 ? "border-violet-500/15" : "border-white/[0.07]"}`}
+            } ${step === 2 ? "border-violet-500/15" : step === 3 ? "border-teal-500/15" : "border-white/[0.07]"}`}
           >
 
             {/* Step 0 : Activité */}
@@ -973,6 +1005,109 @@ export default function OnboardingPage() {
               </>
             )}
 
+            {/* Step 3 : Google Search Console */}
+            {step === 3 && (
+              <>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(13,148,136,0.2), rgba(15,118,110,0.1))", border: "1px solid rgba(13,148,136,0.3)" }}>
+                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-teal-400">
+                        <path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M11 8v3l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <h2 className="text-xl font-black">Google Search Console</h2>
+                  </div>
+                  <p className="text-gray-500 text-sm">Connectez votre GSC pour des projections de trafic basées sur vos vraies données. <span className="text-teal-400/70">Facultatif — vous pouvez le faire plus tard.</span></p>
+                </div>
+
+                {/* OAuth button */}
+                {!gscConnected ? (
+                  <div className="flex flex-col gap-3">
+                    <a
+                      href="/api/auth/google?from=onboarding"
+                      className="relative flex items-center gap-3 px-5 py-4 rounded-xl border border-white/[0.1] bg-white/[0.04] hover:border-teal-500/30 hover:bg-teal-500/5 transition-all group overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                      <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <svg viewBox="0 0 24 24" className="w-5 h-5">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white">Connecter Google Search Console</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Autorise RankPill en lecture seule sur vos données de recherche</p>
+                      </div>
+                      <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-gray-600 ml-auto group-hover:text-teal-400 transition-colors flex-shrink-0">
+                        <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </a>
+
+                    {/* Tutorial box */}
+                    <div className="bg-teal-500/5 border border-teal-500/15 rounded-xl p-4 flex flex-col gap-3">
+                      <p className="text-xs font-bold text-teal-400 uppercase tracking-wider">Quelle adresse saisir dans GSC ?</p>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start gap-2.5">
+                          <div className="w-5 h-5 rounded bg-teal-500/15 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-teal-400 text-xs font-black">1</span>
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-white">Propriété domaine (recommandée)</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Couvre tous les sous-domaines et protocoles. Format :</p>
+                            <code className="block mt-1 bg-black/40 border border-white/[0.07] rounded-lg px-3 py-1.5 text-xs text-teal-300 font-mono">sc-domain:votresite.com</code>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                          <div className="w-5 h-5 rounded bg-teal-500/15 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-teal-400 text-xs font-black">2</span>
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-white">Propriété URL (alternative)</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Si vous avez ajouté votre site en tant qu'URL. Format :</p>
+                            <code className="block mt-1 bg-black/40 border border-white/[0.07] rounded-lg px-3 py-1.5 text-xs text-teal-300 font-mono">https://www.votresite.com/</code>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-600">Retrouvez l'adresse exacte dans <span className="text-gray-400">search.google.com/search-console</span> → menu déroulant propriétés en haut à gauche.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4 animate-[fadeInUp_0.4s_ease-out_both]">
+                    {/* Connected badge */}
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-teal-500/10 border border-teal-500/25">
+                      <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                        <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-teal-400">
+                          <path d="M3 8l3.5 3.5 6.5-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-teal-300">Google Search Console connecté</p>
+                        <p className="text-xs text-teal-400/60 mt-0.5">Vos tokens d'accès ont été sauvegardés</p>
+                      </div>
+                    </div>
+
+                    {/* GSC site URL input */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
+                        Adresse de votre propriété GSC <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={form.gsc_site_url}
+                        onChange={(e) => update("gsc_site_url", e.target.value)}
+                        placeholder="sc-domain:votresite.com"
+                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-teal-500/50 focus:shadow-[0_0_0_3px_rgba(13,148,136,0.08)] transition-all"
+                      />
+                      <p className="text-gray-600 text-xs mt-1.5">Format exact de l'adresse visible dans votre Search Console — avec le préfixe <code className="text-teal-400/70">sc-domain:</code> ou l'URL complète avec <code className="text-teal-400/70">https://</code></p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             {/* Erreur */}
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 animate-[fadeInUp_0.3s_ease-out_both]">
@@ -996,11 +1131,7 @@ export default function OnboardingPage() {
                 <button
                   onClick={() => canProceed() && goToStep(step + 1)}
                   disabled={!canProceed()}
-                  className={`relative overflow-hidden disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg group ${
-                    step === 1
-                      ? "bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-orange-500/20"
-                      : "bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-orange-500/20"
-                  }`}
+                  className="relative overflow-hidden disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg group bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-orange-500/20"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
                   <span className="flex items-center gap-2">
@@ -1011,32 +1142,44 @@ export default function OnboardingPage() {
                   </span>
                 </button>
               ) : (
-                <button
-                  onClick={handleSubmit}
-                  disabled={!canProceed() || loading}
-                  className="relative overflow-hidden disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg group"
-                  style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 8px 24px rgba(139,92,246,0.25)" }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
-                  <span className="flex items-center gap-2">
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                        </svg>
-                        Lancement...
-                      </>
-                    ) : (
-                      <>
-                        Lancer RankPill
-                        <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4">
-                          <path d="M8 2l6 6-6 6M2 8h12" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </>
-                    )}
-                  </span>
-                </button>
+                <div className="flex flex-col items-end gap-2">
+                  <button
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    className="relative overflow-hidden disabled:opacity-30 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-wide text-sm shadow-lg group"
+                    style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)", boxShadow: "0 8px 24px rgba(13,148,136,0.25)" }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                    <span className="flex items-center gap-2">
+                      {loading ? (
+                        <>
+                          <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                          </svg>
+                          Lancement...
+                        </>
+                      ) : (
+                        <>
+                          Lancer RankPill
+                          <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4">
+                            <path d="M8 2l6 6-6 6M2 8h12" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </>
+                      )}
+                    </span>
+                  </button>
+                  {!gscConnected && (
+                    <button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={loading}
+                      className="text-xs text-gray-600 hover:text-gray-400 transition-colors disabled:opacity-30"
+                    >
+                      Passer cette étape →
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 

@@ -229,12 +229,12 @@ export default function LandingPage() {
           {[0, 1].map((copy) => (
             <div key={copy} className="flex items-center flex-shrink-0" aria-hidden={copy === 1 ? "true" : undefined}>
               {[
-                "Fais exploser ton référencement SEO de façon automatique",
-                "Triple ton trafic organique avec nos outils professionnels",
-                "Des articles SEO publiés automatiquement sur ton site chaque jour",
-                "RankPill génère du contenu optimisé pendant que tu dors",
-                "Connecte WordPress, Shopify, Wix ou ton API en 2 minutes",
-                "+340% de trafic organique en moyenne pour nos utilisateurs",
+                "RankPill lit vos données GSC et agit — pas un générateur d'articles",
+                "Positions 5–20 détectées automatiquement · Contenu publié · Trafic capté",
+                "Connecte WordPress, Shopify, Wix ou ton API en 3 minutes",
+                "RankPill comprend votre SEO avant d'écrire le premier mot",
+                "Analyse réelle · Opportunités priorisées · Publication automatique",
+                "Sans rédacteur · Sans agence · Sans effort · Avec de vraies données",
               ].map((msg, i) => (
                 <span key={i} className="inline-flex items-center gap-3 px-7 whitespace-nowrap">
                   <span className="text-[11px] font-black tracking-widest uppercase" style={{ color: i % 3 === 0 ? "#f97316" : i % 3 === 1 ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.4)" }}>
@@ -288,32 +288,44 @@ export default function LandingPage() {
         <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
           style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)", backgroundSize: "80px 80px" }} />
 
-        <div className="relative max-w-5xl mx-auto">
+        <div className="relative max-w-4xl mx-auto">
           {/* Badge */}
-          <div className="animate-fade-in-up inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm font-medium px-4 py-2 rounded-full mb-8">
-            <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
+          <div className="animate-fade-in-up inline-flex items-center gap-2 bg-white/[0.04] border border-white/10 text-gray-400 text-xs font-semibold px-4 py-2 rounded-full mb-10 tracking-wide uppercase">
+            <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse flex-shrink-0" />
             {t.hero.badge}
           </div>
 
-          {/* Titre ligne 1 */}
-          <h1 className="animate-fade-in-up delay-100 text-6xl md:text-8xl font-black leading-none tracking-tight mb-2" style={{ animationDelay: "100ms" }}>
+          {/* Headline */}
+          <h1 className="animate-fade-in-up text-5xl md:text-7xl font-black leading-[1.05] tracking-tight mb-3" style={{ animationDelay: "100ms" }}>
             {t.hero.title1}
           </h1>
-
-          {/* Titre ligne 2 — gradient animé */}
-          <h1 className="animate-fade-in-up text-6xl md:text-8xl font-black leading-none tracking-tight mb-8"
+          <h1 className="animate-fade-in-up text-5xl md:text-7xl font-black leading-[1.05] tracking-tight mb-8"
             style={{ animationDelay: "200ms", background: "linear-gradient(90deg, #f97316, #ef4444, #fb923c, #f97316)", backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", animation: "fadeInUp 0.5s cubic-bezier(0.16,1,0.3,1) 200ms both, shimmer 4s linear infinite" }}>
             {t.hero.title2}
           </h1>
 
           {/* Subtitle */}
-          <p className="animate-fade-in-up text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed" style={{ animationDelay: "350ms" }}>
+          <p className="animate-fade-in-up text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed" style={{ animationDelay: "300ms" }}>
             {t.hero.subtitle}
           </p>
 
-          {/* CTA */}
-          <div className="animate-fade-in-up flex flex-col sm:flex-row items-center justify-center gap-4" style={{ animationDelay: "500ms" }}>
-            <Link href="/signup" className="group relative overflow-hidden bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-10 py-4 rounded-xl text-lg transition-all shadow-2xl shadow-orange-500/30 uppercase tracking-wide hover:shadow-orange-500/50 hover:scale-[1.03]">
+          {/* Bullets */}
+          <ul className="animate-fade-in-up flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 mb-12" style={{ animationDelay: "420ms" }}>
+            {t.hero.bullets.map((bullet, i) => (
+              <li key={i} className="flex items-center gap-2 text-sm text-gray-400">
+                <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.2), rgba(239,68,68,0.1))", border: "1px solid rgba(249,115,22,0.35)" }}>
+                  <svg viewBox="0 0 10 10" fill="none" className="w-2.5 h-2.5 text-orange-400">
+                    <path d="M2 5.5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </span>
+                <span>{bullet}</span>
+              </li>
+            ))}
+          </ul>
+
+          {/* CTAs */}
+          <div className="animate-fade-in-up flex flex-col sm:flex-row items-center justify-center gap-4" style={{ animationDelay: "550ms" }}>
+            <Link href="/signup" className="group relative overflow-hidden bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-9 py-4 rounded-xl text-base transition-all shadow-2xl shadow-orange-500/30 uppercase tracking-wide hover:shadow-orange-500/50 hover:scale-[1.03]">
               <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)" }} />
               <span className="relative flex items-center gap-2">
                 {t.hero.cta}
@@ -322,7 +334,7 @@ export default function LandingPage() {
                 </svg>
               </span>
             </Link>
-            <a href="#comment" className="group text-gray-400 hover:text-white font-medium px-8 py-4 rounded-xl transition-all border border-white/10 hover:border-white/25 hover:bg-white/[0.03] flex items-center gap-2">
+            <a href="#comment" className="group text-gray-400 hover:text-white font-medium px-7 py-4 rounded-xl transition-all border border-white/10 hover:border-white/25 hover:bg-white/[0.03] flex items-center gap-2 text-sm">
               {t.hero.ctaSecondary}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 group-hover:translate-y-0.5 transition-transform">
                 <polyline points="6 9 12 15 18 9"/>
@@ -330,7 +342,8 @@ export default function LandingPage() {
             </a>
           </div>
 
-          <p className="animate-fade-in text-gray-600 text-sm mt-6" style={{ animationDelay: "700ms" }}>{t.hero.note}</p>
+          {/* Micro preuve */}
+          <p className="animate-fade-in text-gray-600 text-xs mt-6 tracking-wide" style={{ animationDelay: "700ms" }}>{t.hero.note}</p>
 
           {/* Floating decoration dots */}
           <div className="absolute top-8 right-0 w-2 h-2 bg-orange-500/40 rounded-full animate-float" style={{ animationDelay: "0s" }} />

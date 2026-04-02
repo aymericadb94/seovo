@@ -5,9 +5,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
+  const state = searchParams.get("state") ?? "settings";
+  const fromOnboarding = state === "onboarding";
 
   if (error || !code) {
-    return Response.redirect(`${appUrl}/settings?gsc=error`);
+    return Response.redirect(fromOnboarding ? `${appUrl}/onboarding?gsc=error` : `${appUrl}/settings?gsc=error`);
   }
 
   // Exchange code for tokens
@@ -35,7 +37,7 @@ export async function GET(request: Request) {
 
   if (!tokens.access_token) {
     const reason = encodeURIComponent(tokens.error_description ?? tokens.error ?? "token_exchange_failed");
-    return Response.redirect(`${appUrl}/settings?gsc=error&reason=${reason}`);
+    return Response.redirect(fromOnboarding ? `${appUrl}/onboarding?gsc=error&reason=${reason}` : `${appUrl}/settings?gsc=error&reason=${reason}`);
   }
 
   const supabase = await createClient();
@@ -43,6 +45,22 @@ export async function GET(request: Request) {
 
   if (!user) {
     return Response.redirect(`${appUrl}/login`);
+  }
+
+  if (fromOnboarding) {
+    // During onboarding the sites row doesn't exist yet — store tokens in user metadata temporarily
+    const { error: metaError } = await supabase.auth.updateUser({
+      data: {
+        gsc_pending_access_token: tokens.access_token,
+        gsc_pending_refresh_token: tokens.refresh_token ?? null,
+        gsc_pending_token_expiry: Date.now() + (tokens.expires_in ?? 3600) * 1000,
+      },
+    });
+    if (metaError) {
+      console.error("[GSC callback] failed to save tokens to metadata:", metaError.message);
+      return Response.redirect(`${appUrl}/onboarding?gsc=error&reason=token_save_failed`);
+    }
+    return Response.redirect(`${appUrl}/onboarding?gsc=connected`);
   }
 
   const { error: updateError } = await supabase

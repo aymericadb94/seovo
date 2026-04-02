@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { computeProjections } from "@/lib/seo-projections";
+import { computeProjections, type GSCQuery } from "@/lib/seo-projections";
+import { getValidAccessToken } from "@/lib/google";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
 
     const { data: site } = await supabase
       .from("sites")
-      .select("business_name, industry, site_url, keywords, seo_context")
+      .select("business_name, industry, site_url, keywords, seo_context, gsc_site_url")
       .eq("user_id", user.id)
       .single();
 
@@ -186,12 +187,43 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
       return Response.json({ error: "Analyse générée mais sauvegarde échouée : " + updateError.message }, { status: 500 });
     }
 
-    // Calcul automatique des projections SEO (sans GSC à ce stade)
+    // Calcul automatique des projections SEO — avec GSC si disponible (connecté à l'onboarding)
     try {
       const seoScore = analysis.seo_score?.overall ?? 35;
+      let gscQueries: GSCQuery[] = [];
+      if ((site as { gsc_site_url?: string | null }).gsc_site_url) {
+        try {
+          const token = await getValidAccessToken(user.id);
+          if (token) {
+            const gscSiteUrl = (site as { gsc_site_url: string }).gsc_site_url;
+            const end = new Date(); end.setDate(end.getDate() - 2);
+            const start = new Date(); start.setDate(start.getDate() - 32);
+            const fmt = (d: Date) => d.toISOString().split("T")[0];
+            const gscRes = await fetch(
+              `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(gscSiteUrl)}/searchAnalytics/query`,
+              {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ startDate: fmt(start), endDate: fmt(end), dimensions: ["query"], rowLimit: 100 }),
+              }
+            );
+            if (gscRes.ok) {
+              type Row = { keys: string[]; clicks: number; impressions: number; ctr: number; position: number };
+              const gscData = await gscRes.json() as { rows?: Row[] };
+              gscQueries = (gscData.rows ?? []).map((r) => ({
+                query: r.keys[0],
+                clicks: r.clicks,
+                impressions: r.impressions,
+                ctr: r.ctr,
+                position: Math.round(r.position * 10) / 10,
+              }));
+            }
+          }
+        } catch { /* GSC fetch non-fatal */ }
+      }
       const projections = computeProjections(
         uniqueKeywords,
-        [], // pas de données GSC au moment de l'analyse initiale
+        gscQueries,
         seoScore,
         (site.seo_context as Record<string, unknown> | null),
         site.site_url
