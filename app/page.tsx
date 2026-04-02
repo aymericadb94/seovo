@@ -365,11 +365,18 @@ export default function LandingPage() {
       {/* ── Comment ça marche ────────────────────────────────────────────── */}
       <section id="comment" className="py-28 px-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-[500px] h-[500px] pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(249,115,22,0.05), transparent 65%)" }} />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom left, rgba(239,68,68,0.04), transparent 65%)" }} />
 
         <div className="max-w-5xl mx-auto" ref={stepsSection.ref}>
           <div className={`text-center mb-20 transition-all duration-700 ${stepsSection.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+            {/* Badge intro */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-6 text-xs font-bold tracking-wider uppercase"
+              style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)", color: "#f97316" }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+              Fonctionnement
+            </div>
             <h2 className="text-4xl md:text-5xl font-black mb-4 tracking-tight">{t.howItWorks.title}</h2>
-            <p className="text-gray-400 text-lg">{t.howItWorks.subtitle}</p>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">{t.howItWorks.subtitle}</p>
           </div>
 
           {/* Desktop : flex avec connecteurs inline */}
@@ -384,11 +391,8 @@ export default function LandingPage() {
                 >
                   {/* Badge */}
                   <div className="relative w-20 h-20 mb-8 flex-shrink-0">
-                    {/* Glow */}
                     <div className="absolute inset-0 rounded-full blur-xl" style={{ background: "rgba(249,115,22,0.2)" }} />
-                    {/* Anneau tournant pointillé */}
                     <div className="absolute inset-[-8px] rounded-full border border-dashed animate-[spin_12s_linear_infinite]" style={{ borderColor: "rgba(249,115,22,0.35)" }} />
-                    {/* Cercle */}
                     <div className="relative w-full h-full rounded-full flex items-center justify-center"
                       style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.15), rgba(239,68,68,0.08))", border: "1.5px solid rgba(249,115,22,0.5)", boxShadow: "0 0 24px rgba(249,115,22,0.15), inset 0 1px 0 rgba(255,255,255,0.08)" }}>
                       <span className="text-2xl font-black text-white tracking-tight">{step.number}</span>
@@ -396,7 +400,7 @@ export default function LandingPage() {
                   </div>
 
                   {/* Carte */}
-                  <div className="relative w-full rounded-2xl p-6 group overflow-hidden text-center"
+                  <div className="relative w-full rounded-2xl p-6 group overflow-hidden text-left"
                     style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
                       style={{ background: "radial-gradient(ellipse at top center, rgba(249,115,22,0.08), transparent 65%)" }} />
@@ -406,13 +410,28 @@ export default function LandingPage() {
                     </div>
                     <h3 className="text-base font-black mb-2 transition-colors duration-300 group-hover:text-orange-400">{step.title}</h3>
                     <p className="text-gray-500 text-sm leading-relaxed">{step.description}</p>
+                    {step.bullets.length > 0 && (
+                      <ul className="mt-3 space-y-2">
+                        {step.bullets.map((bullet, bi) => (
+                          <li key={bi} className="flex items-start gap-2.5 text-xs text-gray-400">
+                            <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                              style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.25)" }}>
+                              <svg viewBox="0 0 8 8" fill="none" className="w-2.5 h-2.5 text-orange-400">
+                                <path d="M1.5 4l2 2L6.5 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </span>
+                            {bullet}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
 
-                {/* Connecteur — centré sur les cercles (mt = moitié du badge = 40px) */}
+                {/* Connecteur */}
                 {i < t.howItWorks.steps.length - 1 && (
                   <div className="flex-shrink-0 w-16 overflow-hidden" style={{ marginTop: "39px", height: "2px" }}>
-                    <div className={`h-full transition-all duration-700 rounded-full`}
+                    <div className="h-full transition-all duration-700 rounded-full"
                       style={{ background: "linear-gradient(90deg, rgba(249,115,22,0.7), rgba(249,115,22,0.3))", width: stepsSection.inView ? "100%" : "0%", transitionDelay: `${i * 200 + 400}ms` }} />
                   </div>
                 )}
@@ -436,6 +455,21 @@ export default function LandingPage() {
                 <div className="flex-1 pt-1">
                   <h3 className="text-base font-black mb-1">{step.title}</h3>
                   <p className="text-gray-500 text-sm leading-relaxed">{step.description}</p>
+                  {step.bullets.length > 0 && (
+                    <ul className="mt-2.5 space-y-1.5">
+                      {step.bullets.map((bullet, bi) => (
+                        <li key={bi} className="flex items-start gap-2 text-xs text-gray-500">
+                          <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                            style={{ background: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.2)" }}>
+                            <svg viewBox="0 0 8 8" fill="none" className="w-2 h-2 text-orange-400">
+                              <path d="M1.5 4l2 2L6.5 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </span>
+                          {bullet}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             ))}

@@ -70,12 +70,31 @@ export const translations = {
       { value: "0h", label: "de travail manuel" },
     ],
     howItWorks: {
-      title: "Comment ça marche",
-      subtitle: "Trois étapes. Zéro complexité.",
+      title: "Comment RankPill transforme votre SEO",
+      subtitle: "En 3 étapes, votre site analyse, publie et progresse — sans effort de votre part.",
       steps: [
-        { number: "01", title: "Connectez votre site", description: "WordPress ou Shopify — la connexion prend moins de 2 minutes." },
-        { number: "02", title: "Notre système analyse votre secteur", description: "RankPill identifie les mots-clés à fort potentiel pour votre activité." },
-        { number: "03", title: "Les contenus se publient seuls", description: "Chaque jour, un nouvel article optimisé apparaît sur votre site." },
+        {
+          number: "01",
+          title: "Connectez votre site en 2 minutes",
+          description: "Reliez WordPress, Shopify ou votre CMS et Google Search Console. RankPill accède à vos données réelles : requêtes, positions, CTR et pages indexées.",
+          bullets: [] as string[],
+        },
+        {
+          number: "02",
+          title: "L'analyse identifie vos opportunités SEO",
+          description: "Notre moteur lit vos données GSC et priorise les actions à fort potentiel :",
+          bullets: [
+            "Mots-clés en positions 5–20 prêts à passer en top 3",
+            "Contenus manquants que vos clients recherchent déjà",
+            "Pages sous-performantes à renforcer en priorité",
+          ],
+        },
+        {
+          number: "03",
+          title: "Le contenu se publie, le trafic monte",
+          description: "Chaque jour, un article SEO ciblé est généré et publié sur votre site — calibré pour ranker sur une requête précise, pas pour remplir.",
+          bullets: [] as string[],
+        },
       ],
     },
     features: {
@@ -301,12 +320,31 @@ export const translations = {
       { value: "0h", label: "manual work" },
     ],
     howItWorks: {
-      title: "How it works",
-      subtitle: "Three steps. Zero complexity.",
+      title: "How RankPill transforms your SEO",
+      subtitle: "In 3 steps, your site analyzes, publishes and grows — without any effort from you.",
       steps: [
-        { number: "01", title: "Connect your site", description: "WordPress or Shopify — connection takes less than 2 minutes." },
-        { number: "02", title: "Our system analyzes your industry", description: "RankPill identifies high-potential keywords for your business." },
-        { number: "03", title: "Content publishes itself", description: "Every day, a new optimized article appears on your site." },
+        {
+          number: "01",
+          title: "Connect your site in 2 minutes",
+          description: "Link WordPress, Shopify or your CMS and Google Search Console. RankPill accesses your real data: queries, positions, CTR and indexed pages.",
+          bullets: [] as string[],
+        },
+        {
+          number: "02",
+          title: "Analysis identifies your SEO opportunities",
+          description: "Our engine reads your GSC data and prioritizes high-impact actions:",
+          bullets: [
+            "Keywords in positions 5–20 ready to reach top 3",
+            "Missing content your customers are already searching for",
+            "Underperforming pages to strengthen first",
+          ],
+        },
+        {
+          number: "03",
+          title: "Content publishes itself, traffic grows",
+          description: "Every day, a targeted SEO article is generated and published on your site — calibrated to rank on a specific query, not to fill space.",
+          bullets: [] as string[],
+        },
       ],
     },
     features: {
@@ -532,12 +570,31 @@ export const translations = {
       { value: "0h", label: "de trabajo manual" },
     ],
     howItWorks: {
-      title: "Cómo funciona",
-      subtitle: "Tres pasos. Cero complejidad.",
+      title: "Cómo RankPill transforma tu SEO",
+      subtitle: "En 3 pasos, tu sitio analiza, publica y crece — sin ningún esfuerzo por tu parte.",
       steps: [
-        { number: "01", title: "Conecta tu sitio", description: "WordPress o Shopify — la conexión tarda menos de 2 minutos." },
-        { number: "02", title: "Nuestro sistema analiza tu sector", description: "RankPill identifica las palabras clave con mayor potencial para tu negocio." },
-        { number: "03", title: "Los contenidos se publican solos", description: "Cada día, un nuevo artículo optimizado aparece en tu sitio." },
+        {
+          number: "01",
+          title: "Conecta tu sitio en 2 minutos",
+          description: "Vincula WordPress, Shopify o tu CMS y Google Search Console. RankPill accede a tus datos reales: consultas, posiciones, CTR y páginas indexadas.",
+          bullets: [] as string[],
+        },
+        {
+          number: "02",
+          title: "El análisis identifica tus oportunidades SEO",
+          description: "Nuestro motor lee tus datos de GSC y prioriza las acciones de mayor impacto:",
+          bullets: [
+            "Palabras clave en posiciones 5–20 listas para alcanzar el top 3",
+            "Contenidos ausentes que tus clientes ya buscan",
+            "Páginas con bajo rendimiento a reforzar primero",
+          ],
+        },
+        {
+          number: "03",
+          title: "El contenido se publica solo, el tráfico crece",
+          description: "Cada día, un artículo SEO dirigido se genera y publica en tu sitio — calibrado para posicionarse en una búsqueda concreta, no para rellenar.",
+          bullets: [] as string[],
+        },
       ],
     },
     features: {
@@ -763,12 +820,31 @@ export const translations = {
       { value: "0h", label: "manuelle Arbeit" },
     ],
     howItWorks: {
-      title: "Wie es funktioniert",
-      subtitle: "Drei Schritte. Null Komplexität.",
+      title: "Wie RankPill Ihr SEO transformiert",
+      subtitle: "In 3 Schritten analysiert, veröffentlicht und wächst Ihre Website — ohne jeglichen Aufwand.",
       steps: [
-        { number: "01", title: "Verbinden Sie Ihre Website", description: "WordPress oder Shopify — die Verbindung dauert weniger als 2 Minuten." },
-        { number: "02", title: "Unser System analysiert Ihre Branche", description: "RankPill identifiziert hochpotenzielle Keywords für Ihr Unternehmen." },
-        { number: "03", title: "Inhalte veröffentlichen sich selbst", description: "Jeden Tag erscheint ein neuer optimierter Artikel auf Ihrer Website." },
+        {
+          number: "01",
+          title: "Verbinden Sie Ihre Website in 2 Minuten",
+          description: "Verknüpfen Sie WordPress, Shopify oder Ihr CMS und Google Search Console. RankPill greift auf Ihre echten Daten zu: Suchanfragen, Positionen, CTR und indexierte Seiten.",
+          bullets: [] as string[],
+        },
+        {
+          number: "02",
+          title: "Die Analyse identifiziert Ihre SEO-Chancen",
+          description: "Unsere Engine liest Ihre GSC-Daten und priorisiert die wirkungsvollsten Maßnahmen:",
+          bullets: [
+            "Keywords auf Positionen 5–20, bereit für die Top 3",
+            "Fehlende Inhalte, nach denen Ihre Kunden bereits suchen",
+            "Schwache Seiten, die zuerst gestärkt werden müssen",
+          ],
+        },
+        {
+          number: "03",
+          title: "Inhalte veröffentlichen sich selbst — Traffic steigt",
+          description: "Jeden Tag wird ein gezielter SEO-Artikel erstellt und veröffentlicht — kalibriert, um bei einer konkreten Suchanfrage zu ranken, nicht um Platz zu füllen.",
+          bullets: [] as string[],
+        },
       ],
     },
     features: {
@@ -994,12 +1070,31 @@ export const translations = {
       { value: "0h", label: "di lavoro manuale" },
     ],
     howItWorks: {
-      title: "Come funziona",
-      subtitle: "Tre passi. Zero complessità.",
+      title: "Come RankPill trasforma il tuo SEO",
+      subtitle: "In 3 passaggi, il tuo sito analizza, pubblica e cresce — senza alcuno sforzo da parte tua.",
       steps: [
-        { number: "01", title: "Connetti il tuo sito", description: "WordPress o Shopify — la connessione richiede meno di 2 minuti." },
-        { number: "02", title: "Il nostro sistema analizza il tuo settore", description: "RankPill identifica le parole chiave ad alto potenziale per la tua attività." },
-        { number: "03", title: "I contenuti si pubblicano da soli", description: "Ogni giorno, un nuovo articolo ottimizzato appare sul tuo sito." },
+        {
+          number: "01",
+          title: "Connetti il tuo sito in 2 minuti",
+          description: "Collega WordPress, Shopify o il tuo CMS e Google Search Console. RankPill accede ai tuoi dati reali: query, posizioni, CTR e pagine indicizzate.",
+          bullets: [] as string[],
+        },
+        {
+          number: "02",
+          title: "L'analisi identifica le tue opportunità SEO",
+          description: "Il nostro motore legge i tuoi dati GSC e prioritizza le azioni ad alto impatto:",
+          bullets: [
+            "Le parole chiave in posizione 5–20 pronte per la top 3",
+            "I contenuti mancanti che i tuoi clienti cercano già",
+            "Le pagine sottoperformanti da rafforzare per prime",
+          ],
+        },
+        {
+          number: "03",
+          title: "I contenuti si pubblicano da soli, il traffico cresce",
+          description: "Ogni giorno, un articolo SEO mirato viene generato e pubblicato sul tuo sito — calibrato per posizionarsi su una query specifica, non per riempire spazio.",
+          bullets: [] as string[],
+        },
       ],
     },
     features: {
