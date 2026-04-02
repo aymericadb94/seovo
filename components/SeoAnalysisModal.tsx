@@ -39,7 +39,6 @@ type Props = {
 
 const STEPS = [
   { id: "intro", label: "Bienvenue" },
-  { id: "strengths", label: "Points forts" },
   { id: "analyzing", label: "Analyse" },
   { id: "results", label: "Stratégie" },
 ];
@@ -185,13 +184,9 @@ function BreakdownBar({ label, score }: { label: string; score: number }) {
 }
 
 export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", prefilledDifferentiators = "" }: Props) {
-  const hasPrefilled = prefilledStrengths.trim().length > 0;
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
-  const [answers, setAnswers] = useState({
-    strengths: prefilledStrengths,
-    differentiators: prefilledDifferentiators,
-  });
+  const answers = { strengths: prefilledStrengths, differentiators: prefilledDifferentiators };
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -203,7 +198,7 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
   }, []);
 
   async function runAnalysis() {
-    setStep(2);
+    setStep(1);
     setAnalyzing(true);
     setError(null);
     setScanLines([]);
@@ -245,16 +240,16 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
 
       if (json.error) {
         setError(json.error);
-        setStep(1);
+        setStep(0);
       } else {
         await new Promise(r => setTimeout(r, 700));
         setResult(json.analysis);
-        setStep(3);
+        setStep(2);
       }
     } catch {
       clearInterval(interval);
       setError("Erreur de connexion");
-      setStep(4);
+      setStep(0);
     }
     setAnalyzing(false);
   }
@@ -263,11 +258,6 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
     setVisible(false);
     setTimeout(onComplete, 400);
   }
-
-  const canNext = () => {
-    if (step === 1) return answers.strengths.trim().length > 10;
-    return true;
-  };
 
   return (
     <div
@@ -293,37 +283,6 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
         {/* Header gradient bar */}
         <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-red-500 to-orange-400" />
 
-        {/* Progress bar */}
-        {step < 2 && (
-          <div className="px-8 pt-6 pb-0">
-            <div className="flex items-center gap-1.5 mb-6">
-              {STEPS.slice(0, 2).map((s, i) => (
-                <div
-                  key={s.id}
-                  className="h-1 flex-1 rounded-full overflow-hidden relative transition-all duration-500"
-                  style={{ background: "rgba(255,255,255,0.06)" }}
-                >
-                  {i <= step && (
-                    <div
-                      className="absolute inset-0 rounded-full"
-                      style={{
-                        background: "linear-gradient(90deg, #f97316, #ef4444)",
-                        animation: i === step ? "none" : undefined,
-                      }}
-                    />
-                  )}
-                  {/* Beam on active segment */}
-                  {i === step && (
-                    <>
-                      <div className="absolute inset-0 rounded-full" style={{ background: "linear-gradient(90deg, #f97316, #ef4444)" }} />
-                      <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)", animation: "lineBeam 1.8s ease-in-out infinite" }} />
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="px-8 pb-8 pt-2">
 
@@ -415,20 +374,10 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
                 ))}
               </div>
 
-              {/* Badge données importées */}
-              {hasPrefilled && (
-                <div className="flex items-center justify-center gap-2 mb-4 animate-[fadeIn_0.4s_ease_0.45s_both]">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold" style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", color: "#4ade80" }}>
-                    <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    Points forts importés depuis l&apos;onboarding
-                  </div>
-                </div>
-              )}
-
               {/* CTA */}
               <div className="animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_0.5s_both]">
                 <button
-                  onClick={() => hasPrefilled ? runAnalysis() : setStep(1)}
+                  onClick={runAnalysis}
                   className="relative w-full py-4 text-white font-black rounded-xl text-sm uppercase tracking-widest overflow-hidden group"
                   style={{
                     background: "linear-gradient(135deg, #f97316 0%, #ef4444 100%)",
@@ -450,60 +399,8 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
             </div>
           )}
 
-          {/* ── Step 1: Points forts ──────────────────────────── */}
+          {/* ── Step 1: Analyzing ─────────────────────────────── */}
           {step === 1 && (
-            <div>
-              <p className="text-orange-400 text-xs font-bold uppercase tracking-widest mb-2">Étape 1 / 1</p>
-              <h2 className="text-xl font-black text-white mb-1">Vos points forts</h2>
-              <p className="text-gray-500 text-sm mb-5">Qu&apos;est-ce qui vous rend unique ? Pourquoi choisir votre marque ?</p>
-              {error && (
-                <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-                  <p className="text-red-400 text-sm">⚠ {error}</p>
-                </div>
-              )}
-              <div className="space-y-3 mb-5">
-                <div>
-                  <label className="text-xs text-gray-500 uppercase tracking-wide font-bold mb-1.5 block">
-                    Points forts *
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Ex: Livraison gratuite en 24h, produits fabriqués en France, garantie 5 ans, service client 7j/7..."
-                    value={answers.strengths}
-                    onChange={e => setAnswers(a => ({ ...a, strengths: e.target.value }))}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl p-3.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500/50 resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 uppercase tracking-wide font-bold mb-1.5 block">
-                    Différenciateurs (optionnel)
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="Ex: Technologie propriétaire, expertise de 15 ans, certifications, labels..."
-                    value={answers.differentiators}
-                    onChange={e => setAnswers(a => ({ ...a, differentiators: e.target.value }))}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl p-3.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500/50 resize-none"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => setStep(0)} className="px-4 py-3 text-gray-500 hover:text-white text-sm border border-white/10 rounded-xl transition-colors">
-                  ← Retour
-                </button>
-                <button
-                  onClick={runAnalysis}
-                  disabled={!canNext() || analyzing}
-                  className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-                >
-                  Lancer l&apos;analyse ✦
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Step 2: Analyzing ─────────────────────────────── */}
-          {step === 2 && (
             <div className="py-2">
               <div className="text-center mb-6">
                 {/* Animated logo */}
@@ -594,7 +491,7 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
           )}
 
           {/* ── Step 6: Results ───────────────────────────────── */}
-          {step === 3 && result && (
+          {step === 2 && result && (
             <div>
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/20 flex items-center justify-center text-sm">
