@@ -404,6 +404,41 @@ export default function Dashboard() {
   const [roadmapRecord, setRoadmapRecord] = useState<RoadmapRecord | null>(null);
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
 
+  // SEO Projections
+  type ProjectionItem = {
+    keyword: string; action: string; current_position: number | null;
+    target_position: number; current_clicks: number; potential_clicks: number;
+    estimated_gain: number; confidence_score: number; timeframe: string;
+    rationale: string; difficulty: "easy" | "medium" | "hard";
+  };
+  type ProjectionsResult = {
+    estimated_results: ProjectionItem[];
+    total_estimated_gain: { low: number; high: number };
+    total_current_clicks: number;
+    has_gsc_data: boolean;
+    computed_at: string;
+  };
+  const [projections, setProjections] = useState<ProjectionsResult | null>(null);
+  const [projectionsLoading, setProjectionsLoading] = useState(false);
+
+  async function loadProjections() {
+    try {
+      const res = await fetch("/api/seo-projections");
+      const json = await res.json();
+      if (!json.error && json.projections) setProjections(json.projections);
+    } catch { /* ignore */ }
+  }
+
+  async function generateProjections() {
+    setProjectionsLoading(true);
+    try {
+      const res = await fetch("/api/seo-projections", { method: "POST" });
+      const json = await res.json();
+      if (!json.error) setProjections(json.projections);
+    } catch { /* ignore */ }
+    setProjectionsLoading(false);
+  }
+
   async function loadRoadmap() {
     try {
       const res = await fetch("/api/roadmap");
@@ -435,6 +470,7 @@ export default function Dashboard() {
     loadData();
     loadAudit();
     loadRoadmap();
+    loadProjections();
     window.addEventListener("focus", loadData);
     return () => window.removeEventListener("focus", loadData);
   }, []);
@@ -1110,6 +1146,153 @@ export default function Dashboard() {
                     </button>
                   </div>
                 </div>
+
+                {/* ── Projections SEO ──────────────────────────────────── */}
+                {data.site?.seo_analysis_done && (
+                  <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 animate-fade-in-up delay-200 overflow-hidden">
+                    {/* Halos */}
+                    <div className="absolute top-0 right-0 w-80 h-40 pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(34,197,94,0.06), transparent 65%)" }} />
+                    <div className="absolute bottom-0 left-0 w-64 h-32 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom left, rgba(249,115,22,0.05), transparent 65%)" }} />
+
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-5 relative">
+                      <div>
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Potentiel de croissance SEO</p>
+                        {projections ? (
+                          <div className="flex items-baseline gap-2">
+                            <p className="text-white font-black text-2xl">
+                              +{projections.total_estimated_gain.low.toLocaleString("fr-FR")}
+                            </p>
+                            <p className="text-gray-500 text-sm font-bold">
+                              à +{projections.total_estimated_gain.high.toLocaleString("fr-FR")} clics/mois
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-white font-black text-lg">Estimez votre potentiel organique</p>
+                        )}
+                        {projections && (
+                          <p className="text-gray-600 text-xs mt-1">
+                            {projections.has_gsc_data ? "Basé sur vos données GSC réelles" : "Estimation sans GSC — connectez Google Search Console pour plus de précision"}
+                            {" · "}Calculé le {new Date(projections.computed_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {projections && (
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(34,197,94,0.1)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.2)" }}>
+                            {projections.estimated_results.length} opportunités
+                          </span>
+                        )}
+                        <button
+                          onClick={generateProjections}
+                          disabled={projectionsLoading}
+                          className="relative px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide overflow-hidden transition-all disabled:opacity-50"
+                          style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.15), rgba(16,185,129,0.1))", border: "1px solid rgba(34,197,94,0.25)", color: "#4ade80" }}
+                        >
+                          {projectionsLoading ? (
+                            <span className="flex items-center gap-1.5">
+                              <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeDashoffset="12"/></svg>
+                              Calcul...
+                            </span>
+                          ) : projections ? "Recalculer" : "Calculer"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {projections ? (
+                      <>
+                        {/* Barre de gain global */}
+                        <div className="mb-5 p-4 rounded-xl relative overflow-hidden" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)" }}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-gray-400 text-xs font-bold">Clics actuels</span>
+                            <span className="text-white text-xs font-black">{projections.total_current_clicks.toLocaleString("fr-FR")}/mois</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+                              <div className="h-full rounded-full relative overflow-hidden" style={{
+                                width: `${Math.min(100, (projections.total_current_clicks / Math.max(projections.total_current_clicks + projections.total_estimated_gain.high, 1)) * 100)}%`,
+                                background: "linear-gradient(90deg, #f97316, #fb923c)",
+                              }}>
+                                <div className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)" }} />
+                              </div>
+                            </div>
+                            <span className="text-orange-400 text-xs font-bold whitespace-nowrap">actuel</span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-2">
+                            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+                              <div className="h-full rounded-full relative overflow-hidden" style={{
+                                width: `${Math.min(100, ((projections.total_current_clicks + projections.total_estimated_gain.low) / Math.max(projections.total_current_clicks + projections.total_estimated_gain.high, 1)) * 100)}%`,
+                                background: "linear-gradient(90deg, #22c55e, #4ade80)",
+                              }}>
+                                <div className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite_0.5s]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)" }} />
+                              </div>
+                            </div>
+                            <span className="text-green-400 text-xs font-bold whitespace-nowrap">potentiel</span>
+                          </div>
+                        </div>
+
+                        {/* Top opportunités */}
+                        <div className="space-y-2">
+                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-3">Top opportunités — triées par gain</p>
+                          {projections.estimated_results.slice(0, 6).map((item, i) => {
+                            const diffColor = item.difficulty === "easy" ? "#4ade80" : item.difficulty === "medium" ? "#fb923c" : "#f87171";
+                            const diffBg = item.difficulty === "easy" ? "rgba(34,197,94,0.1)" : item.difficulty === "medium" ? "rgba(249,115,22,0.1)" : "rgba(239,68,68,0.1)";
+                            const actionLabel = item.action === "optimization" ? "Optimisation" : item.action === "creation" ? "Création" : "Enrichissement";
+                            const actionColor = item.action === "optimization" ? "#60a5fa" : item.action === "creation" ? "#a78bfa" : "#fb923c";
+                            return (
+                              <div key={i} className="group flex items-start gap-3 p-3 rounded-xl transition-all duration-200 hover:bg-white/[0.03]"
+                                style={{ borderLeft: `2px solid ${diffColor}22` }}>
+                                {/* Rang */}
+                                <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black mt-0.5"
+                                  style={{ background: i === 0 ? "linear-gradient(135deg, #22c55e, #4ade80)" : "rgba(255,255,255,0.05)", color: i === 0 ? "white" : "#6b7280" }}>
+                                  {i + 1}
+                                </span>
+                                {/* Contenu */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                    <span className="text-white text-xs font-bold truncate">{item.keyword}</span>
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: diffBg, color: diffColor }}>
+                                      {item.difficulty === "easy" ? "Facile" : item.difficulty === "medium" ? "Moyen" : "Difficile"}
+                                    </span>
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "rgba(255,255,255,0.04)", color: actionColor, border: `1px solid ${actionColor}30` }}>
+                                      {actionLabel}
+                                    </span>
+                                  </div>
+                                  <p className="text-gray-600 text-[10px] leading-relaxed line-clamp-1 group-hover:line-clamp-none transition-all">{item.rationale}</p>
+                                  <p className="text-gray-700 text-[10px] mt-0.5">{item.timeframe}</p>
+                                </div>
+                                {/* Gain */}
+                                <div className="flex-shrink-0 text-right">
+                                  <p className="text-green-400 font-black text-sm">+{item.estimated_gain.toLocaleString("fr-FR")}</p>
+                                  <p className="text-gray-700 text-[10px]">clics/mois</p>
+                                  <p className="text-gray-700 text-[10px]">{Math.round(item.confidence_score * 100)}% fiabilité</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {projections.estimated_results.length > 6 && (
+                          <p className="text-gray-600 text-xs text-center mt-3">
+                            +{projections.estimated_results.length - 6} autres opportunités disponibles
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)" }}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                          </svg>
+                        </div>
+                        <p className="text-gray-400 text-sm font-bold">Calculez votre potentiel SEO</p>
+                        <p className="text-gray-600 text-xs max-w-xs leading-relaxed">
+                          Le moteur analyse vos {data.keywordStats.length + data.uncoveredKeywords.length} mots-clés et estime les gains de clics atteignables pour chacun.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* ── Row 2 : Graphique publications ───────────────────── */}
                 <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up delay-200 overflow-hidden">
