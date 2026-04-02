@@ -487,16 +487,18 @@ export default function Dashboard() {
     return () => window.removeEventListener("focus", loadData);
   }, []);
 
-  // Popup audit : uniquement à partir de la 2ème connexion
+  // Popup audit : uniquement si analyse faite + à partir de la 2ème connexion
   useEffect(() => {
     if (!auditAvailable) return;
+    if (!data?.site?.seo_analysis_done) return; // pas d'audit avant l'analyse
+    if (showSeoModal) return; // ne pas afficher pendant l'analyse en cours
     const hasVisited = localStorage.getItem("rankpill_has_visited");
     if (!hasVisited) {
       localStorage.setItem("rankpill_has_visited", "1");
       return; // 1ère connexion → pas de popup
     }
     setShowAuditReport(true);
-  }, [auditAvailable]);
+  }, [auditAvailable, data, showSeoModal]);
 
   // Reprendre le tutorial au bon popup si l'utilisateur a rechargé la page en cours de flow
   useEffect(() => {
