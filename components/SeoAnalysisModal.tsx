@@ -283,6 +283,13 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
         {/* Header gradient bar */}
         <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-red-500 to-orange-400" />
 
+        {/* Erreur globale — visible sur step 0 après échec */}
+        {error && step === 0 && (
+          <div className="mx-8 mt-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+            <p className="text-red-400 text-sm font-bold">⚠ Erreur : {error}</p>
+            <p className="text-red-400/70 text-xs mt-0.5">Veuillez réessayer ou vérifier votre connexion.</p>
+          </div>
+        )}
 
         <div className="px-8 pb-8 pt-2">
 

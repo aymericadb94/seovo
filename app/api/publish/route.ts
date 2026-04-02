@@ -145,12 +145,16 @@ export async function POST(request: Request) {
       }
       let featuredMediaId: number | null = null;
       if (cover_image_query) {
-        const pexelsImg = await fetchPexelsImage(cover_image_query);
-        if (pexelsImg) {
-          featuredMediaId = await uploadImageToWordPress(
-            site.site_url, site.wp_username, site.wp_app_password,
-            pexelsImg.url, cover_alt_text || title
-          );
+        try {
+          const pexelsImg = await fetchPexelsImage(cover_image_query);
+          if (pexelsImg) {
+            featuredMediaId = await uploadImageToWordPress(
+              site.site_url, site.wp_username, site.wp_app_password,
+              pexelsImg.url, cover_alt_text || title
+            );
+          }
+        } catch (imgErr) {
+          console.error("[publish] image fetch/upload failed (non-fatal):", imgErr);
         }
       }
       url = await publishToWordPress(site.site_url, site.wp_username, site.wp_app_password, title, content, meta_description, featuredMediaId);
@@ -160,8 +164,12 @@ export async function POST(request: Request) {
       }
       let shopifyImageUrl: string | null = null;
       if (cover_image_query) {
-        const pexelsImg = await fetchPexelsImage(cover_image_query);
-        if (pexelsImg) shopifyImageUrl = pexelsImg.url;
+        try {
+          const pexelsImg = await fetchPexelsImage(cover_image_query);
+          if (pexelsImg) shopifyImageUrl = pexelsImg.url;
+        } catch (imgErr) {
+          console.error("[publish] shopify image fetch failed (non-fatal):", imgErr);
+        }
       }
       url = await publishToShopify(site.site_url, site.shopify_api_key, title, content, meta_description, shopifyImageUrl, cover_alt_text);
     } else if (site.cms === "wix") {

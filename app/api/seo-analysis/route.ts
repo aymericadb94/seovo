@@ -151,13 +151,26 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
       return Response.json({ error: "Réponse Claude invalide" }, { status: 500 });
     }
 
-    const analysis = JSON.parse(raw.slice(start, end + 1));
+    let analysis: { priority_keywords: { keyword: string }[]; quick_wins?: string[]; seo_score?: { overall?: number } } & Record<string, unknown>;
+    try {
+      analysis = JSON.parse(raw.slice(start, end + 1));
+    } catch {
+      return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
+    }
+
+    if (!Array.isArray(analysis.priority_keywords)) {
+      return Response.json({ error: "Structure d'analyse invalide (priority_keywords manquant)" }, { status: 500 });
+    }
 
     const allNewKeywords: string[] = [
-      ...(analysis.priority_keywords ?? []).map((k: { keyword: string }) => k.keyword),
-      ...(analysis.quick_wins ?? []),
+      ...(analysis.priority_keywords as { keyword: string }[]).map((k) => k.keyword).filter(Boolean),
+      ...((analysis.quick_wins as string[] | undefined) ?? []).filter(Boolean),
     ];
     const uniqueKeywords = [...new Set(allNewKeywords)].slice(0, 25);
+
+    if (uniqueKeywords.length === 0) {
+      return Response.json({ error: "Aucun mot-clé généré par l'analyse" }, { status: 500 });
+    }
 
     const { error: updateError } = await supabase
       .from("sites")

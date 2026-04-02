@@ -198,7 +198,7 @@ async function fetchGSCQueries(token: string, gscSiteUrl: string): Promise<GSCQu
       query: r.keys[0],
       clicks: r.clicks,
       impressions: r.impressions,
-      ctr: r.ctr * 100, // normalise en %
+      ctr: r.ctr, // 0-1 decimal, cohérent avec getCTR()
       position: Math.round(r.position * 10) / 10,
     }));
   } catch {
@@ -249,11 +249,12 @@ function computeProjections(
     let impressionsForCalc = currentImpressions;
     if (!hasGSCData || impressionsForCalc < 50) {
       // Pour création ou données faibles : estimer volume via médiane des données GSC disponibles
-      const medianImpressions = gscQueries.length > 0
-        ? gscQueries
-            .map((q) => q.impressions)
-            .sort((a, b) => a - b)[Math.floor(gscQueries.length / 2)]
-        : 200; // fallback ultra-conservateur
+      let medianImpressions = 200; // fallback ultra-conservateur
+      if (gscQueries.length > 0) {
+        const sorted = gscQueries.map((q) => q.impressions).sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        medianImpressions = sorted[mid] ?? sorted[sorted.length - 1] ?? 200;
+      }
       impressionsForCalc = Math.round(medianImpressions * 0.4); // 40% du médian = conservateur
     }
 

@@ -403,6 +403,7 @@ export default function Dashboard() {
   type RoadmapRecord = { id: string; created_at: string; data: RoadmapData };
   const [roadmapRecord, setRoadmapRecord] = useState<RoadmapRecord | null>(null);
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
+  const [roadmapLoading, setRoadmapLoading] = useState(false);
 
   // SEO Projections
   type ProjectionItem = {
@@ -448,10 +449,16 @@ export default function Dashboard() {
   }
 
   async function generateRoadmap() {
-    const res = await fetch("/api/roadmap", { method: "POST" });
-    const json = await res.json();
-    if (json.error) throw new Error(json.error);
-    setRoadmapRecord(json.roadmap);
+    setRoadmapLoading(true);
+    try {
+      const res = await fetch("/api/roadmap", { method: "POST" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setRoadmapRecord(json.roadmap);
+    } finally {
+      setRoadmapLoading(false);
+    }
   }
 
   async function loadData() {
