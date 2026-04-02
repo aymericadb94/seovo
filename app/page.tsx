@@ -84,6 +84,230 @@ const plans = [
   },
 ];
 
+// ─── ProofSection ─────────────────────────────────────────────────────────────
+
+function ProofSection() {
+  const { t } = useLanguage();
+  const { ref, inView } = useInView(0.1);
+  const [scanPhase, setScanPhase] = useState<0 | 1 | 2>(0);
+
+  useEffect(() => {
+    if (!inView || scanPhase > 0) return;
+    setScanPhase(1);
+    const timer = setTimeout(() => setScanPhase(2), 2400);
+    return () => clearTimeout(timer);
+  }, [inView, scanPhase]);
+
+  const active = scanPhase === 2;
+  const c1 = useCounter(14, active, 1800);
+  const c2 = useCounter(6, active, 1500);
+  const c3 = useCounter(3, active, 1200);
+
+  return (
+    <section id="demo" className="py-28 px-6 relative overflow-hidden">
+      {/* Background halos */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px]"
+          style={{ background: "radial-gradient(ellipse at top center, rgba(249,115,22,0.06), transparent 65%)" }} />
+        <div className="absolute bottom-0 right-0 w-[400px] h-[400px]"
+          style={{ background: "radial-gradient(ellipse at bottom right, rgba(239,68,68,0.04), transparent 65%)" }} />
+      </div>
+
+      <div className="max-w-4xl mx-auto" ref={ref}>
+
+        {/* Header */}
+        <div className={`text-center mb-14 transition-all duration-700 ${inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-6 text-xs font-bold tracking-wider uppercase"
+            style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)", color: "#f97316" }}>
+            <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
+              <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M6 3.5v3l2 1.2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            {t.proof.badge}
+          </div>
+          <h2 className="text-4xl md:text-5xl font-black mb-4 tracking-tight">{t.proof.title}</h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto leading-relaxed">{t.proof.subtitle}</p>
+        </div>
+
+        {/* Main analysis panel */}
+        <div className={`relative rounded-2xl overflow-hidden transition-all duration-700 ${inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
+          style={{ transitionDelay: "200ms", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 0 80px rgba(249,115,22,0.06), 0 24px 60px rgba(0,0,0,0.4)" }}>
+
+          {/* Glow interne orange */}
+          <div className="absolute inset-0 pointer-events-none rounded-2xl"
+            style={{ background: "radial-gradient(ellipse at top center, rgba(249,115,22,0.05) 0%, transparent 55%)" }} />
+
+          {/* Window chrome */}
+          <div className="relative flex items-center justify-between px-5 py-3.5"
+            style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="flex items-center gap-3">
+              {/* Traffic light dots */}
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full" style={{ background: "rgba(239,68,68,0.55)" }} />
+                <div className="w-3 h-3 rounded-full" style={{ background: "rgba(234,179,8,0.55)" }} />
+                <div className="w-3 h-3 rounded-full transition-colors duration-700" style={{ background: active ? "rgba(34,197,94,0.8)" : "rgba(34,197,94,0.25)" }} />
+              </div>
+              <span className="text-gray-500 text-xs font-mono">rankpill.fr — analyse SEO</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full transition-colors duration-500 ${active ? "bg-green-400" : "bg-orange-400 animate-pulse"}`} />
+              <span className={`text-xs font-bold transition-colors duration-500 ${active ? "text-green-400" : "text-orange-400"}`}>
+                {active ? t.proof.scanDone : t.proof.scanRunning}
+              </span>
+            </div>
+          </div>
+
+          {/* Scan progress bar */}
+          <div className="h-[2px] overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <div className="h-full rounded-full transition-all ease-out"
+              style={{
+                width: scanPhase === 0 ? "0%" : scanPhase === 1 ? "82%" : "100%",
+                transitionDuration: scanPhase === 1 ? "2100ms" : "350ms",
+                background: "linear-gradient(90deg, #f97316, #ef4444, #fb923c)",
+              }} />
+          </div>
+
+          <div className="p-6 md:p-8">
+
+            {/* Fake URL row */}
+            <div className="flex items-center gap-3 mb-8">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-gray-500 flex-shrink-0">
+                  <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M8 1.5C8 1.5 5.5 4.5 5.5 8s2.5 6.5 2.5 6.5M8 1.5C8 1.5 10.5 4.5 10.5 8S8 14.5 8 14.5M1.5 8h13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                <span className="text-gray-400 text-xs font-mono">votresite.com</span>
+              </div>
+              <div className={`flex items-center gap-1.5 transition-all duration-500 ${active ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"}`}>
+                <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)" }}>
+                  <svg viewBox="0 0 8 8" fill="none" className="w-2.5 h-2.5">
+                    <path d="M1.5 4l2 2L6.5 2" stroke="#4ade80" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <span className="text-green-400 text-xs font-bold">{t.proof.scanDone}</span>
+              </div>
+              {/* Fake scanning dots */}
+              {!active && scanPhase === 1 && (
+                <div className="flex items-center gap-1">
+                  {[0, 1, 2].map(i => (
+                    <div key={i} className="w-1 h-1 rounded-full bg-orange-400 animate-bounce"
+                      style={{ animationDelay: `${i * 150}ms`, animationDuration: "0.8s" }} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Metrics grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+              {/* Metric 1 */}
+              <div className={`relative rounded-xl p-4 transition-all duration-700 overflow-hidden ${active ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+                style={{ transitionDelay: "0ms", background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.15)" }}>
+                <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none"
+                  style={{ background: "radial-gradient(ellipse at top right, rgba(249,115,22,0.12), transparent 70%)" }} />
+                <p className="text-3xl font-black text-white mb-0.5 relative">{active ? c1 : "—"}</p>
+                <p className="text-orange-400 text-xs font-bold leading-tight relative">{t.proof.metrics[0].label}</p>
+                <p className="text-gray-600 text-[10px] mt-0.5 relative">{t.proof.metrics[0].sub}</p>
+              </div>
+
+              {/* Metric 2 */}
+              <div className={`relative rounded-xl p-4 transition-all duration-700 overflow-hidden ${active ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+                style={{ transitionDelay: "100ms", background: "rgba(249,115,22,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <p className="text-3xl font-black text-white mb-0.5">{active ? c2 : "—"}</p>
+                <p className="text-gray-300 text-xs font-bold leading-tight">{t.proof.metrics[1].label}</p>
+                <p className="text-gray-600 text-[10px] mt-0.5">{t.proof.metrics[1].sub}</p>
+              </div>
+
+              {/* Metric 3 */}
+              <div className={`relative rounded-xl p-4 transition-all duration-700 overflow-hidden ${active ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+                style={{ transitionDelay: "200ms", background: "rgba(249,115,22,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <p className="text-3xl font-black text-white mb-0.5">{active ? c3 : "—"}</p>
+                <p className="text-gray-300 text-xs font-bold leading-tight">{t.proof.metrics[2].label}</p>
+                <p className="text-gray-600 text-[10px] mt-0.5">{t.proof.metrics[2].sub}</p>
+              </div>
+
+              {/* Metric 4 — trafic estimé (range) */}
+              <div className={`relative rounded-xl p-4 transition-all duration-700 overflow-hidden ${active ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+                style={{ transitionDelay: "300ms", background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)" }}>
+                <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none"
+                  style={{ background: "radial-gradient(ellipse at top right, rgba(34,197,94,0.12), transparent 70%)" }} />
+                <p className="text-xl font-black text-green-400 mb-0.5 leading-tight relative">{active ? t.proof.metrics[3].value : "—"}</p>
+                <p className="text-green-400/80 text-xs font-bold leading-tight relative">{t.proof.metrics[3].label}</p>
+                <p className="text-gray-600 text-[10px] mt-0.5 relative">{t.proof.metrics[3].sub}</p>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="mb-5" style={{ height: "1px", background: "rgba(255,255,255,0.06)" }} />
+
+            {/* Plan header */}
+            <div className={`flex items-center gap-2 mb-4 transition-all duration-500 ${active ? "opacity-100" : "opacity-0"}`}
+              style={{ transitionDelay: "400ms" }}>
+              <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-orange-400 flex-shrink-0">
+                <path d="M13 3L6 10.5 3 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <p className="text-xs font-black uppercase tracking-wider" style={{ color: "#f97316" }}>{t.proof.planTitle}</p>
+            </div>
+
+            {/* Actions grid */}
+            <div className="grid md:grid-cols-2 gap-2.5 mb-6">
+              {t.proof.actions.map((action, i) => (
+                <div key={i}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl transition-all duration-500 ${active ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-3"}`}
+                  style={{ transitionDelay: `${450 + i * 100}ms`, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  {/* Orange count badge */}
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 font-black text-sm"
+                    style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.18), rgba(239,68,68,0.1))", color: "#f97316", border: "1px solid rgba(249,115,22,0.25)" }}>
+                    {action.n}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-white font-bold text-sm leading-tight">{action.label}</p>
+                    <p className="text-gray-500 text-xs leading-snug mt-0.5 truncate">{action.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Interpretation */}
+            <div className={`rounded-xl p-4 transition-all duration-500 ${active ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}`}
+              style={{ transitionDelay: "900ms", background: "rgba(249,115,22,0.05)", border: "1px solid rgba(249,115,22,0.15)" }}>
+              <div className="flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{ background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.3)" }}>
+                  <svg viewBox="0 0 10 10" fill="none" className="w-3 h-3">
+                    <path d="M5 1v4M5 7.5v1" stroke="#f97316" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <p className="text-gray-300 text-sm leading-relaxed">{t.proof.interpretation}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className={`text-center mt-10 transition-all duration-700 ${inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+          style={{ transitionDelay: "400ms" }}>
+          <a href="/signup"
+            className="group relative inline-flex items-center gap-2.5 overflow-hidden bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-9 py-4 rounded-xl text-sm uppercase tracking-wide transition-all shadow-2xl shadow-orange-500/25 hover:shadow-orange-500/45 hover:scale-[1.03]">
+            <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]"
+              style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)" }} />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 relative">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <span className="relative">{t.proof.cta}</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              className="w-4 h-4 relative group-hover:translate-x-1 transition-transform">
+              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </a>
+          <p className="text-gray-600 text-xs mt-3">{t.proof.ctaNote}</p>
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
 
 function FaqSection() {
@@ -476,6 +700,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Preuve produit / simulation ──────────────────────────────────── */}
+      <ProofSection />
 
       {/* ── Fonctionnalités ──────────────────────────────────────────────── */}
       <section id="fonctionnalites" className="py-28 px-6 bg-white/[0.02] relative overflow-hidden">
