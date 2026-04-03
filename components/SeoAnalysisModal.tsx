@@ -187,19 +187,21 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
   const answers = { strengths: prefilledStrengths, differentiators: prefilledDifferentiators };
-  const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scanLines, setScanLines] = useState<string[]>([]);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 100);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, []);
 
   async function runAnalysis() {
     setStep(1);
-    setAnalyzing(true);
     setError(null);
     setScanLines([]);
 
@@ -221,6 +223,7 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
         i++;
       }
     }, INTERVAL_MS);
+    intervalRef.current = interval;
 
     try {
       const res = await fetch("/api/seo-analysis", {
@@ -230,6 +233,7 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
       });
       const json = await res.json();
       clearInterval(interval);
+      intervalRef.current = null;
 
       // Afficher rapidement les lignes restantes avant de transitionner
       const remaining = lines.slice(i);
@@ -251,7 +255,6 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
       setError("Erreur de connexion");
       setStep(0);
     }
-    setAnalyzing(false);
   }
 
   function handleClose() {

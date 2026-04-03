@@ -11,9 +11,10 @@ export async function GET() {
       .select("*")
       .eq("user_id", user.id)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error) return Response.json({ error: error.message }, { status: 500 });
+    if (!data) return Response.json({ error: "Aucun site configuré" }, { status: 404 });
     return Response.json({
       ...data,
       gsc_connected: !!data.google_access_token,

@@ -174,7 +174,12 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
       return Response.json({ error: "Réponse invalide" }, { status: 500 });
     }
 
-    const auditData = JSON.parse(raw.slice(start, end + 1));
+    let auditData: Record<string, unknown>;
+    try {
+      auditData = JSON.parse(raw.slice(start, end + 1));
+    } catch {
+      return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
+    }
 
     // Enrich with real stats
     const fullData = {
