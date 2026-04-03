@@ -12,6 +12,20 @@ export async function POST(request: Request) {
       return Response.json({ error: "Non authentifié" }, { status: 401 });
     }
 
+    // Validation des champs obligatoires côté serveur
+    if (!body.business_name?.trim()) {
+      return Response.json({ error: "Le nom de l'entreprise est requis." }, { status: 400 });
+    }
+    if (!body.industry?.trim()) {
+      return Response.json({ error: "Le secteur d'activité est requis." }, { status: 400 });
+    }
+    if (!body.cms) {
+      return Response.json({ error: "Le CMS est requis." }, { status: 400 });
+    }
+    if (!body.site_url?.trim()) {
+      return Response.json({ error: "L'URL du site est requise." }, { status: 400 });
+    }
+
     // Vérifier la connexion avant de sauvegarder
     if (body.cms === "wordpress") {
       try {
