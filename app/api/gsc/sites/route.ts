@@ -7,7 +7,13 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
 
-    const token = await getValidAccessToken(user.id);
+    // Essaie d'abord le token depuis la table sites (utilisateurs existants)
+    // Sinon, utilise le token en attente stocké dans user_metadata (flux onboarding)
+    let token = await getValidAccessToken(user.id);
+    if (!token) {
+      const meta = user.user_metadata as { gsc_pending_access_token?: string } | null;
+      token = meta?.gsc_pending_access_token ?? null;
+    }
     if (!token) return Response.json({ error: "Google non connecté" }, { status: 403 });
 
     const res = await fetch("https://www.googleapis.com/webmasters/v3/sites", {

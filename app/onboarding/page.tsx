@@ -315,6 +315,8 @@ export default function OnboardingPage() {
   const [error, setError] = useState("");
   const [animKey, setAnimKey] = useState(0);
   const [gscConnected, setGscConnected] = useState(false);
+  const [gscProperties, setGscProperties] = useState<{ url: string }[]>([]);
+  const [loadingGscSites, setLoadingGscSites] = useState(false);
   const FORM_STORAGE_KEY = "rankpill_onboarding_form";
   const emptyForm: FormData = {
     business_name: "", industry: "", cms: "", site_url: "",
@@ -352,6 +354,14 @@ export default function OnboardingPage() {
       }
       if (gsc === "connected") {
         setGscConnected(true);
+        setLoadingGscSites(true);
+        fetch("/api/gsc/sites")
+          .then(r => r.json())
+          .then((d: { sites?: { url: string }[] }) => {
+            if (d.sites) setGscProperties(d.sites);
+          })
+          .catch(() => {})
+          .finally(() => setLoadingGscSites(false));
       } else {
         setError("La connexion Google Search Console a échoué. Vous pouvez réessayer ou passer cette étape.");
       }
@@ -1138,19 +1148,63 @@ export default function OnboardingPage() {
                       </div>
                     </div>
 
-                    {/* GSC site URL input */}
+                    {/* GSC properties */}
                     <div>
                       <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
-                        Adresse exacte de votre propriété GSC <span className="text-red-400">*</span>
+                        Sélectionnez votre propriété GSC <span className="text-red-400">*</span>
                       </label>
-                      <input
-                        type="text"
-                        value={form.gsc_site_url}
-                        onChange={(e) => update("gsc_site_url", e.target.value)}
-                        placeholder="sc-domain:votresite.com"
-                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
-                      />
-                      <p className="text-gray-600 text-xs mt-1.5">Copiez l'adresse telle quelle depuis le menu déroulant de Google Search Console — avec le préfixe <code className="text-orange-400/70">sc-domain:</code> ou l'URL complète avec <code className="text-orange-400/70">https://</code></p>
+
+                      {loadingGscSites ? (
+                        <div className="flex items-center gap-2 py-3 text-gray-500 text-sm">
+                          <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-orange-400 animate-spin" />
+                          Chargement de vos propriétés…
+                        </div>
+                      ) : gscProperties.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {gscProperties.map((prop) => (
+                            <button
+                              key={prop.url}
+                              type="button"
+                              onClick={() => update("gsc_site_url", prop.url)}
+                              className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
+                                form.gsc_site_url === prop.url
+                                  ? "border-orange-500/50 bg-orange-500/10 text-white"
+                                  : "border-white/[0.08] bg-white/[0.03] text-gray-300 hover:border-orange-500/30 hover:bg-orange-500/5"
+                              }`}
+                            >
+                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                                form.gsc_site_url === prop.url ? "border-orange-500 bg-orange-500" : "border-gray-600"
+                              }`}>
+                                {form.gsc_site_url === prop.url && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                )}
+                              </div>
+                              <span className="text-sm font-medium truncate">{prop.url}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          value={form.gsc_site_url}
+                          onChange={(e) => update("gsc_site_url", e.target.value)}
+                          placeholder="sc-domain:votresite.com"
+                          className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-all"
+                        />
+                      )}
+
+                      {gscProperties.length > 0 && (
+                        <p className="text-gray-600 text-xs mt-2">
+                          Propriété non listée ?{" "}
+                          <button
+                            type="button"
+                            className="text-orange-500/70 hover:text-orange-400 underline underline-offset-2"
+                            onClick={() => setGscProperties([])}
+                          >
+                            Saisir manuellement
+                          </button>
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
