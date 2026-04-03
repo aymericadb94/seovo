@@ -315,7 +315,8 @@ export default function OnboardingPage() {
   const [error, setError] = useState("");
   const [animKey, setAnimKey] = useState(0);
   const [gscConnected, setGscConnected] = useState(false);
-  const [form, setForm] = useState<FormData>({
+  const FORM_STORAGE_KEY = "rankpill_onboarding_form";
+  const emptyForm: FormData = {
     business_name: "", industry: "", cms: "", site_url: "",
     wp_username: "", wp_app_password: "", shopify_api_key: "",
     wix_api_key: "", wix_site_id: "",
@@ -326,6 +327,14 @@ export default function OnboardingPage() {
     strengths: "", differentiators: "",
     keywords: "", competitors: "", constraints: "",
     gsc_site_url: "",
+  };
+
+  const [form, setForm] = useState<FormData>(() => {
+    try {
+      const saved = localStorage.getItem(FORM_STORAGE_KEY);
+      if (saved) return { ...emptyForm, ...JSON.parse(saved) as FormData };
+    } catch { /* ignore */ }
+    return emptyForm;
   });
 
   // Detect GSC OAuth return — restaurer le form sauvegardé avant le redirect
@@ -353,7 +362,11 @@ export default function OnboardingPage() {
   }, []);
 
   function update(key: keyof FormData, value: string | number) {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((f) => {
+      const next = { ...f, [key]: value };
+      try { localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
   }
 
   function goToStep(n: number) {
@@ -430,7 +443,10 @@ export default function OnboardingPage() {
     });
     const data = await res.json();
     if (!res.ok) { setError(data.error || t.onboarding.error); setLoading(false); }
-    else router.push("/onboarding/success");
+    else {
+      try { localStorage.removeItem(FORM_STORAGE_KEY); } catch { /* ignore */ }
+      router.push("/onboarding/success");
+    }
   }
 
   const STEPS = ["Activité", "Site", "Stratégie", "Google"];
@@ -1028,9 +1044,6 @@ export default function OnboardingPage() {
                   <div className="flex flex-col gap-3">
                     <a
                       href="/api/auth/google?from=onboarding"
-                      onClick={() => {
-                        localStorage.setItem("rankpill_onboarding_form", JSON.stringify(form));
-                      }}
                       className="relative flex items-center gap-3 px-5 py-4 rounded-xl border border-white/[0.1] bg-white/[0.04] hover:border-orange-500/30 hover:bg-orange-500/5 transition-all group overflow-hidden"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
