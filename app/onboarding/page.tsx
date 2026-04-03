@@ -328,19 +328,26 @@ export default function OnboardingPage() {
     gsc_site_url: "",
   });
 
-  // Detect GSC OAuth return
+  // Detect GSC OAuth return — restaurer le form sauvegardé avant le redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const gsc = params.get("gsc");
-    if (gsc === "connected") {
-      setGscConnected(true);
+    if (gsc === "connected" || gsc === "error") {
+      const saved = localStorage.getItem("rankpill_onboarding_form");
+      if (saved) {
+        try {
+          const restored = JSON.parse(saved) as FormData;
+          setForm(restored);
+        } catch { /* ignore */ }
+        localStorage.removeItem("rankpill_onboarding_form");
+      }
+      if (gsc === "connected") {
+        setGscConnected(true);
+      } else {
+        setError("La connexion Google Search Console a échoué. Vous pouvez réessayer ou passer cette étape.");
+      }
       setStep(3);
       setAnimKey(k => k + 1);
-      window.history.replaceState({}, "", "/onboarding");
-    } else if (gsc === "error") {
-      setStep(3);
-      setAnimKey(k => k + 1);
-      setError("La connexion Google Search Console a échoué. Vous pouvez réessayer ou passer cette étape.");
       window.history.replaceState({}, "", "/onboarding");
     }
   }, []);
@@ -1021,6 +1028,9 @@ export default function OnboardingPage() {
                   <div className="flex flex-col gap-3">
                     <a
                       href="/api/auth/google?from=onboarding"
+                      onClick={() => {
+                        localStorage.setItem("rankpill_onboarding_form", JSON.stringify(form));
+                      }}
                       className="relative flex items-center gap-3 px-5 py-4 rounded-xl border border-white/[0.1] bg-white/[0.04] hover:border-orange-500/30 hover:bg-orange-500/5 transition-all group overflow-hidden"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
