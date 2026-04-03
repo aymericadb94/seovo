@@ -30,6 +30,15 @@ export async function POST(request: Request) {
       return Response.json({ error: error.message }, { status: 400 });
     }
 
+    // Supabase ne renvoie pas d'erreur si l'email existe déjà (anti-enumeration)
+    // mais retourne un user avec identities vide dans ce cas
+    if (data.user && data.user.identities?.length === 0) {
+      return Response.json(
+        { error: "Cette adresse email est déjà utilisée. Connectez-vous ou utilisez une autre adresse." },
+        { status: 409 }
+      );
+    }
+
     // Email de bienvenue (non bloquant)
     try {
       await sendWelcomeEmail({ to: email });
