@@ -9,6 +9,7 @@ import SeoAnalysisModal from "@/components/SeoAnalysisModal";
 import AuditModal, { type AuditData } from "@/components/AuditModal";
 import RoadmapModal, { type RoadmapData } from "@/components/RoadmapModal";
 import Footer from "@/components/Footer";
+import LinkingGraph from "@/components/LinkingGraph";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
@@ -230,7 +231,7 @@ export default function Dashboard() {
   const [cronRunning, setCronRunning] = useState(false);
   const [cronResult, setCronResult] = useState<string | null>(null);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "performance" | "publications" | "keywords" | "calendar">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "performance" | "linking" | "publications" | "keywords" | "calendar">("overview");
   const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null);
   const [indexationResults, setIndexationResults] = useState<Record<string, { indexed: boolean | null; verdict: string; coverage: string }>>({});
   const [indexationLoading, setIndexationLoading] = useState(false);
@@ -795,9 +796,9 @@ export default function Dashboard() {
         {/* Tabs */}
         <div className="border-t border-white/[0.04]">
           <div className="max-w-screen-xl mx-auto px-6 flex items-center gap-1 py-0">
-            {(["overview", "performance", "publications", "keywords", "calendar"] as const).map((tab) => {
+            {(["overview", "performance", "linking", "publications", "keywords", "calendar"] as const).map((tab) => {
               const isLocked = (tutorialStep ?? 0) < 4 && tab !== "overview";
-              const labels: Record<string, string> = { overview: "Vue d'ensemble", performance: "Performance", publications: "Publications", keywords: "Mots-clés", calendar: "Calendrier" };
+              const labels: Record<string, string> = { overview: "Vue d'ensemble", performance: "Performance", linking: "Maillage", publications: "Publications", keywords: "Mots-clés", calendar: "Calendrier" };
               return (
                 <button
                   key={tab}
@@ -1974,6 +1975,15 @@ export default function Dashboard() {
                 </div>
               );
             })()}
+
+            {/* ════════════════════════════════════════════════════════════
+                TAB — MAILLAGE INTERNE
+            ════════════════════════════════════════════════════════════ */}
+            {activeTab === "linking" && (
+              <div className="animate-fade-in-up">
+                <LinkingGraph />
+              </div>
+            )}
 
             {/* ════════════════════════════════════════════════════════════
                 TAB 2 — PUBLICATIONS
