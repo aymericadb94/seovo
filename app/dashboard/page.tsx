@@ -892,38 +892,53 @@ export default function Dashboard() {
                     style={{ zIndex: tutorialStep === 1 ? 10 : "auto" }}
                   >
                   <div
-                    className="bg-white/[0.03] rounded-2xl p-6 md:p-8 overflow-hidden"
-                    style={tutorialStep === 1
-                      ? { border: "1px solid rgba(139,92,246,0.2)", animation: "borderGlowViolet 2.5s ease-in-out infinite" }
-                      : { border: "1px solid rgba(255,255,255,0.07)" }
-                    }
+                    className="relative rounded-2xl p-6 md:p-8 overflow-hidden"
+                    style={{
+                      background: "rgba(255,255,255,0.03)",
+                      ...(tutorialStep === 1
+                        ? { border: "1px solid rgba(249,115,22,0.3)", animation: "borderGlowOrange 2.5s ease-in-out infinite" }
+                        : { border: "1px solid rgba(249,115,22,0.1)" }),
+                    }}
                   >
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.15em]">Architecture SEO</p>
-                        <p className="text-white font-black text-xl mt-0.5">Cocon Sémantique</p>
+                    {/* Glows de fond */}
+                    <div className="absolute top-0 left-0 w-[500px] h-[250px] pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(249,115,22,0.06), transparent 65%)" }} />
+                    <div className="absolute bottom-0 right-0 w-[350px] h-[200px] pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(239,68,68,0.04), transparent 65%)" }} />
+
+                    {/* Header */}
+                    <div className="relative flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: "rgba(249,115,22,0.15)", color: "#fb923c" }}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                            <circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-7.07-15.07l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: "#fb923c" }}>Architecture SEO</p>
+                          <p className="text-white font-black text-xl">Cocon Sémantique</p>
+                        </div>
                       </div>
                       {cocoonData && (
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="px-3 py-1.5 rounded-full text-xs font-black"
-                            style={{
-                              background: cocoonData.score >= 70 ? "rgba(34,197,94,0.1)" : cocoonData.score >= 40 ? "rgba(249,115,22,0.1)" : "rgba(239,68,68,0.1)",
-                              border: `1px solid ${cocoonData.score >= 70 ? "rgba(34,197,94,0.25)" : cocoonData.score >= 40 ? "rgba(249,115,22,0.25)" : "rgba(239,68,68,0.25)"}`,
-                              color: cocoonData.score >= 70 ? "#22c55e" : cocoonData.score >= 40 ? "#f97316" : "#ef4444",
-                            }}
-                          >
-                            {cocoonData.score}/100 — {cocoonData.score_label}
-                          </div>
+                        <div
+                          className="px-3 py-1.5 rounded-full text-xs font-black"
+                          style={{
+                            background: cocoonData.score >= 70 ? "rgba(34,197,94,0.1)" : cocoonData.score >= 40 ? "rgba(249,115,22,0.1)" : "rgba(239,68,68,0.1)",
+                            border: `1px solid ${cocoonData.score >= 70 ? "rgba(34,197,94,0.25)" : cocoonData.score >= 40 ? "rgba(249,115,22,0.25)" : "rgba(239,68,68,0.25)"}`,
+                            color: cocoonData.score >= 70 ? "#22c55e" : cocoonData.score >= 40 ? "#f97316" : "#ef4444",
+                          }}
+                        >
+                          {cocoonData.score}/100 — {cocoonData.score_label}
                         </div>
                       )}
                     </div>
 
                     {/* ── Bulle tutoriel cocon (étape 1) ── */}
                     {tutorialStep === 1 && (
-                      <div className="mb-5 p-4 rounded-xl animate-[modalPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_0.2s_both]" style={{ background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.32)" }}>
+                      <div className="relative mb-5 p-4 rounded-xl animate-[modalPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_0.2s_both]" style={{ background: "rgba(249,115,22,0.07)", border: "1px solid rgba(249,115,22,0.32)" }}>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-violet-400 text-xs font-black uppercase tracking-wider">🕸️ Cocon Sémantique</span>
+                          <span className="text-orange-400 text-xs font-black uppercase tracking-wider">🕸️ Cocon Sémantique</span>
                           <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 2 / 4</span>
                         </div>
                         <p className="text-white/70 text-xs leading-relaxed mb-3">
@@ -933,12 +948,12 @@ export default function Dashboard() {
                           <button
                             onClick={() => advanceTutorial(2)}
                             className="w-full py-2.5 rounded-lg text-xs font-black text-white transition-all hover:opacity-90"
-                            style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)", boxShadow: "0 4px 20px rgba(139,92,246,0.3)" }}
+                            style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 4px 20px rgba(249,115,22,0.3)" }}
                           >
                             Continuer → Analyser mon potentiel SEO
                           </button>
                         ) : (
-                          <div className="flex items-center gap-2 text-violet-400/70 text-xs">
+                          <div className="flex items-center gap-2 text-orange-400/70 text-xs">
                             <span className="text-base animate-bounce">↓</span>
                             <span>Cliquez sur le bouton ci-dessous pour générer votre cocon</span>
                           </div>
@@ -947,71 +962,86 @@ export default function Dashboard() {
                     )}
 
                     {cocoonError && (
-                      <div className="mb-4 p-3 rounded-xl text-sm text-red-400" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                      <div className="relative mb-4 p-3 rounded-xl text-sm text-red-400" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
                         Erreur : {cocoonError}
                       </div>
                     )}
 
                     {!cocoonData && !cocoonLoading && (
-                      <div className="text-center py-12">
-                        <div className="text-4xl mb-4">🕸️</div>
-                        <p className="text-gray-400 mb-2 text-sm">Aucun cocon sémantique généré</p>
-                        <p className="text-gray-600 text-xs mb-6 max-w-md mx-auto">
-                          Analysez la structure SEO de votre site pour créer un cocon sémantique intelligent qui connecte toutes vos pages.
+                      <div className="relative text-center py-12">
+                        {/* Icône réseau animée */}
+                        <div className="relative inline-block mb-6">
+                          <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.15)" }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-9 h-9 animate-[float_3s_ease-in-out_infinite]">
+                              <circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-7.07-15.07l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                            </svg>
+                          </div>
+                          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f97316, #ef4444)" }}>
+                            <span className="text-[8px] text-white font-black">+</span>
+                          </div>
+                        </div>
+                        <p className="text-white font-bold mb-2 text-sm">Structurez votre SEO</p>
+                        <p className="text-gray-500 text-xs mb-6 max-w-sm mx-auto leading-relaxed">
+                          Créez un cocon sémantique intelligent qui connecte toutes vos pages et maximise votre visibilité Google.
                         </p>
                         <button
                           onClick={generateCocoon}
-                          className="relative overflow-hidden px-6 py-3 rounded-xl text-sm font-black text-white transition-all hover:opacity-90 active:scale-[0.98]"
-                          style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)", boxShadow: "0 6px 28px rgba(139,92,246,0.35)" }}
+                          className="relative overflow-hidden px-8 py-3.5 rounded-xl text-sm font-black text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
+                          style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 8px 32px rgba(249,115,22,0.35)" }}
                         >
-                          <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }} />
+                          <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)" }} />
                           <span className="relative">Générer mon cocon sémantique →</span>
                         </button>
                       </div>
                     )}
 
                     {cocoonLoading && (
-                      <div className="text-center py-16">
-                        <div className="inline-flex items-center gap-3 px-5 py-3 rounded-xl" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
-                          <svg className="animate-spin h-4 w-4 text-violet-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                          <span className="text-violet-300 text-sm font-bold">Analyse en cours... (30-60s)</span>
+                      <div className="relative text-center py-16">
+                        {/* Spinner animé multi-layer */}
+                        <div className="relative inline-block mb-6">
+                          <div className="w-16 h-16 rounded-full animate-spin" style={{ border: "3px solid rgba(249,115,22,0.1)", borderTopColor: "#f97316" }} />
+                          <div className="absolute inset-2 rounded-full animate-spin" style={{ border: "2px solid rgba(239,68,68,0.08)", borderBottomColor: "#ef4444", animationDirection: "reverse", animationDuration: "1.5s" }} />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="1.5" className="w-5 h-5 animate-pulse"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-7.07-15.07l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4"/></svg>
+                          </div>
                         </div>
-                        <p className="text-gray-600 text-xs mt-3">Clusterisation des mots-clés, structure du cocon, maillage interne...</p>
+                        <p className="text-orange-300 text-sm font-bold mb-1">Construction du cocon en cours...</p>
+                        <p className="text-gray-600 text-xs">Clusterisation des mots-clés, structure du cocon, maillage interne</p>
+                        {/* Barre de progression animée */}
+                        <div className="mt-5 mx-auto w-48 h-1 rounded-full overflow-hidden" style={{ background: "rgba(249,115,22,0.1)" }}>
+                          <div className="h-full rounded-full animate-[shimmer_2s_linear_infinite]" style={{ width: "40%", background: "linear-gradient(90deg, #f97316, #ef4444, #f97316)", backgroundSize: "200% 100%" }} />
+                        </div>
                       </div>
                     )}
 
                     {cocoonData && !cocoonLoading && (
                       <>
                         {/* Diagnostic */}
-                        <p className="text-gray-400 text-sm mb-6 leading-relaxed">{cocoonData.diagnosis}</p>
+                        <p className="relative text-gray-400 text-sm mb-6 leading-relaxed">{cocoonData.diagnosis}</p>
 
-                        {/* Stats rapides */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                          <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-center">
-                            <p className="text-2xl font-black text-violet-400">{cocoonData.clusters.length}</p>
-                            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1">Clusters</p>
-                          </div>
-                          <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-center">
-                            <p className="text-2xl font-black text-green-400">
-                              {cocoonData.clusters.reduce((s, c) => s + 1 + c.support_pages.length, 0)}
-                            </p>
-                            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1">Pages totales</p>
-                          </div>
-                          <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-center">
-                            <p className="text-2xl font-black text-orange-400">
-                              {cocoonData.clusters.reduce((s, c) => s + c.support_pages.filter(p => p.status === "to_create").length + (c.pillar.status === "to_create" ? 1 : 0), 0)}
-                            </p>
-                            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1">Pages manquantes</p>
-                          </div>
-                          <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-center">
-                            <p className="text-2xl font-black text-emerald-400">+{cocoonData.traffic_potential.growth_percentage}%</p>
-                            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1">Potentiel trafic</p>
-                          </div>
+                        {/* Stats rapides avec animations */}
+                        <div className="relative grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                          {[
+                            { value: cocoonData.clusters.length, label: "Clusters", color: "#fb923c", delay: "0ms" },
+                            { value: cocoonData.clusters.reduce((s, c) => s + 1 + c.support_pages.length, 0), label: "Pages totales", color: "#f97316", delay: "100ms" },
+                            { value: cocoonData.clusters.reduce((s, c) => s + c.support_pages.filter(p => p.status === "to_create").length + (c.pillar.status === "to_create" ? 1 : 0), 0), label: "A créer", color: "#ef4444", delay: "200ms" },
+                            { value: `+${cocoonData.traffic_potential.growth_percentage}%`, label: "Potentiel", color: "#22c55e", delay: "300ms" },
+                          ].map((stat) => (
+                            <div
+                              key={stat.label}
+                              className="group relative rounded-xl p-4 text-center overflow-hidden transition-transform hover:scale-[1.03] animate-fade-in-up"
+                              style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${stat.color}18`, animationDelay: stat.delay }}
+                            >
+                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: `radial-gradient(ellipse at center, ${stat.color}10, transparent 70%)` }} />
+                              <p className="text-2xl font-black relative" style={{ color: stat.color }}>{stat.value}</p>
+                              <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1 relative">{stat.label}</p>
+                            </div>
+                          ))}
                         </div>
 
                         {/* Clusters */}
-                        <div className="space-y-3">
-                          {cocoonData.clusters.map((cluster) => {
+                        <div className="relative space-y-3">
+                          {cocoonData.clusters.map((cluster, ci) => {
                             const isOpen = cocoonExpanded === cluster.name;
                             const existing = [cluster.pillar, ...cluster.support_pages].filter(p => p.status === "existing").length;
                             const total = 1 + cluster.support_pages.length;
@@ -1022,15 +1052,16 @@ export default function Dashboard() {
                               faible: "text-gray-400 bg-white/[0.04] border-white/[0.08]",
                             };
                             return (
-                              <div key={cluster.name} className="border border-white/[0.06] rounded-xl overflow-hidden transition-all">
+                              <div
+                                key={cluster.name}
+                                className="rounded-xl overflow-hidden transition-all animate-fade-in-up"
+                                style={{ border: isOpen ? "1px solid rgba(249,115,22,0.2)" : "1px solid rgba(255,255,255,0.06)", animationDelay: `${ci * 80}ms` }}
+                              >
                                 <button
                                   onClick={() => setCocoonExpanded(isOpen ? null : cluster.name)}
                                   className="w-full flex items-center gap-4 p-4 text-left hover:bg-white/[0.02] transition-colors"
                                 >
-                                  {/* Icone expand */}
-                                  <svg className={`w-4 h-4 text-gray-500 transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-
-                                  {/* Nom + badge priorité */}
+                                  <svg className={`w-4 h-4 text-orange-400/60 transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
                                       <span className="text-white font-bold text-sm truncate">{cluster.name}</span>
@@ -1040,48 +1071,38 @@ export default function Dashboard() {
                                     </div>
                                     <p className="text-gray-500 text-xs truncate">{cluster.objective}</p>
                                   </div>
-
-                                  {/* Barre de complétion */}
                                   <div className="flex items-center gap-3 flex-shrink-0">
                                     <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                                      <div
-                                        className="h-full rounded-full transition-all"
-                                        style={{ width: `${pct}%`, background: pct >= 80 ? "#22c55e" : pct >= 40 ? "#f97316" : "#ef4444" }}
-                                      />
+                                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: pct >= 80 ? "#22c55e" : pct >= 40 ? "#f97316" : "#ef4444" }} />
                                     </div>
                                     <span className="text-gray-500 text-xs font-mono w-10 text-right">{existing}/{total}</span>
                                   </div>
-
-                                  {/* Trafic estimé */}
-                                  <span className="text-violet-400/80 text-xs font-bold flex-shrink-0">
-                                    +{cluster.traffic_potential} clics/mois
-                                  </span>
+                                  <span className="text-orange-400/70 text-xs font-bold flex-shrink-0">+{cluster.traffic_potential}</span>
                                 </button>
 
-                                {/* Contenu expandé */}
                                 {isOpen && (
-                                  <div className="border-t border-white/[0.05] p-4 bg-white/[0.01] animate-fade-in">
-                                    {/* Pillar page */}
+                                  <div className="border-t border-orange-500/10 p-4 animate-fade-in" style={{ background: "rgba(249,115,22,0.02)" }}>
+                                    {/* Page pilier */}
                                     <div className="mb-4">
-                                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-violet-400 mb-2">Page pilier</p>
-                                      <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.15)" }}>
-                                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cluster.pillar.status === "existing" ? "bg-green-400" : "bg-orange-400"}`} />
+                                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-orange-400 mb-2">Page pilier</p>
+                                      <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.15)" }}>
+                                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cluster.pillar.status === "existing" ? "bg-green-400" : "bg-orange-400 animate-pulse"}`} />
                                         <div className="flex-1 min-w-0">
                                           <p className="text-white text-sm font-semibold truncate">{cluster.pillar.title}</p>
                                           <p className="text-gray-500 text-xs">{cluster.pillar.keyword}</p>
                                         </div>
-                                        <span className={`text-[10px] font-bold uppercase ${cluster.pillar.status === "existing" ? "text-green-400" : "text-orange-400"}`}>
+                                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${cluster.pillar.status === "existing" ? "text-green-400 bg-green-500/10" : "text-orange-400 bg-orange-500/10"}`}>
                                           {cluster.pillar.status === "existing" ? "Existant" : "A créer"}
                                         </span>
                                       </div>
                                     </div>
 
-                                    {/* Support pages */}
+                                    {/* Pages support */}
                                     <div className="mb-4">
                                       <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-2">Pages support ({cluster.support_pages.length})</p>
                                       <div className="space-y-1.5">
                                         {cluster.support_pages.map((page, idx) => (
-                                          <div key={idx} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                          <div key={idx} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:border-orange-500/15 transition-colors">
                                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${page.status === "existing" ? "bg-green-400" : "bg-orange-400"}`} />
                                             <div className="flex-1 min-w-0">
                                               <p className="text-gray-300 text-sm truncate">{page.title}</p>
@@ -1098,14 +1119,14 @@ export default function Dashboard() {
                                     {/* Liens internes */}
                                     {cluster.internal_links.length > 0 && (
                                       <div>
-                                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-2">Maillage interne ({cluster.internal_links.length} liens)</p>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-2">Maillage ({cluster.internal_links.length} liens)</p>
                                         <div className="space-y-1">
                                           {cluster.internal_links.map((link, idx) => (
                                             <div key={idx} className="flex items-center gap-2 text-xs text-gray-500">
                                               <span className="text-gray-400 truncate max-w-[35%]">{link.from}</span>
-                                              <svg className="w-3 h-3 text-violet-400/60 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                              <svg className="w-3 h-3 text-orange-400/50 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                               <span className="text-gray-400 truncate max-w-[35%]">{link.to}</span>
-                                              <span className="text-violet-400/50 ml-auto flex-shrink-0">&quot;{link.anchor}&quot;</span>
+                                              <span className="text-orange-400/40 ml-auto flex-shrink-0 italic">{link.anchor}</span>
                                             </div>
                                           ))}
                                         </div>
@@ -1120,14 +1141,19 @@ export default function Dashboard() {
 
                         {/* Actions d'optimisation */}
                         {cocoonData.optimization_actions.length > 0 && (
-                          <div className="mt-6 pt-5 border-t border-white/[0.05]">
+                          <div className="relative mt-6 pt-5 border-t border-orange-500/10">
                             <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-3">Actions recommandées</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                               {cocoonData.optimization_actions.slice(0, 6).map((action, idx) => {
-                                const impactColor = action.impact === "fort" ? "text-green-400" : action.impact === "moyen" ? "text-orange-400" : "text-gray-500";
+                                const impactColors: Record<string, { bg: string; text: string; border: string }> = {
+                                  fort: { bg: "rgba(34,197,94,0.06)", text: "text-green-400", border: "rgba(34,197,94,0.12)" },
+                                  moyen: { bg: "rgba(249,115,22,0.06)", text: "text-orange-400", border: "rgba(249,115,22,0.12)" },
+                                  faible: { bg: "rgba(255,255,255,0.02)", text: "text-gray-500", border: "rgba(255,255,255,0.06)" },
+                                };
+                                const c = impactColors[action.impact] ?? impactColors.faible;
                                 return (
-                                  <div key={idx} className="flex items-start gap-2 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                                    <span className={`text-[10px] font-black uppercase mt-0.5 ${impactColor}`}>{action.impact}</span>
+                                  <div key={idx} className="flex items-start gap-2 p-3 rounded-lg" style={{ background: c.bg, border: `1px solid ${c.border}` }}>
+                                    <span className={`text-[10px] font-black uppercase mt-0.5 ${c.text}`}>{action.impact}</span>
                                     <p className="text-gray-400 text-xs leading-relaxed">{action.action}</p>
                                   </div>
                                 );
@@ -1136,12 +1162,9 @@ export default function Dashboard() {
                           </div>
                         )}
 
-                        {/* Bouton regénérer */}
-                        <div className="mt-5 flex justify-end">
-                          <button
-                            onClick={generateCocoon}
-                            className="text-xs text-gray-500 hover:text-violet-400 transition-colors font-medium"
-                          >
+                        {/* Regénérer */}
+                        <div className="relative mt-5 flex justify-end">
+                          <button onClick={generateCocoon} className="text-xs text-gray-500 hover:text-orange-400 transition-colors font-medium">
                             ↻ Régénérer le cocon
                           </button>
                         </div>
