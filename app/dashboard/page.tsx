@@ -306,8 +306,9 @@ export default function Dashboard() {
     cocoonProgressRef.current = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const ratio = Math.min(elapsed / estimatedDuration, 1);
-      // Courbe ease-out : avance vite puis ralentit, plafonne à 92%
-      const pct = Math.min(92, Math.round(ratio * 100 * (1 - ratio * 0.3)));
+      // Courbe ease-out cubique : monte vite puis ralentit, plafonne à 92%
+      const eased = 1 - Math.pow(1 - ratio, 2);
+      const pct = Math.min(92, Math.round(eased * 92));
       setCocoonProgress(pct);
     }, 500);
     try {
@@ -1045,7 +1046,7 @@ export default function Dashboard() {
                             { value: cocoonData.clusters.length, label: "Clusters", color: "#fb923c", delay: "0ms" },
                             { value: cocoonData.clusters.reduce((s, c) => s + 1 + c.support_pages.length, 0), label: "Pages totales", color: "#f97316", delay: "100ms" },
                             { value: cocoonData.clusters.reduce((s, c) => s + c.support_pages.filter(p => p.status === "to_create").length + (c.pillar.status === "to_create" ? 1 : 0), 0), label: "A créer", color: "#ef4444", delay: "200ms" },
-                            { value: `+${cocoonData.traffic_potential.growth_percentage}%`, label: "Potentiel", color: "#22c55e", delay: "300ms" },
+                            { value: cocoonData.traffic_potential.growth_percentage > 999 ? `x${Math.round(cocoonData.traffic_potential.potential_6_months / Math.max(cocoonData.traffic_potential.current_estimated, 1))}` : `+${cocoonData.traffic_potential.growth_percentage}%`, label: "Potentiel", color: "#22c55e", delay: "300ms" },
                           ].map((stat) => (
                             <div
                               key={stat.label}
