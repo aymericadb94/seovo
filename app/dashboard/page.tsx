@@ -292,14 +292,19 @@ export default function Dashboard() {
     } catch { /* ignore */ }
   }
 
+  const [cocoonError, setCocoonError] = useState<string | null>(null);
+
   async function generateCocoon() {
     setCocoonLoading(true);
+    setCocoonError(null);
     try {
       const res = await fetch("/api/semantic-cocoon", { method: "POST" });
       const json = await res.json();
+      if (json.error) { setCocoonError(json.error); return; }
       if (json.result) setCocoonData(json.result as CocoonData);
-    } catch { /* ignore */ }
-    finally { setCocoonLoading(false); }
+    } catch (err) {
+      setCocoonError(err instanceof Error ? err.message : "Erreur réseau");
+    } finally { setCocoonLoading(false); }
   }
 
   // ── Projections ────────────────────────────────────────────────────────────
@@ -895,6 +900,12 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
+
+                    {cocoonError && (
+                      <div className="mb-4 p-3 rounded-xl text-sm text-red-400" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                        Erreur : {cocoonError}
+                      </div>
+                    )}
 
                     {!cocoonData && !cocoonLoading && (
                       <div className="text-center py-12">
