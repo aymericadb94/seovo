@@ -891,31 +891,55 @@ export default function Dashboard() {
                       )}
                     </div>
 
-                    {/* Score ring + stats */}
+                    {/* Score ring + stats RankPill */}
                     <div className="grid grid-cols-12 gap-4 md:gap-6 items-center">
                       <div className="col-span-12 sm:col-span-4 lg:col-span-3 flex justify-center">
                         <ScoreRing score={animScore} />
                       </div>
                       <div className="col-span-12 sm:col-span-8 lg:col-span-9 grid grid-cols-2 md:grid-cols-4 gap-3">
                         {([
-                          { label: "Ce mois", value: animMonth, sub: "articles publiés", color: "" },
-                          { label: "Mots-clés couverts", value: `${animKw}/${kpis?.totalKeywords ?? 0}`, sub: "configurés", color: "" },
-                          ...(gscPerf ? [
-                            { label: "Clics (30j)", value: gscPerf.totalClicks.toLocaleString("fr-FR"), sub: "Google Search", color: "#34A853" },
-                            { label: "Position moy.", value: gscPerf.avgPosition.toFixed(1), sub: `CTR ${(gscPerf.avgCtr * 100).toFixed(1)}%`, color: "#4285F4" },
-                          ] : [
-                            { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, sub: "articles publiés", color: "" },
-                            { label: "Total publié", value: kpis?.totalArticles ?? 0, sub: "articles", color: "" },
-                          ]),
-                        ] as { label: string; value: string | number; sub: string; color: string }[]).map((s, i) => (
-                          <div key={s.label} className="flex flex-col gap-1.5 p-4 rounded-xl animate-fade-in-up" style={{ background: s.color ? `${s.color}08` : "rgba(255,255,255,0.03)", border: s.color ? `1px solid ${s.color}18` : "1px solid rgba(255,255,255,0.06)", animationDelay: `${i * 80 + 300}ms` }}>
+                          { label: "Ce mois", value: animMonth, sub: "articles publiés" },
+                          { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, sub: "articles publiés" },
+                          { label: "Mots-clés couverts", value: `${animKw}/${kpis?.totalKeywords ?? 0}`, sub: "configurés" },
+                          { label: "Total publié", value: kpis?.totalArticles ?? 0, sub: "articles" },
+                        ] as const).map((s, i) => (
+                          <div key={s.label} className="flex flex-col gap-1.5 p-4 rounded-xl animate-fade-in-up" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", animationDelay: `${i * 80 + 300}ms` }}>
                             <span className="text-gray-500 text-xs font-bold truncate">{s.label}</span>
-                            <span className="font-black text-2xl leading-none" style={{ color: s.color || "white" }}>{s.value}</span>
+                            <span className="text-white font-black text-2xl leading-none">{s.value}</span>
                             <span className="text-gray-600 text-xs">{s.sub}</span>
                           </div>
                         ))}
                       </div>
                     </div>
+
+                    {/* Bandeau GSC inline */}
+                    {gscPerf && (
+                      <div className="mt-5 rounded-xl overflow-hidden animate-fade-in-up delay-300" style={{ background: "rgba(66,133,244,0.04)", border: "1px solid rgba(66,133,244,0.12)" }}>
+                        <div className="flex items-stretch divide-x divide-blue-500/10">
+                          {[
+                            { value: gscPerf.totalImpressions.toLocaleString("fr-FR"), label: "Impressions", color: "#4285F4" },
+                            { value: gscPerf.totalClicks.toLocaleString("fr-FR"), label: "Clics", color: "#34A853" },
+                            { value: `${(gscPerf.avgCtr * 100).toFixed(1)}%`, label: "CTR", color: "#FBBC05" },
+                            { value: gscPerf.avgPosition.toFixed(1), label: "Position", color: "#EA4335" },
+                          ].map((m) => (
+                            <div key={m.label} className="flex-1 py-3 px-4 text-center">
+                              <p className="font-black text-lg leading-none" style={{ color: m.color }}>{m.value}</p>
+                              <p className="text-gray-500 text-[9px] font-bold uppercase tracking-wide mt-1">{m.label}</p>
+                            </div>
+                          ))}
+                          <button
+                            onClick={() => setActiveTab("performance")}
+                            className="flex items-center gap-1.5 px-4 text-xs font-bold text-blue-400/70 hover:text-blue-400 transition-colors flex-shrink-0"
+                          >
+                            Détails
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                          </button>
+                        </div>
+                        <div className="px-4 py-1.5 text-center" style={{ background: "rgba(66,133,244,0.03)", borderTop: "1px solid rgba(66,133,244,0.06)" }}>
+                          <p className="text-gray-600 text-[9px] font-medium">Google Search Console — 30 derniers jours</p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Countdown */}
                     {kpis?.nextPublicationAt && (
