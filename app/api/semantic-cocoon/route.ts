@@ -276,22 +276,32 @@ FORMAT DE RÉPONSE : JSON valide uniquement, aucun texte avant ou après.
 
     const msg = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 8000,
+      max_tokens: 16000,
       messages: [{ role: "user", content: prompt }],
     });
 
-    const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
+    const rawText = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+    // Nettoyer : retirer les blocs markdown ```json ... ```
+    const cleaned = rawText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
     if (start === -1 || end === -1) {
+      console.error("[semantic-cocoon] Pas de JSON trouvé. Début de la réponse:", rawText.slice(0, 300));
       return Response.json({ error: "Réponse Claude invalide" }, { status: 500 });
     }
 
     let result: unknown;
     try {
-      result = JSON.parse(raw.slice(start, end + 1));
-    } catch {
-      return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
+      result = JSON.parse(cleaned.slice(start, end + 1));
+    } catch (parseErr) {
+      console.error("[semantic-cocoon] JSON parse error:", parseErr, "Extrait:", cleaned.slice(start, start + 200));
+      // Tentative de réparation : supprimer les trailing commas
+      try {
+        const repaired = cleaned.slice(start, end + 1).replace(/,\s*([}\]])/g, "$1");
+        result = JSON.parse(repaired);
+      } catch {
+        return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
+      }
     }
 
     // ── Sauvegarder (upsert) ──────────────────────────────────────────────────

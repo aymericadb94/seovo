@@ -283,6 +283,8 @@ export default function Dashboard() {
   const [cocoonData, setCocoonData] = useState<CocoonData | null>(null);
   const [cocoonLoading, setCocoonLoading] = useState(false);
   const [cocoonExpanded, setCocoonExpanded] = useState<string | null>(null);
+  const [cocoonProgress, setCocoonProgress] = useState(0);
+  const cocoonProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function loadCocoon() {
     try {
@@ -297,11 +299,24 @@ export default function Dashboard() {
   async function generateCocoon() {
     setCocoonLoading(true);
     setCocoonError(null);
+    setCocoonProgress(0);
+    // Progression réaliste : rapide au début, ralentit vers la fin
+    const startTime = Date.now();
+    const estimatedDuration = 60000; // ~60s estimé
+    cocoonProgressRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const ratio = Math.min(elapsed / estimatedDuration, 1);
+      // Courbe ease-out : avance vite puis ralentit, plafonne à 92%
+      const pct = Math.min(92, Math.round(ratio * 100 * (1 - ratio * 0.3)));
+      setCocoonProgress(pct);
+    }, 500);
     try {
       const res = await fetch("/api/semantic-cocoon", { method: "POST" });
       const json = await res.json();
-      if (json.error) { setCocoonError(json.error); return; }
+      if (cocoonProgressRef.current) clearInterval(cocoonProgressRef.current);
+      if (json.error) { setCocoonError(json.error); setCocoonProgress(0); return; }
       if (json.result) {
+        setCocoonProgress(100);
         setCocoonData(json.result as CocoonData);
         setTutorialStep(prev => {
           if (prev === 1) { localStorage.setItem("rankpill_onboarding", "2"); return 2; }
@@ -309,7 +324,9 @@ export default function Dashboard() {
         });
       }
     } catch (err) {
+      if (cocoonProgressRef.current) clearInterval(cocoonProgressRef.current);
       setCocoonError(err instanceof Error ? err.message : "Erreur réseau");
+      setCocoonProgress(0);
     } finally { setCocoonLoading(false); }
   }
 
@@ -1007,10 +1024,13 @@ export default function Dashboard() {
                         </div>
                         <p className="text-orange-300 text-sm font-bold mb-1">Construction du cocon en cours...</p>
                         <p className="text-gray-600 text-xs">Clusterisation des mots-clés, structure du cocon, maillage interne</p>
-                        {/* Barre de progression animée */}
-                        <div className="mt-5 mx-auto w-48 h-1 rounded-full overflow-hidden" style={{ background: "rgba(249,115,22,0.1)" }}>
-                          <div className="h-full rounded-full animate-[shimmer_2s_linear_infinite]" style={{ width: "40%", background: "linear-gradient(90deg, #f97316, #ef4444, #f97316)", backgroundSize: "200% 100%" }} />
+                        {/* Barre de progression temps réel */}
+                        <div className="mt-5 mx-auto w-48 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(249,115,22,0.1)" }}>
+                          <div className="h-full rounded-full relative overflow-hidden" style={{ width: `${cocoonProgress}%`, background: "linear-gradient(90deg, #f97316, #ef4444)", transition: "width 0.5s ease-out" }}>
+                            <div className="absolute inset-0 animate-[shimmer_2s_linear_infinite]" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)", backgroundSize: "200% 100%" }} />
+                          </div>
                         </div>
+                        <p className="text-gray-600 text-xs mt-2">{cocoonProgress}%</p>
                       </div>
                     )}
 
