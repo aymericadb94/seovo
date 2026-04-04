@@ -228,7 +228,7 @@ export default function Dashboard() {
   const [indexationLoading, setIndexationLoading] = useState(false);
 
   // ── Tutorial (0=score, 1=cocon, 2=potentiel, 3=roadmap, 4=libre) ─────────────
-  const [tutorialStep, setTutorialStep] = useState(4);
+  const [tutorialStep, setTutorialStep] = useState<number | null>(null);
   const [scoreBubbleStep, setScoreBubbleStep] = useState(0);
   const tutorialInitRef = useRef(false);
 
@@ -428,7 +428,8 @@ export default function Dashboard() {
     if (tutorialInitRef.current) return;
     tutorialInitRef.current = true;
     const saved = localStorage.getItem("rankpill_onboarding");
-    const step = saved !== null ? Math.min(parseInt(saved, 10), 4) : 0;
+    // Si pas de valeur sauvée et pas de modal qui vient de se fermer → dashboard libre
+    const step = saved !== null ? Math.min(parseInt(saved, 10), 4) : (seoModalWasOpenRef.current ? 0 : 4);
     setTutorialStep(step);
     setScoreBubbleStep(0);
   }, [data?.site?.seo_analysis_done]);
@@ -655,7 +656,7 @@ export default function Dashboard() {
         <div className="border-t border-white/[0.04]">
           <div className="max-w-screen-xl mx-auto px-6 flex items-center gap-1 py-0">
             {(["overview", "publications", "keywords", "calendar"] as const).map((tab) => {
-              const isLocked = tutorialStep < 4 && tab !== "overview";
+              const isLocked = (tutorialStep ?? 0) < 4 && tab !== "overview";
               const labels: Record<string, string> = { overview: "Vue d'ensemble", publications: "Publications", keywords: "Mots-clés", calendar: "Calendrier" };
               return (
                 <button
@@ -688,7 +689,7 @@ export default function Dashboard() {
         )}
 
         {/* Bandeau GSC non connecté */}
-        {!loading && data?.site && !data.site.gsc_connected && tutorialStep >= 4 && (
+        {!loading && data?.site && !data.site.gsc_connected && (tutorialStep ?? 0) >= 4 && (
           <div className="mb-6 flex items-center justify-between gap-4 bg-[#0d0d0d] border border-white/[0.08] rounded-2xl px-5 py-4 animate-fade-in">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center flex-shrink-0">
@@ -717,7 +718,7 @@ export default function Dashboard() {
             {/* ════════════════════════════════════════════════════════════
                 TAB 1 — VUE D'ENSEMBLE avec système de tutoriel
             ════════════════════════════════════════════════════════════ */}
-            {activeTab === "overview" && (
+            {activeTab === "overview" && tutorialStep !== null && (
               <div className="space-y-5 relative">
 
                 {/* ── OVERLAY SOMBRE (étapes 0 uniquement) ──────────────── */}
