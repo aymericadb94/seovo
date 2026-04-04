@@ -109,56 +109,106 @@ export async function POST(request: Request) {
     const message = await client.messages.create({
       model: "claude-opus-4-6",
       max_tokens: 8000,
-      system: `You are the world's best SEO content writer. Every article you produce is unique, creative, and generates real organic traffic. You never produce generic or repetitive content. You always write in the language specified — this is non-negotiable.`,
+      system: `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`,
       messages: [
         {
           role: "user",
-          content: `You are a world-class SEO writer specializing in the "${industry ?? "e-commerce"}" sector. You work for "${businessName}".
+          content: `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
-MISSION: Write an exceptional SEO blog article on the main keyword: "${keyword}"
+LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
 
-LANGUAGE: Write the ENTIRE article in ${language}. Every word must be in ${language}.${internalLinksContext}${styleGuideContext}
+MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}
 
-QUALITY REQUIREMENTS (premium SEO agency level):
+---
 
-1. TITLE (H1): Catchy, contains the keyword, 50-60 characters ideally.
+MISSION : Générer un article de blog parfaitement optimisé pour le SEO.
 
-2. META DESCRIPTION: 150-160 characters, compelling, contains the keyword.
+---
 
-3. FEATURED SNIPPET BLOCK (this is the FIRST element in the content, immediately after H1 — critical for Google position 0 and LLMs like ChatGPT/Perplexity):
-   - Start with an H2 containing the main keyword phrased as a question (e.g. "Qu'est-ce que X ?" / "Comment X ?" / "Pourquoi X ?")
-   - Immediately follow with a <p> of exactly 40-60 words: direct, complete answer. No filler, no "in this article", no "we will see".
-   - If steps implied (how to, guide, tutorial): add a <ol> with 4-8 concise steps right after the paragraph.
-   - If comparison implied: add a <table> with 2-4 columns and 3-6 rows right after the paragraph.
-   - If definition implied: start the paragraph with "[Keyword] est..." followed by the definition.
+PARTIE 1 — STRUCTURE SEO
+- 1 H1 avec le mot-clé intégré naturellement
+- Plusieurs H2 / H3 logiques et hiérarchisés
+- Paragraphes aérés, structure fluide
+- Aucune répétition abusive de mots-clés
 
-4. INTRODUCTION (150-200 words): Strong hook after the featured snippet. States the problem or opportunity. Announces what the reader will learn.
+PARTIE 2 — INTRODUCTION (150-200 mots)
+- Accroche naturelle et percutante
+- Reformulation du besoin utilisateur
+- Annonce claire du contenu
 
-5. ARTICLE BODY (1200-1800 words):
-   - 4 to 6 well-structured H2 sections
-   - H3 subsections when needed
-   - Short paragraphs (3-4 lines max)
-   - Concrete examples related to the sector
-   - Figures and statistics for credibility
-   - Bullet lists for readability
-   - Tone: expert but accessible, never robotic (unless DA says otherwise)
-   - Keyword density: natural, 1-2% maximum
+PARTIE 3 — FEATURED SNIPPET (OBLIGATOIRE — généré dans le champ "featured_snippet" ET intégré au début du contenu)
+- Répond directement à la requête en 2 à 4 lignes OU sous forme de liste
+- Format : H2 avec le mot-clé sous forme de question, suivi d'un <p> de 40-60 mots
+- Si guide/tutoriel : ajouter un <ol> avec 4-8 étapes concises
+- Si comparatif : ajouter un <table> avec 2-4 colonnes et 3-6 lignes
+- Si définition : commencer par "[Mot-clé] est..."
 
-6. FAQ SECTION (3-4 questions): Questions the target audience really asks. Each answer must be 40-60 words max — short enough to also be captured as a featured snippet.
+PARTIE 4 — CONTENU PRINCIPAL (1200-1800 mots)
+- 4 à 6 sections H2 bien structurées avec H3 si nécessaire
+- Paragraphes courts (3-4 lignes max)
+- Exemples concrets liés au secteur "${industry ?? "e-commerce"}"
+- Chiffres et statistiques pour la crédibilité
+- Listes à puces pour la lisibilité
+- Ton : expert mais accessible, jamais robotique
+- Densité mot-clé : naturelle, 1-2% maximum
 
-7. CONCLUSION (100-150 words): Summary + strong call to action.
+PARTIE 5 — FAQ (3-4 questions)
+- Questions réellement posées par l'audience cible
+- Chaque réponse : 40-60 mots max (pouvant aussi être capturée comme featured snippet)
 
-RESPONSE FORMAT: Valid JSON only, no text before or after.
+PARTIE 6 — CONCLUSION (100-150 mots)
+- Résumé synthétique
+- Call-to-action fort
 
-{"title": "The optimized H1 title", "meta_description": "The 150-160 character meta description", "cover_image_query": "3-5 english keywords for a relevant stock photo (e.g. 'vintage clothing warehouse wholesale')", "cover_alt_text": "SEO-optimized alt text for the cover image, 8-12 words, includes main keyword, written in the article language", "content": "The complete HTML content"}
+PARTIE 7 — MAILLAGE INTERNE
+Propose 2 à 4 liens internes avec ancrage naturel en lien avec la thématique.
 
-HTML must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. No <html>, <body>, <head>.`,
+PARTIE 8 — IMAGE
+Génère une requête Pexels précise et cohérente avec le sujet (3-5 mots-clés en anglais).
+
+PARTIE 9 — MÉTA DONNÉES
+- title SEO : optimisé CTR, 50-60 caractères, contient le mot-clé
+- meta_description : 150-160 caractères, incitative et naturelle
+
+---
+
+ANTI-SPAM / QUALITÉ (IMPÉRATIF) :
+- Aucune sur-optimisation
+- Aucun contenu générique
+- Aucune répétition excessive
+- Le contenu doit sembler écrit par un humain expert
+
+---
+
+FORMAT DE SORTIE : JSON valide uniquement, aucun texte avant ou après.
+
+{
+  "title": "Le H1 optimisé",
+  "meta_description": "La meta description de 150-160 caractères",
+  "featured_snippet": "Le bloc featured snippet en HTML pur (h2 + p, ou h2 + p + ol/table)",
+  "content": "Le contenu HTML complet de l'article (sans le featured_snippet qui est déjà inclus au début)",
+  "internal_links": [
+    { "anchor": "texte d'ancrage naturel", "target": "slug-ou-url-cible" }
+  ],
+  "pexels_query": "3-5 english keywords for stock photo",
+  "cover_alt_text": "Texte alt SEO de l'image, 8-12 mots, inclut le mot-clé, dans la langue de l'article"
+}
+
+HTML autorisé : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. Pas de <html>, <body>, <head>.`,
         },
       ],
     });
 
     const raw = message.content[0].type === "text" ? message.content[0].text : "";
-    let parsed: { title: string; content: string; meta_description: string; cover_image_query?: string; cover_alt_text?: string };
+    let parsed: {
+      title: string;
+      content: string;
+      meta_description: string;
+      featured_snippet?: string;
+      internal_links?: { anchor: string; target: string }[];
+      pexels_query?: string;
+      cover_alt_text?: string;
+    };
     try {
       const start = raw.indexOf("{");
       const end = raw.lastIndexOf("}");
@@ -171,9 +221,11 @@ HTML must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thea
     }
     return Response.json({
       title: parsed.title,
-      content: parsed.content,
+      content: parsed.featured_snippet
+        ? parsed.featured_snippet + "\n" + parsed.content
+        : parsed.content,
       meta_description: parsed.meta_description,
-      cover_image_query: parsed.cover_image_query ?? null,
+      cover_image_query: parsed.pexels_query ?? null,
       cover_alt_text: parsed.cover_alt_text ?? null,
     });
   } catch (err: unknown) {
