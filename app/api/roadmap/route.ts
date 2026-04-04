@@ -169,9 +169,13 @@ INTENTION STRATÉGIQUE (onboarding) :
 - Contraintes : ${seoCtx.constraints ?? "aucune"}
 ` : "";
 
-    const prompt = `Tu es un expert SEO senior spécialisé en stratégie de contenu avancée et en domination des résultats Google en 2026.
+    const currentYear = new Date().getFullYear();
+    const prompt = `Tu es un expert SEO senior spécialisé en stratégie de contenu avancée et en domination des résultats Google en ${currentYear}.
 
 Ta mission est de générer une roadmap éditoriale de 40 articles raccord avec l'analyse SEO réelle du site.
+
+DATE ACTUELLE : ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+ANNÉE EN COURS : ${currentYear} (utilise TOUJOURS cette année si un titre ou mot-clé contient une année, JAMAIS une année passée)
 
 SITE : ${site.business_name}
 SECTEUR : ${site.industry}

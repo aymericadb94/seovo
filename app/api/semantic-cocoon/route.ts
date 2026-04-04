@@ -142,6 +142,9 @@ export async function POST() {
     // ── Prompt Claude ─────────────────────────────────────────────────────────
     const prompt = `Tu es un expert SEO senior (10+ ans) spécialisé dans les cocons sémantiques avancés, l'architecture SEO et la distribution du PageRank interne.
 
+DATE ACTUELLE : ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+ANNÉE EN COURS : ${new Date().getFullYear()} (utilise TOUJOURS cette année si un mot-clé ou titre contient une année)
+
 SITE : ${site.business_name}
 SECTEUR : ${site.industry}
 URL : ${site.site_url}

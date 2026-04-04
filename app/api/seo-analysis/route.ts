@@ -98,12 +98,15 @@ RÉPONSES DU PROPRIÉTAIRE :
 
 MISSION : Génère un score SEO réel basé sur les signaux observés + une stratégie SEO complète.
 
+DATE ACTUELLE : ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+
 RÈGLES ABSOLUES :
 1. Les mots-clés doivent correspondre à la portée géographique
 2. Mix de mots-clés : 30% fort volume, 50% longue traîne transactionnelle, 20% niche facile
 3. Génère EXACTEMENT 20 mots-clés prioritaires
 4. Chaque mot-clé doit être une vraie requête Google
 5. Le score SEO doit refléter l'état RÉEL du site avant d'utiliser RankPill (pas de score gonflé)
+6. Si un mot-clé contient une année, utilise TOUJOURS ${new Date().getFullYear()} (jamais une année passée)
 
 RÉPONSE : JSON uniquement, sans texte avant/après.
 
