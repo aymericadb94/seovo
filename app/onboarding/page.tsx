@@ -315,6 +315,7 @@ export default function OnboardingPage() {
   const [error, setError] = useState("");
   const [animKey, setAnimKey] = useState(0);
   const [gscConnected, setGscConnected] = useState(false);
+  const [keywordInput, setKeywordInput] = useState("");
   const [gscProperties, setGscProperties] = useState<{ url: string }[]>([]);
   const [loadingGscSites, setLoadingGscSites] = useState(false);
   const FORM_STORAGE_KEY = "rankpill_onboarding_form";
@@ -966,14 +967,51 @@ export default function OnboardingPage() {
                   <SectionLabel>Mots-clés & SEO</SectionLabel>
                   <div>
                     <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Mots-clés prioritaires <span className="text-red-400">*</span></label>
-                    <textarea
-                      value={form.keywords}
-                      onChange={(e) => update("keywords", e.target.value)}
-                      placeholder="ex: logiciel RH, gestion des congés, paie en ligne, SIRH PME"
-                      rows={3}
-                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.08)] transition-all resize-none text-sm"
-                    />
-                    <p className="text-gray-600 text-xs mt-1.5">Séparés par des virgules — utilisés pour guider la génération d&apos;articles</p>
+                    {/* Tags */}
+                    <div
+                      className="flex flex-wrap gap-2 min-h-[48px] w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-3 py-2.5 focus-within:border-violet-500/50 focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.08)] transition-all cursor-text"
+                      onClick={(e) => {
+                        const input = (e.currentTarget as HTMLElement).querySelector("input");
+                        input?.focus();
+                      }}
+                    >
+                      {form.keywords.split(",").map(k => k.trim()).filter(Boolean).map((kw, i) => (
+                        <span key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium" style={{ background: "rgba(139,92,246,0.15)", color: "#c4b5fd", border: "1px solid rgba(139,92,246,0.25)" }}>
+                          {kw}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const tags = form.keywords.split(",").map(k => k.trim()).filter(Boolean);
+                              update("keywords", tags.filter((_, idx) => idx !== i).join(", "));
+                            }}
+                            className="text-violet-400/60 hover:text-violet-300 transition-colors leading-none"
+                          >×</button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        value={keywordInput}
+                        onChange={(e) => setKeywordInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === ",") {
+                            e.preventDefault();
+                            const val = keywordInput.trim().replace(/,$/, "");
+                            if (!val) return;
+                            const existing = form.keywords.split(",").map(k => k.trim()).filter(Boolean);
+                            if (!existing.includes(val)) {
+                              update("keywords", [...existing, val].join(", "));
+                            }
+                            setKeywordInput("");
+                          } else if (e.key === "Backspace" && !keywordInput) {
+                            const tags = form.keywords.split(",").map(k => k.trim()).filter(Boolean);
+                            if (tags.length > 0) update("keywords", tags.slice(0, -1).join(", "));
+                          }
+                        }}
+                        placeholder={form.keywords ? "" : "ex: logiciel RH, gestion des congés…"}
+                        className="flex-1 min-w-[140px] bg-transparent text-white placeholder-gray-600 text-sm outline-none py-0.5"
+                      />
+                    </div>
+                    <p className="text-gray-600 text-xs mt-1.5">Appuyez sur <kbd className="px-1 py-0.5 rounded bg-white/[0.07] text-gray-400 font-mono text-[10px]">Entrée</kbd> pour valider chaque mot-clé</p>
                   </div>
                 </div>
 
