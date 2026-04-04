@@ -182,8 +182,11 @@ function CountdownTimer({ targetIso }: { targetIso: string | null }) {
   }, [targetIso]);
 
   const hasTime = time.ms > 0 && targetIso;
-  const total = totalDurationRef.current || time.ms || 1;
-  const progress = hasTime ? Math.max(2, Math.min(98, ((total - time.ms) / total) * 100)) : 0;
+  // Total duration = 24h (daily cron cycle). Progress = how much of the 24h has elapsed.
+  const CYCLE_MS = 24 * 60 * 60 * 1000;
+  const remaining = time.ms;
+  const elapsed = CYCLE_MS - remaining;
+  const progress = hasTime ? Math.max(2, Math.min(98, (elapsed / CYCLE_MS) * 100)) : 0;
 
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -287,7 +290,9 @@ export default function Dashboard() {
   };
   // ── GSC Performance ────────────────────────────────────────────────────────
   type GscPage = { url: string; clicks: number; impressions: number; ctr: number; position: number };
-  type GscPerf = { totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number; pages: GscPage[] };
+  type GscDailyPoint = { date: string; clicks: number; impressions: number };
+  type GscQuery = { query: string; clicks: number; impressions: number; ctr: number; position: number };
+  type GscPerf = { totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number; pages: GscPage[]; dailyChart: GscDailyPoint[]; queries: GscQuery[] };
   const [gscPerf, setGscPerf] = useState<GscPerf | null>(null);
 
   const [cocoonData, setCocoonData] = useState<CocoonData | null>(null);
@@ -1821,44 +1826,151 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Top pages */}
-                  <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden animate-fade-in-up delay-400">
-                    <div className="px-6 py-4 border-b border-white/[0.06]">
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Top pages par clics</p>
+                  {/* Graphique clics & impressions — 30 jours */}
+                  {gscPerf.dailyChart && gscPerf.dailyChart.length > 0 && (
+                    <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 animate-fade-in-up delay-300">
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-5">Évolution — 30 derniers jours</p>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={gscPerf.dailyChart} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="gscClicksGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#34A853" stopOpacity={0.3} />
+                                <stop offset="95%" stopColor="#34A853" stopOpacity={0} />
+                              </linearGradient>
+                              <linearGradient id="gscImprGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#4285F4" stopOpacity={0.2} />
+                                <stop offset="95%" stopColor="#4285F4" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                            <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 10 }} tickFormatter={(v: string) => { const d = new Date(v); return `${d.getDate()}/${d.getMonth() + 1}`; }} axisLine={false} tickLine={false} />
+                            <YAxis yAxisId="left" tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false} width={40} />
+                            <YAxis yAxisId="right" orientation="right" tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false} width={50} />
+                            <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12 }} labelStyle={{ color: "#9ca3af" }} labelFormatter={(v) => new Date(String(v)).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} />
+                            <Area yAxisId="right" type="monotone" dataKey="impressions" stroke="#4285F4" strokeWidth={2} fillOpacity={1} fill="url(#gscImprGrad)" name="Impressions" />
+                            <Area yAxisId="left" type="monotone" dataKey="clicks" stroke="#34A853" strokeWidth={2} fillOpacity={1} fill="url(#gscClicksGrad)" name="Clics" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex items-center justify-center gap-6 mt-3">
+                        <div className="flex items-center gap-2"><div className="w-3 h-0.5 rounded-full" style={{ background: "#34A853" }} /><span className="text-gray-500 text-[10px] font-bold">Clics</span></div>
+                        <div className="flex items-center gap-2"><div className="w-3 h-0.5 rounded-full" style={{ background: "#4285F4" }} /><span className="text-gray-500 text-[10px] font-bold">Impressions</span></div>
+                      </div>
                     </div>
-                    <div className="divide-y divide-white/[0.04]">
-                      {gscPerf.pages.slice(0, 10).map((page, i) => {
-                        const path = (() => { try { return new URL(page.url).pathname; } catch { return page.url; } })();
-                        const posColor = page.position <= 3 ? "#34A853" : page.position <= 10 ? "#FBBC05" : page.position <= 20 ? "#EA4335" : "#6b7280";
-                        return (
-                          <div key={i} className="flex items-center gap-4 px-6 py-3 hover:bg-white/[0.02] transition-colors">
-                            <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black" style={{ background: i === 0 ? "linear-gradient(135deg, #4285F4, #34A853)" : "rgba(255,255,255,0.05)", color: i === 0 ? "white" : "#6b7280" }}>{i + 1}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-white text-sm font-medium truncate">{path}</p>
+                  )}
+
+                  {/* Top pages + Top requêtes côte à côte */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {/* Top pages */}
+                    <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden animate-fade-in-up delay-400">
+                      <div className="px-6 py-4 border-b border-white/[0.06]">
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Top pages par clics</p>
+                      </div>
+                      <div className="divide-y divide-white/[0.04]">
+                        {gscPerf.pages.slice(0, 10).map((page, i) => {
+                          const path = (() => { try { return new URL(page.url).pathname; } catch { return page.url; } })();
+                          const posColor = page.position <= 3 ? "#34A853" : page.position <= 10 ? "#FBBC05" : page.position <= 20 ? "#EA4335" : "#6b7280";
+                          return (
+                            <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.02] transition-colors">
+                              <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black" style={{ background: i === 0 ? "linear-gradient(135deg, #4285F4, #34A853)" : "rgba(255,255,255,0.05)", color: i === 0 ? "white" : "#6b7280" }}>{i + 1}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white text-xs font-medium truncate">{path}</p>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0 text-xs">
+                                <div className="text-right">
+                                  <p className="text-white font-bold text-xs">{page.clicks}</p>
+                                  <p className="text-gray-600 text-[8px]">clics</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold text-xs" style={{ color: posColor }}>{page.position}</p>
+                                  <p className="text-gray-600 text-[8px]">pos.</p>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-5 flex-shrink-0 text-xs">
-                              <div className="text-right w-16">
-                                <p className="text-white font-bold">{page.clicks}</p>
-                                <p className="text-gray-600 text-[9px]">clics</p>
-                              </div>
-                              <div className="text-right w-16">
-                                <p className="text-gray-400 font-bold">{page.impressions}</p>
-                                <p className="text-gray-600 text-[9px]">impr.</p>
-                              </div>
-                              <div className="text-right w-12">
-                                <p className="font-bold" style={{ color: posColor }}>{page.position}</p>
-                                <p className="text-gray-600 text-[9px]">pos.</p>
-                              </div>
-                              <div className="text-right w-12">
-                                <p className="text-gray-400 font-bold">{page.ctr}%</p>
-                                <p className="text-gray-600 text-[9px]">CTR</p>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    {/* Top requêtes */}
+                    {gscPerf.queries && gscPerf.queries.length > 0 && (
+                      <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden animate-fade-in-up delay-400">
+                        <div className="px-6 py-4 border-b border-white/[0.06]">
+                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Top requêtes Google</p>
+                        </div>
+                        <div className="divide-y divide-white/[0.04]">
+                          {gscPerf.queries.slice(0, 15).map((q, i) => {
+                            const posColor = q.position <= 3 ? "#34A853" : q.position <= 10 ? "#FBBC05" : q.position <= 20 ? "#EA4335" : "#6b7280";
+                            return (
+                              <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.02] transition-colors">
+                                <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black" style={{ background: i < 3 ? "linear-gradient(135deg, #FBBC05, #f97316)" : "rgba(255,255,255,0.05)", color: i < 3 ? "white" : "#6b7280" }}>{i + 1}</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-white text-xs font-medium truncate">{q.query}</p>
+                                </div>
+                                <div className="flex items-center gap-3 flex-shrink-0 text-xs">
+                                  <div className="text-right">
+                                    <p className="text-white font-bold text-xs">{q.clicks}</p>
+                                    <p className="text-gray-600 text-[8px]">clics</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-gray-400 font-bold text-xs">{q.impressions}</p>
+                                    <p className="text-gray-600 text-[8px]">impr.</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-bold text-xs" style={{ color: posColor }}>{q.position}</p>
+                                    <p className="text-gray-600 text-[8px]">pos.</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-gray-400 font-bold text-xs">{q.ctr}%</p>
+                                    <p className="text-gray-600 text-[8px]">CTR</p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Distribution des positions */}
+                  {(() => {
+                    const posRanges = [
+                      { label: "Top 3", min: 0, max: 3, color: "#34A853" },
+                      { label: "4–10", min: 3, max: 10, color: "#FBBC05" },
+                      { label: "11–20", min: 10, max: 20, color: "#EA4335" },
+                      { label: "21–50", min: 20, max: 50, color: "#6b7280" },
+                      { label: "50+", min: 50, max: 9999, color: "#374151" },
+                    ];
+                    const allItems = [...gscPerf.pages, ...(gscPerf.queries ?? []).map(q => ({ ...q, url: q.query }))];
+                    const dist = posRanges.map(r => ({
+                      ...r,
+                      count: allItems.filter(p => p.position > r.min && p.position <= r.max).length,
+                    }));
+                    const maxCount = Math.max(...dist.map(d => d.count), 1);
+
+                    return (
+                      <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 animate-fade-in-up delay-500">
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-5">Distribution des positions</p>
+                        <div className="space-y-3">
+                          {dist.map(d => (
+                            <div key={d.label} className="flex items-center gap-4">
+                              <span className="text-gray-400 text-xs font-bold w-12 text-right">{d.label}</span>
+                              <div className="flex-1 h-7 rounded-lg overflow-hidden" style={{ background: "rgba(255,255,255,0.03)" }}>
+                                <div
+                                  className="h-full rounded-lg flex items-center px-3 transition-all duration-700"
+                                  style={{ width: `${Math.max(2, (d.count / maxCount) * 100)}%`, background: `${d.color}30`, borderLeft: `3px solid ${d.color}` }}
+                                >
+                                  <span className="text-[10px] font-black" style={{ color: d.color }}>{d.count}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}

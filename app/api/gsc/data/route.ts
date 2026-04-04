@@ -28,35 +28,36 @@ export async function GET() {
     const endDate = daysAgo(2); // GSC has ~2 day delay
     const startDate = daysAgo(30);
 
-    // Global metrics
-    const [globalRes, pagesRes] = await Promise.all([
-      fetch(`https://www.googleapis.com/webmasters/v3/sites/${siteUrl}/searchAnalytics/query`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    // Global metrics — parallel requests
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const apiBase = `https://www.googleapis.com/webmasters/v3/sites/${siteUrl}/searchAnalytics/query`;
+
+    const [globalRes, pagesRes, queriesRes] = await Promise.all([
+      fetch(apiBase, {
+        method: "POST", headers,
         body: JSON.stringify({ startDate, endDate, dimensions: ["date"], rowLimit: 30 }),
       }),
-      fetch(`https://www.googleapis.com/webmasters/v3/sites/${siteUrl}/searchAnalytics/query`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startDate, endDate,
-          dimensions: ["page"],
-          rowLimit: 25,
-          dimensionFilterGroups: [],
-        }),
+      fetch(apiBase, {
+        method: "POST", headers,
+        body: JSON.stringify({ startDate, endDate, dimensions: ["page"], rowLimit: 50 }),
+      }),
+      fetch(apiBase, {
+        method: "POST", headers,
+        body: JSON.stringify({ startDate, endDate, dimensions: ["query"], rowLimit: 100 }),
       }),
     ]);
 
     type GSCRow = { keys: string[]; clicks: number; impressions: number; ctr: number; position: number };
     type GSCResponse = { rows?: GSCRow[] };
 
-    if (!globalRes.ok || !pagesRes.ok) {
-      const errBody = await (!globalRes.ok ? globalRes : pagesRes).json().catch(() => ({})) as { error?: { message?: string } };
+    if (!globalRes.ok) {
+      const errBody = await globalRes.json().catch(() => ({})) as { error?: { message?: string } };
       return Response.json({ error: errBody?.error?.message ?? "Erreur Google Search Console" }, { status: 502 });
     }
 
     const globalData = await globalRes.json() as GSCResponse;
-    const pagesData = await pagesRes.json() as GSCResponse;
+    const pagesData = pagesRes.ok ? await pagesRes.json() as GSCResponse : { rows: [] };
+    const queriesData = queriesRes.ok ? await queriesRes.json() as GSCResponse : { rows: [] };
 
     const rows = globalData.rows ?? [];
     const totalClicks = rows.reduce((s, r) => s + r.clicks, 0);
@@ -78,7 +79,15 @@ export async function GET() {
       position: Math.round(r.position * 10) / 10,
     }));
 
-    return Response.json({ totalClicks, totalImpressions, avgCtr, avgPosition, dailyChart, pages });
+    const queries = (queriesData.rows ?? []).map(r => ({
+      query: r.keys[0],
+      clicks: r.clicks,
+      impressions: r.impressions,
+      ctr: Math.round(r.ctr * 1000) / 10,
+      position: Math.round(r.position * 10) / 10,
+    }));
+
+    return Response.json({ totalClicks, totalImpressions, avgCtr, avgPosition, dailyChart, pages, queries });
   } catch (err: unknown) {
     return Response.json({ error: err instanceof Error ? err.message : "Erreur" }, { status: 500 });
   }

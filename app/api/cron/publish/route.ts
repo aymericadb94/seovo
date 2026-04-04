@@ -4,6 +4,8 @@ import { sendArticlePublishedEmail } from "@/lib/email";
 import { publishToWix, analyzeWixSite } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
 import { fetchPexelsImage } from "@/lib/pexels";
+import { emitEvent, createPublicationEvent, createMilestoneEvent } from "@/lib/seo-events";
+import { recordAction } from "@/lib/seo-feedback";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -553,6 +555,25 @@ export async function GET(request: Request) {
           });
           if (insertError) {
             console.error("[cron/publish] failed to record publication:", insertError.message);
+          }
+
+          // ── SEO Event hook — enregistrer la publication pour le recalcul ──
+          try {
+            const pubEvent = createPublicationEvent(keyword, title, publishedUrl ?? "");
+            await emitEvent(supabase, site.user_id, pubEvent);
+
+            // Record action for feedback loop (gain will be measured at J+7/14/30)
+            await recordAction(supabase, site.user_id, "publication", keyword, publishedUrl ?? "", null, [], 0);
+
+            // Check milestones
+            const { count } = await supabase
+              .from("publications")
+              .select("id", { count: "exact", head: true })
+              .eq("user_id", site.user_id);
+            const milestoneEvent = createMilestoneEvent(count ?? 0);
+            if (milestoneEvent) await emitEvent(supabase, site.user_id, milestoneEvent);
+          } catch {
+            // Non-blocking — events will be detected at next recalc anyway
           }
 
           // Notification email à l'utilisateur
