@@ -11,7 +11,7 @@ import RoadmapModal, { type RoadmapData } from "@/components/RoadmapModal";
 import Footer from "@/components/Footer";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, BarChart, Bar,
+  ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -92,27 +92,18 @@ function ScoreRing({ score }: { score: number }) {
   return (
     <div className="flex items-center gap-4">
       <div className="relative w-28 h-28 flex items-center justify-center flex-shrink-0">
-        {/* Halo pulsant derrière le ring */}
         <div
           className="absolute inset-0 rounded-full animate-pulse"
-          style={{
-            background: `radial-gradient(circle, ${color}18 0%, transparent 68%)`,
-            animationDuration: "2.5s",
-          }}
+          style={{ background: `radial-gradient(circle, ${color}18 0%, transparent 68%)`, animationDuration: "2.5s" }}
         />
         <svg className="absolute inset-0 rotate-[-90deg]" viewBox="0 0 100 100">
           <defs>
             <filter id="scoreGlow" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
-          {/* Piste de fond */}
           <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
-          {/* Arc coloré avec glow */}
           <circle
             cx="50" cy="50" r={r} fill="none"
             stroke={color} strokeWidth="8"
@@ -123,7 +114,6 @@ function ScoreRing({ score }: { score: number }) {
             style={{ transition: "stroke-dashoffset 1.4s cubic-bezier(0.34,1.56,0.64,1)" }}
           />
         </svg>
-        {/* Chiffre central — apparaît après l'arc */}
         <div
           className="text-center z-10"
           style={{ opacity: numVisible ? 1 : 0, transform: numVisible ? "scale(1)" : "scale(0.8)", transition: "opacity 0.5s ease 0.9s, transform 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.9s" }}
@@ -134,63 +124,16 @@ function ScoreRing({ score }: { score: number }) {
       </div>
       <div>
         <p className="text-white font-bold text-lg">Score SEO</p>
-        {/* Badge avec shimmer */}
         <span
           className="relative inline-flex items-center overflow-hidden text-xs font-bold px-2.5 py-1 rounded-full mt-1"
           style={{ background: `${color}20`, color }}
         >
-          <span
-            className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]"
-            style={{ background: `linear-gradient(90deg, transparent, ${color}40, transparent)` }}
-          />
+          <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: `linear-gradient(90deg, transparent, ${color}40, transparent)` }} />
           {label}
         </span>
         <p className="text-gray-500 text-xs mt-2">Basé sur vos publications et mots-clés couverts</p>
       </div>
     </div>
-  );
-}
-
-// ─── Custom bar with glow dot ─────────────────────────────────────────────────
-
-function GlowBar(props: { x?: number; y?: number; width?: number; height?: number; value?: number }) {
-  const { x = 0, y = 0, width = 0, height = 0, value = 0 } = props;
-  if (!value || height <= 0) return null;
-  const cx = x + width / 2;
-  return (
-    <g>
-      {/* Barre principale avec filter glow */}
-      <defs>
-        <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#f97316" />
-          <stop offset="100%" stopColor="#ef4444" stopOpacity={0.7} />
-        </linearGradient>
-        <filter id="barGlow" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-      </defs>
-      {/* Reflet de fond sous la barre */}
-      <rect
-        x={x + width * 0.2} y={y + height * 0.6}
-        width={width * 0.6} height={height * 0.4}
-        rx={3}
-        fill="#f97316"
-        opacity={0.12}
-        filter="url(#barGlow)"
-      />
-      {/* Barre */}
-      <rect
-        x={x} y={y}
-        width={width} height={height}
-        rx={4}
-        fill="url(#barGrad)"
-        filter="url(#barGlow)"
-      />
-      {/* Dot lumineux au sommet */}
-      <circle cx={cx} cy={y} r={4} fill="#f97316" filter="url(#barGlow)" />
-      <circle cx={cx} cy={y} r={2} fill="#fff" opacity={0.9} />
-    </g>
   );
 }
 
@@ -207,38 +150,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
-// ─── Keyword badge ────────────────────────────────────────────────────────────
-
-function KeywordBar({ kw, max }: { kw: { keyword: string; count: number; lastPublished: string | null }; max: number }) {
-  const [w, setW] = useState(0);
-  useEffect(() => {
-    const t = setTimeout(() => setW(max > 0 ? (kw.count / max) * 100 : 0), 400);
-    return () => clearTimeout(t);
-  }, [kw.count, max]);
-  return (
-    <div className="flex items-center gap-3 group">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-sm text-white font-medium truncate">{kw.keyword}</span>
-          <span className="text-xs font-black text-orange-400 ml-2 flex-shrink-0">{kw.count}×</span>
-        </div>
-        <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500"
-            style={{ width: `${w}%`, transition: "width 1s cubic-bezier(0.34,1.56,0.64,1)" }}
-          />
-        </div>
-        {kw.lastPublished && (
-          <p className="text-gray-600 text-xs mt-0.5">
-            Dernier : {new Date(kw.lastPublished).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Countdown timer ──────────────────────────────────────────────────────────
 
 function CountdownTimer({ targetIso }: { targetIso: string | null }) {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -265,7 +177,6 @@ function CountdownTimer({ targetIso }: { targetIso: string | null }) {
   }, [targetIso]);
 
   const hasTime = time.ms > 0 && targetIso;
-  // Fenêtre glissante : on affiche la progression dans la dernière heure avant publication
   const windowMs = Math.min(time.ms, 3600000);
   const progress = targetIso && time.ms > 0 ? Math.max(2, Math.min(100, 100 - (windowMs / 3600000) * 100)) : 0;
 
@@ -280,37 +191,11 @@ function CountdownTimer({ targetIso }: { targetIso: string | null }) {
           ] as const).map(({ val, label }, i) => (
             <div key={label} className="flex items-start">
               {i > 0 && (
-                <span
-                  className="font-black select-none"
-                  style={{
-                    fontSize: "2.4rem",
-                    lineHeight: 1,
-                    margin: "0 3px",
-                    color: "rgba(249,115,22,0.3)",
-                    animation: "colonPulse 1s ease-in-out infinite",
-                  }}
-                >:</span>
+                <span className="font-black select-none" style={{ fontSize: "2.4rem", lineHeight: 1, margin: "0 3px", color: "rgba(249,115,22,0.3)", animation: "colonPulse 1s ease-in-out infinite" }}>:</span>
               )}
               <div className="flex flex-col items-center" style={{ minWidth: 50 }}>
-                <span
-                  className="font-black tabular-nums leading-none"
-                  style={{
-                    fontSize: "2.6rem",
-                    color: "white",
-                    textShadow: label === "sec" && glow
-                      ? "0 0 24px rgba(249,115,22,0.9), 0 0 8px rgba(249,115,22,0.6)"
-                      : "0 0 12px rgba(255,255,255,0.06)",
-                    transition: "text-shadow 0.18s ease",
-                  }}
-                >
-                  {val}
-                </span>
-                <span
-                  className="uppercase tracking-widest font-bold"
-                  style={{ fontSize: "0.6rem", color: "rgba(249,115,22,0.45)", marginTop: 5 }}
-                >
-                  {label}
-                </span>
+                <span className="font-black tabular-nums leading-none" style={{ fontSize: "2.6rem", color: "white", textShadow: label === "sec" && glow ? "0 0 24px rgba(249,115,22,0.9), 0 0 8px rgba(249,115,22,0.6)" : "0 0 12px rgba(255,255,255,0.06)", transition: "text-shadow 0.18s ease" }}>{val}</span>
+                <span className="uppercase tracking-widest font-bold" style={{ fontSize: "0.6rem", color: "rgba(249,115,22,0.45)", marginTop: 5 }}>{label}</span>
               </div>
             </div>
           ))}
@@ -318,51 +203,17 @@ function CountdownTimer({ targetIso }: { targetIso: string | null }) {
       ) : (
         <p className="text-2xl font-black text-white">Très prochainement</p>
       )}
-
-      {/* Progress bar with glowing orb */}
       <div className="relative" style={{ height: 6 }}>
         <div className="absolute inset-0 rounded-full" style={{ background: "rgba(255,255,255,0.04)" }} />
-        <div
-          className="absolute inset-y-0 left-0 rounded-full"
-          style={{
-            width: `${progress}%`,
-            background: "linear-gradient(90deg, rgba(249,115,22,0.25) 0%, #f97316 100%)",
-            transition: "width 1s linear",
-          }}
-        />
-        {/* Glowing orb */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{
-            left: `clamp(3px, calc(${progress}% - 3px), calc(100% - 3px))`,
-            width: 12, height: 12,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, #fff 10%, #f97316 70%)",
-            boxShadow: "0 0 12px 4px rgba(249,115,22,0.65), 0 0 4px 1px rgba(255,200,100,0.4)",
-            transition: "left 1s linear",
-          }}
-        />
+        <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${progress}%`, background: "linear-gradient(90deg, rgba(249,115,22,0.25) 0%, #f97316 100%)", transition: "width 1s linear" }} />
+        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: `clamp(3px, calc(${progress}% - 3px), calc(100% - 3px))`, width: 12, height: 12, borderRadius: "50%", background: "radial-gradient(circle, #fff 10%, #f97316 70%)", boxShadow: "0 0 12px 4px rgba(249,115,22,0.65), 0 0 4px 1px rgba(255,200,100,0.4)", transition: "left 1s linear" }} />
       </div>
-
-      <style>{`
-        @keyframes colonPulse {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 0.15; }
-        }
-      `}</style>
+      <style>{`@keyframes colonPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.15; } }`}</style>
     </div>
   );
 }
 
-function cmsLabel(cms: string | null | undefined): string {
-  switch (cms) {
-    case "wordpress": return "WordPress";
-    case "shopify":   return "Shopify";
-    case "wix":       return "Wix";
-    case "custom":    return "API custom";
-    default:          return cms ?? "Inconnu";
-  }
-}
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const router = useRouter();
@@ -373,6 +224,7 @@ export default function Dashboard() {
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "publications" | "keywords" | "calendar">("overview");
   const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null);
+  const [showScoreBubble, setShowScoreBubble] = useState(false);
   const [indexationResults, setIndexationResults] = useState<Record<string, { indexed: boolean | null; verdict: string; coverage: string }>>({});
   const [indexationLoading, setIndexationLoading] = useState(false);
 
@@ -403,52 +255,6 @@ export default function Dashboard() {
   const [roadmapRecord, setRoadmapRecord] = useState<RoadmapRecord | null>(null);
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
   const [roadmapLoading, setRoadmapLoading] = useState(false);
-
-
-  // Maillage interne
-  type LinkingSuggestion = {
-    from_title: string; from_url: string;
-    to_title: string; to_url: string;
-    anchor: string; placement: string;
-    objective: string; priority: string;
-  };
-  type LinkingCluster = { name: string; pillar: string; pages: string[]; missing_links: number };
-  type LinkingOrphan = { title: string; url: string; reason: string };
-  type LinkingResult = {
-    score: number; score_label: string; score_comment: string;
-    cluster_analysis: LinkingCluster[];
-    suggestions: LinkingSuggestion[];
-    orphan_pages: LinkingOrphan[];
-    opportunities: string[];
-  };
-  const [linkingResult, setLinkingResult] = useState<LinkingResult | null>(null);
-  const [linkingLoading, setLinkingLoading] = useState(false);
-  const [linkingGenerated, setLinkingGenerated] = useState(false);
-  const LINKING_MIN_ARTICLES = 5;
-
-  async function loadLinking() {
-    try {
-      const res = await fetch("/api/internal-linking");
-      const json = await res.json();
-      if (!json.error && json.result?.data) {
-        setLinkingResult(json.result.data as LinkingResult);
-        setLinkingGenerated(true);
-      }
-    } catch { /* ignore */ }
-  }
-
-  async function generateLinking() {
-    setLinkingLoading(true);
-    try {
-      const res = await fetch("/api/internal-linking", { method: "POST" });
-      const json = await res.json();
-      if (!json.error) {
-        setLinkingResult(json.result as LinkingResult);
-        setLinkingGenerated(true);
-      }
-    } catch { /* ignore */ }
-    setLinkingLoading(false);
-  }
 
   // SEO Projections
   type ProjectionItem = {
@@ -501,7 +307,7 @@ export default function Dashboard() {
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       setRoadmapRecord(json.roadmap);
-    } finally {
+    } catch { /* ignore */ } finally {
       setRoadmapLoading(false);
     }
   }
@@ -523,13 +329,31 @@ export default function Dashboard() {
     loadAudit();
     loadRoadmap();
     loadProjections();
-    loadLinking();
     window.addEventListener("focus", loadData);
     return () => window.removeEventListener("focus", loadData);
   }, []);
 
-  // Popup audit désactivé
+  // Score bubble — show once after analysis
+  useEffect(() => {
+    if (!data?.site?.seo_analysis_done) return;
+    const seen = localStorage.getItem("rankpill_score_explained");
+    if (seen) return;
+    const t = setTimeout(() => setShowScoreBubble(true), 1400);
+    return () => clearTimeout(t);
+  }, [data?.site?.seo_analysis_done]);
 
+  // Auto-dismiss bubble after 7s
+  useEffect(() => {
+    if (!showScoreBubble) return;
+    const t = setTimeout(() => dismissScoreBubble(), 7000);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showScoreBubble]);
+
+  function dismissScoreBubble() {
+    setShowScoreBubble(false);
+    localStorage.setItem("rankpill_score_explained", "1");
+  }
 
   async function handleLogout() {
     const supabase = createClient();
@@ -594,7 +418,6 @@ export default function Dashboard() {
   }
 
   const kpis = data?.kpis;
-  const showRoadmapCTA = !!data?.site?.seo_analysis_done && !roadmapRecord;
   const animScore = useCounter(kpis?.seoScore ?? 0);
   const animMonth = useCounter(kpis?.articlesThisMonth ?? 0);
   const animKw = useCounter(kpis?.coveredKeywords ?? 0);
@@ -603,19 +426,14 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-[#080808] text-white overflow-x-hidden">
-      {/* SEO Analysis Modal — s'affiche uniquement quand showSeoModal est explicitement true */}
       {showSeoModal === true && (
         <SeoAnalysisModal
-          onComplete={() => {
-            setShowSeoModal(false);
-            loadData();
-          }}
+          onComplete={() => { setShowSeoModal(false); loadData(); }}
           prefilledStrengths={data?.site?.seo_context?.strengths ?? ""}
           prefilledDifferentiators={data?.site?.seo_context?.differentiators ?? ""}
         />
       )}
 
-      {/* Audit mensuel */}
       {showAuditReport && (
         <AuditModal
           auditRecord={latestAudit}
@@ -625,7 +443,6 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Roadmap SEO 40 articles */}
       {showRoadmapModal && (
         <RoadmapModal
           roadmapRecord={roadmapRecord}
@@ -636,20 +453,14 @@ export default function Dashboard() {
 
       {/* Modale limite journalière */}
       {showDailyLimitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in-up" style={{ animationDuration: "200ms" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
           <div className="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ animation: "modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1) both" }}>
-            {/* Gradient de fond */}
             <div className="absolute inset-0 rounded-2xl" style={{ background: "linear-gradient(135deg, #1a0e00 0%, #120800 40%, #0e0e0e 100%)" }} />
-            {/* Bordure gradient animée */}
             <div className="absolute inset-0 rounded-2xl p-px" style={{ background: "linear-gradient(135deg, rgba(251,146,60,0.5), rgba(239,68,68,0.3), rgba(251,146,60,0.1))" }}>
               <div className="absolute inset-0 rounded-2xl" style={{ background: "linear-gradient(135deg, #1a0e00 0%, #120800 40%, #0e0e0e 100%)" }} />
             </div>
-            {/* Halo orange radial */}
             <div className="absolute top-0 left-0 w-64 h-64 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(251,146,60,0.15) 0%, transparent 65%)" }} />
-            <div className="absolute bottom-0 right-0 w-48 h-48 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(239,68,68,0.08) 0%, transparent 65%)" }} />
-
             <div className="relative p-7">
-              {/* Badge + icône */}
               <div className="flex items-start gap-4 mb-5">
                 <div className="relative flex-shrink-0">
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(251,146,60,0.2), rgba(239,68,68,0.15))", border: "1px solid rgba(251,146,60,0.3)" }}>
@@ -658,42 +469,24 @@ export default function Dashboard() {
                       <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                     </svg>
                   </div>
-                  {/* Pulse ring */}
                   <div className="absolute inset-0 rounded-2xl animate-ping opacity-20" style={{ background: "rgba(251,146,60,0.4)", animationDuration: "2s" }} />
                 </div>
                 <div>
                   <h3 className="text-white font-black text-lg leading-tight">Limite journalière<br/>atteinte</h3>
                   <div className="flex items-center gap-1.5 mt-1">
-                    {[1,2,3].map(i => (
-                      <div key={i} className="w-5 h-1.5 rounded-full" style={{ background: "linear-gradient(90deg, #fb923c, #ef4444)" }} />
-                    ))}
+                    {[1,2,3].map(i => <div key={i} className="w-5 h-1.5 rounded-full" style={{ background: "linear-gradient(90deg, #fb923c, #ef4444)" }} />)}
                     <span className="text-orange-400 text-xs font-bold ml-1">3/3</span>
                   </div>
                 </div>
               </div>
-
               <p className="text-white/70 text-sm leading-relaxed mb-2">
                 Vous avez atteint la limite recommandée de <span className="font-bold" style={{ background: "linear-gradient(90deg, #fb923c, #f97316)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>3 publications par jour</span>. Publier davantage peut nuire à votre référencement.
               </p>
-              <p className="text-white/35 text-xs leading-relaxed mb-7">
-                Google peut interpréter un volume excessif comme du spam. Attendez demain pour maintenir une croissance organique optimale.
-              </p>
-
+              <p className="text-white/35 text-xs leading-relaxed mb-7">Google peut interpréter un volume excessif comme du spam. Attendez demain pour maintenir une croissance organique optimale.</p>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowDailyLimitModal(false)}
-                  className="flex-1 px-4 py-3 rounded-xl text-white/50 hover:text-white/80 transition-all text-sm font-medium"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={() => handleManualPublish(true)}
-                  className="flex-1 px-4 py-3 rounded-xl text-white font-bold text-sm transition-all hover:opacity-90 active:scale-95 relative overflow-hidden"
-                  style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 4px 24px rgba(249,115,22,0.35)" }}
-                >
+                <button onClick={() => setShowDailyLimitModal(false)} className="flex-1 px-4 py-3 rounded-xl text-white/50 hover:text-white/80 transition-all text-sm font-medium" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>Annuler</button>
+                <button onClick={() => handleManualPublish(true)} className="flex-1 px-4 py-3 rounded-xl text-white font-bold text-sm transition-all hover:opacity-90 active:scale-95 relative overflow-hidden" style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 4px 24px rgba(249,115,22,0.35)" }}>
                   <span className="relative z-10">Générer quand même</span>
-                  <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity" style={{ background: "linear-gradient(135deg, #fb923c, #f87171)" }} />
                 </button>
               </div>
             </div>
@@ -710,7 +503,6 @@ export default function Dashboard() {
 
       {/* ── Nav ─────────────────────────────────────────────────────────── */}
       <nav className="sticky top-0 z-50 bg-[#080808]/95 backdrop-blur-md border-b border-white/[0.06] animate-fade-in">
-        {/* Rangée 1 : logo + actions */}
         <div className="max-w-screen-xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="text-xl font-black tracking-tight logo-glow cursor-default">
@@ -732,91 +524,61 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            {/* Bouton Auto-publier */}
             {(() => {
               const pubsToday = data?.kpis.pubsToday ?? 0;
               const dailyMax = 3;
               const limitReached = pubsToday >= dailyMax;
               return (
-            <button
-              onClick={() => handleManualPublish()}
-              disabled={cronRunning}
-              className="group relative flex items-center gap-2 px-4 py-2 rounded-xl border border-orange-500/25 bg-orange-500/[0.06] hover:bg-orange-500/[0.12] hover:border-orange-500/50 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {cronRunning && (
-                <span className="absolute inset-0 rounded-xl border border-orange-500/40 animate-ping" />
-              )}
-              {cronRunning ? (
-                <>
-                  <span className="w-3.5 h-3.5 rounded-full border-2 border-orange-400 border-t-transparent animate-spin flex-shrink-0" />
-                  <span className="text-xs font-bold text-orange-400">Publication...</span>
-                </>
-              ) : (
-                <>
-                  {/* Icône éclair */}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                    className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors flex-shrink-0">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" stroke="none"/>
-                  </svg>
-                  <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300 transition-colors">
-                    {limitReached ? "3/3" : `${pubsToday + 1}/3`}
-                  </span>
-                  <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1a1a1a] border border-white/10 text-gray-400 text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
-                    {limitReached ? "Limite journalière atteinte (3/3)" : "Publie automatiquement le prochain mot-clé"}
-                  </span>
-                </>
-              )}
-            </button>
-            );
+                <button
+                  onClick={() => handleManualPublish()}
+                  disabled={cronRunning}
+                  className="group relative flex items-center gap-2 px-4 py-2 rounded-xl border border-orange-500/25 bg-orange-500/[0.06] hover:bg-orange-500/[0.12] hover:border-orange-500/50 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {cronRunning && <span className="absolute inset-0 rounded-xl border border-orange-500/40 animate-ping" />}
+                  {cronRunning ? (
+                    <><span className="w-3.5 h-3.5 rounded-full border-2 border-orange-400 border-t-transparent animate-spin flex-shrink-0" /><span className="text-xs font-bold text-orange-400">Publication...</span></>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors flex-shrink-0">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" stroke="none"/>
+                      </svg>
+                      <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300 transition-colors">{limitReached ? "3/3" : `${pubsToday + 1}/3`}</span>
+                      <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1a1a1a] border border-white/10 text-gray-400 text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                        {limitReached ? "Limite journalière atteinte (3/3)" : "Publie automatiquement le prochain mot-clé"}
+                      </span>
+                    </>
+                  )}
+                </button>
+              );
             })()}
 
-            {/* Bouton Créer un article */}
-            <Link
-              href="/generate"
-              className="group relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-xs shadow-lg shadow-orange-500/25 hover:shadow-orange-500/45 transition-all duration-300 hover:scale-[1.03]"
-            >
-              {/* Shimmer sweep */}
-              <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]"
-                style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)" }} />
-              {/* Icône crayon */}
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-                className="w-3.5 h-3.5 flex-shrink-0 relative">
+            <Link href="/generate" className="group relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-xs shadow-lg shadow-orange-500/25 hover:shadow-orange-500/45 transition-all duration-300 hover:scale-[1.03]">
+              <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)" }} />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 flex-shrink-0 relative">
                 <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
               </svg>
               <span className="relative">Créer</span>
-              {/* Tooltip au hover */}
               <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1a1a1a] border border-white/10 text-gray-400 text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 font-normal">
                 Choisir le mot-clé et prévisualiser avant publication
               </span>
             </Link>
             <Link href="/settings" className="group w-9 h-9 flex items-center justify-center rounded-xl border border-white/10 hover:border-orange-500/40 bg-white/[0.03] hover:bg-orange-500/10 transition-all duration-300">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                className="w-4 h-4 text-gray-500 group-hover:text-orange-400 transition-colors duration-300 group-hover:rotate-90 transition-transform duration-500">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-500 group-hover:text-orange-400 transition-colors duration-300 group-hover:rotate-90 transition-transform duration-500">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
               </svg>
             </Link>
             <Link href="/admin" className="text-gray-600 hover:text-orange-400 text-xs px-2 py-2 transition-colors" title="Admin">◈</Link>
             <LanguageSwitcher />
-            <button onClick={handleLogout} className="text-gray-500 hover:text-white text-xs px-3 py-2 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
-              Déconnexion
-            </button>
+            <button onClick={handleLogout} className="text-gray-500 hover:text-white text-xs px-3 py-2 rounded-lg border border-white/10 hover:border-white/20 transition-colors">Déconnexion</button>
           </div>
         </div>
 
-        {/* Rangée 2 : tabs */}
+        {/* Tabs */}
         <div className="border-t border-white/[0.04]">
           <div className="max-w-screen-xl mx-auto px-6 flex items-center gap-1 py-0">
             {(["overview", "publications", "keywords", "calendar"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-5 py-3 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
-                  activeTab === tab
-                    ? "border-orange-500 text-white"
-                    : "border-transparent text-gray-500 hover:text-gray-300"
-                }`}
-              >
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-3 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${activeTab === tab ? "border-orange-500 text-white" : "border-transparent text-gray-500 hover:text-gray-300"}`}>
                 {tab === "overview" ? "Vue d'ensemble" : tab === "publications" ? "Publications" : tab === "keywords" ? "Mots-clés" : "Calendrier"}
               </button>
             ))}
@@ -826,7 +588,7 @@ export default function Dashboard() {
 
       <div className="max-w-screen-xl mx-auto px-6 py-8">
 
-        {/* ── Notification cron ────────────────────────────────────────── */}
+        {/* Notification cron */}
         {cronResult && (
           <div className="mb-6 bg-orange-500/10 border border-orange-500/20 rounded-xl px-5 py-3 flex items-center justify-between">
             <p className="text-orange-400 font-bold text-sm">✓ {cronResult}</p>
@@ -834,7 +596,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Bandeau GSC non connecté ─────────────────────────────── */}
+        {/* Bandeau GSC non connecté */}
         {!loading && data?.site && !data.site.gsc_connected && (
           <div className="mb-6 flex items-center justify-between gap-4 bg-[#0d0d0d] border border-white/[0.08] rounded-2xl px-5 py-4 animate-fade-in">
             <div className="flex items-center gap-3">
@@ -851,21 +613,15 @@ export default function Dashboard() {
                 <p className="text-gray-500 text-xs">Voyez vos vrais clics, impressions et positions Google en temps réel</p>
               </div>
             </div>
-            <a
-              href="/api/auth/google"
-              className="flex-shrink-0 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-xs px-4 py-2.5 rounded-xl uppercase tracking-wide shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 transition-shadow whitespace-nowrap"
-            >
+            <a href="/api/auth/google" className="flex-shrink-0 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-xs px-4 py-2.5 rounded-xl uppercase tracking-wide shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 transition-shadow whitespace-nowrap">
               Connecter →
             </a>
           </div>
         )}
 
-        {loading && (
-          <div className="text-center text-gray-600 py-24 text-sm">Chargement du dashboard...</div>
-        )}
+        {loading && <div className="text-center text-gray-600 py-24 text-sm">Chargement du dashboard...</div>}
 
         {!loading && data && (
-
           <>
             {/* ════════════════════════════════════════════════════════════
                 TAB 1 — VUE D'ENSEMBLE
@@ -873,757 +629,296 @@ export default function Dashboard() {
             {activeTab === "overview" && (
               <div className="space-y-5">
 
-                {/* ── Row 1 : Score + 4 KPIs ───────────────────────────── */}
-                <div className="grid grid-cols-12 gap-4">
+                {/* ── Hero Score SEO ───────────────────────────────────── */}
+                <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 md:p-8 overflow-hidden animate-fade-in-up">
+                  {/* Background halos */}
+                  <div className="absolute top-0 left-0 w-[500px] h-[250px] pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(249,115,22,0.07), transparent 65%)" }} />
+                  <div className="absolute bottom-0 right-0 w-[300px] h-[200px] pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(239,68,68,0.04), transparent 65%)" }} />
 
-                  {/* Score SEO */}
-                  <div className="col-span-12 lg:col-span-4 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up">
-                    <ScoreRing score={animScore} />
-                    <div className="mt-5 grid grid-cols-2 gap-3">
-                      <div className="bg-white/[0.03] rounded-xl p-3 animate-fade-in-up" style={{ animationDelay: "400ms" }}>
-                        <p className="text-gray-500 text-xs mb-1">Ce mois</p>
-                        <p className="text-white font-black text-xl">{animMonth}</p>
-                        <p className="text-gray-600 text-xs">articles publiés</p>
-                      </div>
-                      <div className="bg-white/[0.03] rounded-xl p-3 animate-fade-in-up" style={{ animationDelay: "550ms" }}>
-                        <p className="text-gray-500 text-xs mb-1">Cette semaine</p>
-                        <p className="text-white font-black text-xl">{kpis?.articlesThisWeek ?? 0}</p>
-                        <p className="text-gray-600 text-xs">articles publiés</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* KPIs */}
-                  <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-2 gap-4">
-
-                    {/* Carte Roadmap — prochains articles */}
-                    {(() => {
-                      const publishedKeywords = new Set((data?.recentPublications ?? []).map(p => p.keyword?.toLowerCase()));
-                      const nextArticles = (roadmapRecord?.data?.articles ?? [])
-                        .filter(a => !publishedKeywords.has(a.keyword?.toLowerCase()))
-                        .sort((a, b) => a.priority - b.priority)
-                        .slice(0, 3);
-                      const total = roadmapRecord?.data?.articles?.length ?? 0;
-                      const done = (data?.kpis.totalArticles ?? 0);
-                      const pct = Math.round((done / Math.max(total, 1)) * 100);
-                      return (
-                        <button
-                          onClick={() => setShowRoadmapModal(true)}
-                          className="relative rounded-2xl p-5 flex flex-col justify-between min-h-[140px] overflow-hidden group text-left animate-fade-in-up"
-                          style={{
-                            animationDelay: "100ms",
-                            background: "rgba(255,255,255,0.03)",
-                            border: "1px solid rgba(255,255,255,0.07)",
-                          }}
-                        >
-                          {/* Halos de fond */}
-                          <div className="absolute top-0 left-0 w-40 h-40 pointer-events-none"
-                            style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.13) 0%, transparent 70%)" }} />
-                          <div className="absolute bottom-0 right-0 w-32 h-32 pointer-events-none"
-                            style={{ background: "radial-gradient(ellipse at bottom right, rgba(96,165,250,0.07) 0%, transparent 70%)" }} />
-                          {/* Hover glow */}
-                          <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                            style={{ background: "radial-gradient(ellipse at 30% 20%, rgba(167,139,250,0.1), transparent 60%)", border: "1px solid rgba(167,139,250,0.3)" }} />
-
-                          {/* Header */}
-                          <div className="flex items-center justify-between mb-3 relative">
-                            <div>
-                              <p className="text-[10px] font-black uppercase tracking-[0.15em]"
-                                style={{ background: "linear-gradient(90deg, #a78bfa, #818cf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                                Roadmap SEO
-                              </p>
-                              {total > 0 && (
-                                <p className="text-white/25 text-[10px] mt-0.5">{total} articles planifiés</p>
-                              )}
-                            </div>
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6"
-                              style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.2), rgba(96,165,250,0.12))", border: "1px solid rgba(167,139,250,0.2)", color: "#c4b5fd" }}>
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-                              </svg>
-                            </div>
-                          </div>
-
-                          {total > 0 ? (
-                            <>
-                              <div className="relative flex-1 space-y-1">
-                                {nextArticles.length > 0 ? nextArticles.map((a, i) => (
-                                  <div key={a.id}
-                                    className="relative rounded-lg px-2.5 py-1.5 overflow-hidden"
-                                    style={{
-                                      opacity: 1 - i * 0.3,
-                                      transition: `all 0.4s ease ${i * 70}ms`,
-                                      background: i === 0 ? "linear-gradient(90deg, rgba(167,139,250,0.12), rgba(96,165,250,0.06) 70%, transparent)" : "transparent",
-                                      borderLeft: i === 0 ? "2px solid rgba(167,139,250,0.6)" : "2px solid rgba(167,139,250,0.12)",
-                                    }}>
-                                    {i === 0 && (
-                                      <div className="absolute inset-0 pointer-events-none animate-[sweep_3s_ease-in-out_infinite]"
-                                        style={{ background: "linear-gradient(90deg, transparent, rgba(167,139,250,0.08), transparent)" }} />
-                                    )}
-                                    <span className="relative text-xs truncate block"
-                                      style={{ color: i === 0 ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)", fontWeight: i === 0 ? 600 : 400, letterSpacing: i === 0 ? "-0.01em" : "normal" }}>
-                                      {a.title}
-                                    </span>
-                                  </div>
-                                )) : (
-                                  <p className="text-white/40 text-xs">Tous les articles publiés !</p>
-                                )}
-                              </div>
-                              <div className="mt-3 relative">
-                                <div className="flex justify-between items-baseline mb-1.5">
-                                  <span className="text-xs font-bold" style={{ background: "linear-gradient(90deg, #a78bfa, #60a5fa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                                    {done}/{total} publiés
-                                  </span>
-                                  <span className="text-[10px] font-bold text-white/25">{pct}%</span>
-                                </div>
-                                <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(167,139,250,0.08)" }}>
-                                  <div className="h-full rounded-full transition-all duration-1000 relative overflow-hidden"
-                                    style={{ width: `${pct}%`, background: "linear-gradient(90deg, #7c3aed, #a78bfa, #60a5fa)" }}>
-                                    <div className="absolute inset-0 animate-[sweep_2s_ease-in-out_infinite]"
-                                      style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)" }} />
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="flex-1 flex flex-col justify-center gap-2">
-                              <p className="text-white/40 text-xs leading-relaxed">Générez votre roadmap pour voir les prochains articles à publier</p>
-                              <span className="text-[10px] font-bold" style={{ background: "linear-gradient(90deg, #a78bfa, #60a5fa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                                Générer →
-                              </span>
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })()}
-
-                    {([{
-                        label: "Mots-clés couverts",
-                        value: animKw,
-                        icon: (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                            <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
-                          </svg>
-                        ),
-                        sub: `sur ${kpis?.totalKeywords ?? 0} configurés`,
-                        color: "#ef4444",
-                        delay: "200ms",
-                      },
-                      {
-                        label: "Couverture mots-clés",
-                        value: kpis && kpis.totalKeywords > 0
-                          ? Math.round((kpis.coveredKeywords / kpis.totalKeywords) * 100)
-                          : 0,
-                        suffix: "%",
-                        icon: (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-                          </svg>
-                        ),
-                        sub: `${kpis?.coveredKeywords ?? 0}/${kpis?.totalKeywords ?? 0} mots-clés`,
-                        color: "#fca5a5",
-                        delay: "400ms",
-                      },
-                    ] as const).map((kpi) => (
-                      <div
-                        key={kpi.label}
-                        className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 flex flex-col justify-between min-h-[140px] card-hover animate-fade-in-up overflow-hidden group"
-                        style={{ animationDelay: kpi.delay }}
-                      >
-                        {/* Glow de fond au hover */}
-                        <div
-                          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
-                          style={{ background: `radial-gradient(ellipse at top right, ${kpi.color}10, transparent 60%)` }}
-                        />
-
-                        <div className="flex items-center justify-between mb-4">
-                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">{kpi.label}</p>
-                          {/* Icône SVG dans container avec glow */}
-                          <div
-                            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110"
-                            style={{ background: `${kpi.color}15`, color: kpi.color, boxShadow: `0 0 0 0 ${kpi.color}30` }}
-                          >
-                            {kpi.icon}
-                          </div>
+                  {/* Tutorial bubble */}
+                  {showScoreBubble && (
+                    <div className="absolute z-20 hidden sm:block" style={{ top: "5rem", left: "13rem", maxWidth: 280 }}>
+                      <div className="absolute -left-2 top-4 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[8px]" style={{ borderRightColor: "rgba(249,115,22,0.45)" }} />
+                      <div className="bg-[#1a0a00] border border-orange-500/40 rounded-2xl p-4 shadow-2xl shadow-orange-500/15 animate-[modalPop_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-orange-400 text-xs font-black uppercase tracking-wider">Score SEO</p>
+                          <button onClick={dismissScoreBubble} className="text-gray-600 hover:text-white transition-colors w-5 h-5 flex items-center justify-center rounded text-xs hover:bg-white/10">✕</button>
                         </div>
-
-                        <p className="text-3xl font-black text-white tracking-tight">
-                          {"text" in kpi ? String(kpi.text) : `${"value" in kpi ? (kpi.value?.toLocaleString("fr-FR") ?? 0) : 0}${"suffix" in kpi ? kpi.suffix ?? "" : ""}`}
+                        <p className="text-white/80 text-xs leading-relaxed mb-3">
+                          Votre score mesure la performance globale de votre SEO : articles publiés, mots-clés couverts et régularité de publication. Il s'améliore automatiquement à chaque publication.
                         </p>
-
-                        {/* Sous-texte avec barre de progression pour couverture */}
-                        <div className="mt-3">
-                          <p className="text-xs font-medium" style={{ color: kpi.color }}>{kpi.sub}</p>
-                          {"suffix" in kpi && kpi.suffix === "%" && (
-                            <div className="mt-2 h-1 bg-white/[0.05] rounded-full overflow-hidden">
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${"value" in kpi ? kpi.value : 0}%`,
-                                  background: `linear-gradient(90deg, ${kpi.color}80, ${kpi.color})`,
-                                  transition: "width 1.2s cubic-bezier(0.34,1.56,0.64,1) 0.5s",
-                                }}
-                              />
-                            </div>
-                          )}
+                        <div className="h-0.5 bg-white/[0.05] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500" style={{ animation: "shrink 7s linear forwards" }} />
                         </div>
                       </div>
-                    ))}
-
-                    {/* Countdown card */}
-                    <div
-                      className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 flex flex-col justify-between min-h-[140px] card-hover animate-fade-in-up overflow-hidden group"
-                      style={{ animationDelay: "300ms" }}
-                    >
-                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
-                        style={{ background: "radial-gradient(ellipse at top right, rgba(249,115,22,0.08), transparent 60%)" }} />
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Prochaine publication</p>
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110"
-                          style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                          </svg>
-                        </div>
-                      </div>
-                      <CountdownTimer targetIso={kpis?.nextPublicationAt ?? null} />
-                      <p className="text-xs font-medium mt-2" style={{ color: "#fb923c" }}>
-                        {kpis ? (kpis.totalArticles > 0 ? "Publication automatique" : "En attente du 1er article") : "—"}
-                      </p>
+                      <style>{`@keyframes shrink { from { width: 100%; } to { width: 0%; } }`}</style>
                     </div>
-                  </div>
-                </div>
+                  )}
 
-                {/* ── Streak banner ─────────────────────────────────── */}
-                {(kpis?.streak ?? 0) > 0 && (
-                  <div className="bg-gradient-to-r from-orange-500/10 to-red-500/5 border border-orange-500/20 rounded-2xl px-6 py-4 flex items-center justify-between animate-fade-in-up delay-150">
-                    <div className="flex items-center gap-4">
-                      <span className="text-3xl">{(kpis?.streak ?? 0) >= 7 ? "🔥" : (kpis?.streak ?? 0) >= 3 ? "⚡" : "✦"}</span>
-                      <div>
-                        <p className="text-white font-black text-lg">{kpis?.streak} jour{(kpis?.streak ?? 0) > 1 ? "s" : ""} de suite</p>
-                        <p className="text-gray-500 text-xs">Streak de publication actuel</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-orange-400 font-black text-2xl">{kpis?.bestStreak}</p>
-                      <p className="text-gray-600 text-xs">Meilleur streak</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Outils SEO ───────────────────────────────────────── */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-150">
-
-                  {/* Audit mensuel */}
-                  <button
-                    onClick={() => setShowAuditReport(true)}
-                    className="relative group bg-white/[0.03] border border-white/[0.07] hover:border-orange-500/30 rounded-2xl p-5 text-left transition-all duration-300 overflow-hidden"
-                  >
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                      style={{ background: "radial-gradient(ellipse at top left, rgba(249,115,22,0.06), transparent 60%)" }} />
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                          <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-                        </svg>
-                      </div>
-                      {auditAvailable && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500/15 text-orange-400 border border-orange-500/25">Nouveau</span>
-                      )}
-                    </div>
-                    <p className="text-white font-bold text-sm mb-1">Audit SEO mensuel</p>
-                    <p className="text-white/40 text-xs leading-relaxed">
-                      {latestAudit
-                        ? `Dernier audit : ${latestAudit.data.month_label} — Score ${latestAudit.data.overall_score}/100`
-                        : "Générez votre premier audit SEO mensuel"}
-                    </p>
-                  </button>
-
-                  {/* Roadmap 40 articles */}
-                  <div className="flex flex-col gap-2 rounded-2xl">
-                    {/* Callout "première fois" */}
-                    {showRoadmapCTA && (
-                      <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl animate-[fadeInUp_0.5s_cubic-bezier(0.16,1,0.3,1)_both]"
-                        style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.12), rgba(139,92,246,0.08))", border: "1px solid rgba(167,139,250,0.3)" }}>
-                        <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "rgba(167,139,250,0.2)" }}>
-                          <span className="text-violet-300 text-xs">✦</span>
-                        </span>
-                        <p className="text-violet-300 text-xs font-bold flex-1">
-                          Votre analyse est prête — générez votre roadmap SEO pour démarrer
-                        </p>
-                        <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3 flex-shrink-0 text-violet-400" style={{ animation: "bounceDown 1.2s ease-in-out infinite" }}>
-                          <path d="M6 1v8M2.5 6.5L6 10l3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => setShowRoadmapModal(true)}
-                      className="relative group bg-white/[0.03] border rounded-2xl p-5 text-left transition-all duration-300 overflow-hidden"
-                      style={showRoadmapCTA ? { animation: "borderGlowViolet 2.2s ease-in-out infinite" } : { borderColor: "rgba(255,255,255,0.07)" }}
-                    >
-                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                        style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.06), transparent 60%)" }} />
-                      {showRoadmapCTA && (
-                        <div className="absolute inset-0 pointer-events-none rounded-2xl"
-                          style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.05), transparent 60%)" }} />
-                      )}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(167,139,250,0.12)", color: "#a78bfa" }}>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-                          </svg>
-                        </div>
-                        {!roadmapRecord && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-bold border"
-                            style={showRoadmapCTA
-                              ? { background: "rgba(167,139,250,0.15)", color: "#c4b5fd", borderColor: "rgba(167,139,250,0.4)" }
-                              : { background: "rgba(167,139,250,0.1)", color: "#a78bfa", borderColor: "rgba(167,139,250,0.25)" }}>
-                            {showRoadmapCTA ? "⚡ À générer maintenant" : "À générer"}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-white font-bold text-sm mb-1">Roadmap SEO — 40 articles</p>
-                      <p className="text-white/40 text-xs leading-relaxed">
-                        {roadmapRecord
-                          ? `Générée le ${new Date(roadmapRecord.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} — ${roadmapRecord.data.articles?.length ?? 0} articles planifiés`
-                          : showRoadmapCTA
-                            ? "Cliquez pour générer votre plan éditorial basé sur votre analyse SEO"
-                            : "Plan éditorial stratégique personnalisé pour dominer Google"}
-                      </p>
-                    </button>
-                  </div>
-                </div>
-
-                {/* ── Projections SEO ──────────────────────────────────── */}
-                {data.site?.seo_analysis_done && (
-                  <div
-                    className="relative bg-white/[0.03] border rounded-2xl p-6 animate-fade-in-up delay-200 overflow-hidden"
-                    style={{ borderColor: "rgba(255,255,255,0.07)" }}
-                  >
-                    {/* Halos */}
-                    <div className="absolute top-0 right-0 w-80 h-40 pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(34,197,94,0.06), transparent 65%)" }} />
-                    <div className="absolute bottom-0 left-0 w-64 h-32 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom left, rgba(249,115,22,0.05), transparent 65%)" }} />
-
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-5 relative">
-                      <div>
-                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Potentiel de croissance SEO</p>
-                        {projections ? (
-                          <div className="flex items-baseline gap-2">
-                            <p className="text-white font-black text-2xl">
-                              +{projections.total_estimated_gain.low.toLocaleString("fr-FR")}
-                            </p>
-                            <p className="text-gray-500 text-sm font-bold">
-                              à +{projections.total_estimated_gain.high.toLocaleString("fr-FR")} clics/mois
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-white font-black text-lg">Estimez votre potentiel organique</p>
-                        )}
-                        {projections && (
-                          <p className="text-gray-600 text-xs mt-1">
-                            {projections.has_gsc_data ? "Basé sur vos données GSC réelles" : "Estimation sans GSC — connectez Google Search Console pour plus de précision"}
-                            {" · "}Calculé le {new Date(projections.computed_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {projections && (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(34,197,94,0.1)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.2)" }}>
-                            {projections.estimated_results.length} opportunités
-                          </span>
-                        )}
-                        <button
-                          onClick={generateProjections}
-                          disabled={projectionsLoading}
-                          className="relative px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide overflow-hidden transition-all disabled:opacity-50"
-                          style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.15), rgba(16,185,129,0.1))", border: "1px solid rgba(34,197,94,0.25)", color: "#4ade80" }}
-                        >
-                          {projectionsLoading ? (
-                            <span className="flex items-center gap-1.5">
-                              <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeDashoffset="12"/></svg>
-                              Calcul...
-                            </span>
-                          ) : projections ? "Recalculer" : "Calculer"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {projections ? (
-                      <>
-                        {/* Barre de gain global */}
-                        <div className="mb-5 p-4 rounded-xl relative overflow-hidden" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)" }}>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-gray-400 text-xs font-bold">Clics actuels</span>
-                            <span className="text-white text-xs font-black">{projections.total_current_clicks.toLocaleString("fr-FR")}/mois</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
-                              <div className="h-full rounded-full relative overflow-hidden" style={{
-                                width: `${Math.min(100, (projections.total_current_clicks / Math.max(projections.total_current_clicks + projections.total_estimated_gain.high, 1)) * 100)}%`,
-                                background: "linear-gradient(90deg, #f97316, #fb923c)",
-                              }}>
-                                <div className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)" }} />
-                              </div>
-                            </div>
-                            <span className="text-orange-400 text-xs font-bold whitespace-nowrap">actuel</span>
-                          </div>
-                          <div className="flex items-center gap-3 mt-2">
-                            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
-                              <div className="h-full rounded-full relative overflow-hidden" style={{
-                                width: `${Math.min(100, ((projections.total_current_clicks + projections.total_estimated_gain.low) / Math.max(projections.total_current_clicks + projections.total_estimated_gain.high, 1)) * 100)}%`,
-                                background: "linear-gradient(90deg, #22c55e, #4ade80)",
-                              }}>
-                                <div className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite_0.5s]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)" }} />
-                              </div>
-                            </div>
-                            <span className="text-green-400 text-xs font-bold whitespace-nowrap">potentiel</span>
-                          </div>
-                        </div>
-
-                        {/* Top opportunités */}
-                        <div className="space-y-2">
-                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-3">Top opportunités — triées par gain</p>
-                          {projections.estimated_results.slice(0, 6).map((item, i) => {
-                            const diffColor = item.difficulty === "easy" ? "#4ade80" : item.difficulty === "medium" ? "#fb923c" : "#f87171";
-                            const diffBg = item.difficulty === "easy" ? "rgba(34,197,94,0.1)" : item.difficulty === "medium" ? "rgba(249,115,22,0.1)" : "rgba(239,68,68,0.1)";
-                            const actionLabel = item.action === "optimization" ? "Optimisation" : item.action === "creation" ? "Création" : "Enrichissement";
-                            const actionColor = item.action === "optimization" ? "#60a5fa" : item.action === "creation" ? "#a78bfa" : "#fb923c";
-                            return (
-                              <div key={i} className="group flex items-start gap-3 p-3 rounded-xl transition-all duration-200 hover:bg-white/[0.03]"
-                                style={{ borderLeft: `2px solid ${diffColor}22` }}>
-                                {/* Rang */}
-                                <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black mt-0.5"
-                                  style={{ background: i === 0 ? "linear-gradient(135deg, #22c55e, #4ade80)" : "rgba(255,255,255,0.05)", color: i === 0 ? "white" : "#6b7280" }}>
-                                  {i + 1}
-                                </span>
-                                {/* Contenu */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                                    <span className="text-white text-xs font-bold truncate">{item.keyword}</span>
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: diffBg, color: diffColor }}>
-                                      {item.difficulty === "easy" ? "Facile" : item.difficulty === "medium" ? "Moyen" : "Difficile"}
-                                    </span>
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "rgba(255,255,255,0.04)", color: actionColor, border: `1px solid ${actionColor}30` }}>
-                                      {actionLabel}
-                                    </span>
-                                  </div>
-                                  <p className="text-gray-600 text-[10px] leading-relaxed line-clamp-1 group-hover:line-clamp-none transition-all">{item.rationale}</p>
-                                  <p className="text-gray-700 text-[10px] mt-0.5">{item.timeframe}</p>
-                                </div>
-                                {/* Gain */}
-                                <div className="flex-shrink-0 text-right">
-                                  <p className="text-green-400 font-black text-sm">+{item.estimated_gain.toLocaleString("fr-FR")}</p>
-                                  <p className="text-gray-700 text-[10px]">clics/mois</p>
-                                  <p className="text-gray-700 text-[10px]">{Math.round(item.confidence_score * 100)}% fiabilité</p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {projections.estimated_results.length > 6 && (
-                          <p className="text-gray-600 text-xs text-center mt-3">
-                            +{projections.estimated_results.length - 6} autres opportunités disponibles
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)" }}>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                          </svg>
-                        </div>
-                        <p className="text-gray-400 text-sm font-bold">Calculez votre potentiel SEO</p>
-                        <p className="text-gray-600 text-xs max-w-xs leading-relaxed">
-                          Le moteur analyse vos {data.keywordStats.length + data.uncoveredKeywords.length} mots-clés et estime les gains de clics atteignables pour chacun.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ── Maillage interne ─────────────────────────────────── */}
-                {data.site?.seo_analysis_done && (
-                  <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 animate-fade-in-up delay-200 overflow-hidden">
-                    <div className="absolute top-0 left-0 w-72 h-36 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(99,102,241,0.07), transparent 65%)" }} />
-
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-5 relative">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(99,102,241,0.12)", color: "#818cf8" }}>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                            <circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/>
-                            <path d="M8 6h8M7 8l4 8M17 8l-4 8"/>
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Maillage interne</p>
-                          {linkingResult ? (
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <p className="text-white font-black text-xl">{linkingResult.score}/100</p>
-                              <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{
-                                background: linkingResult.score >= 70 ? "rgba(34,197,94,0.12)" : linkingResult.score >= 40 ? "rgba(249,115,22,0.12)" : "rgba(239,68,68,0.12)",
-                                color: linkingResult.score >= 70 ? "#4ade80" : linkingResult.score >= 40 ? "#fb923c" : "#f87171",
-                              }}>{linkingResult.score_label}</span>
-                            </div>
-                          ) : (
-                            <p className="text-white font-black text-lg mt-0.5">Analysez votre maillage interne</p>
-                          )}
-                        </div>
-                      </div>
-                      {linkingResult && (
-                        <button
-                          onClick={generateLinking}
-                          disabled={linkingLoading}
-                          className="text-xs text-indigo-400/70 hover:text-indigo-300 transition-colors disabled:opacity-40"
-                        >
-                          {linkingLoading ? "Analyse…" : "↺ Relancer"}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Barre de progression si < 5 articles */}
-                    {(kpis?.totalArticles ?? 0) < LINKING_MIN_ARTICLES ? (
-                      <div className="flex flex-col gap-3">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-400">Articles publiés pour débloquer l'analyse</span>
-                          <span className="text-white font-bold">{kpis?.totalArticles ?? 0} / {LINKING_MIN_ARTICLES}</span>
-                        </div>
-                        <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-700"
-                            style={{
-                              width: `${Math.min(((kpis?.totalArticles ?? 0) / LINKING_MIN_ARTICLES) * 100, 100)}%`,
-                              background: "linear-gradient(90deg, #6366f1, #818cf8)",
-                            }}
-                          />
-                        </div>
-                        <p className="text-gray-600 text-xs">
-                          Encore {LINKING_MIN_ARTICLES - (kpis?.totalArticles ?? 0)} article{LINKING_MIN_ARTICLES - (kpis?.totalArticles ?? 0) > 1 ? "s" : ""} à publier pour débloquer l'analyse de maillage.
-                        </p>
-                      </div>
-                    ) : !linkingGenerated ? (
-                      /* CTA génération */
-                      <div className="flex flex-col gap-4">
-                        <p className="text-gray-500 text-sm">
-                          {kpis?.totalArticles} articles analysables — détectez vos pages orphelines, clusters sémantiques et opportunités de liens.
-                        </p>
-                        <button
-                          onClick={generateLinking}
-                          disabled={linkingLoading}
-                          className="self-start flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
-                          style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}
-                        >
-                          {linkingLoading ? (
-                            <><span className="w-4 h-4 rounded-full border-2 border-indigo-400/30 border-t-indigo-400 animate-spin" />Analyse en cours…</>
-                          ) : (
-                            <><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-4 h-4"><path d="M8 1v6M5 4l3-3 3 3M1 11h14M4 11v4M8 11v4M12 11v4" strokeLinecap="round" strokeLinejoin="round"/></svg>Analyser le maillage</>
-                          )}
-                        </button>
-                      </div>
-                    ) : linkingResult ? (
-                      /* Résultats */
-                      <div className="flex flex-col gap-5">
-                        {/* Score comment */}
-                        <p className="text-gray-400 text-sm leading-relaxed">{linkingResult.score_comment}</p>
-
-                        {/* Suggestions prioritaires */}
-                        {linkingResult.suggestions.filter(s => s.priority === "haute").length > 0 && (
-                          <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Liens à ajouter en priorité</p>
-                            <div className="flex flex-col gap-2">
-                              {linkingResult.suggestions.filter(s => s.priority === "haute").slice(0, 5).map((s, i) => (
-                                <div key={i} className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                                    <span className="truncate max-w-[35%] text-gray-300 font-medium">{s.from_title}</span>
-                                    <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 flex-shrink-0"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                    <span className="truncate max-w-[35%] text-gray-300 font-medium">{s.to_title}</span>
-                                    <span className="ml-auto flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-bold" style={{
-                                      background: s.objective === "SEO" ? "rgba(99,102,241,0.15)" : s.objective === "conversion" ? "rgba(249,115,22,0.12)" : "rgba(255,255,255,0.05)",
-                                      color: s.objective === "SEO" ? "#818cf8" : s.objective === "conversion" ? "#fb923c" : "#9ca3af",
-                                    }}>{s.objective}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <code className="text-xs text-indigo-300 bg-indigo-500/10 px-2 py-1 rounded-lg flex-1 truncate">"{s.anchor}"</code>
-                                    <button
-                                      onClick={() => navigator.clipboard.writeText(s.anchor)}
-                                      className="flex-shrink-0 text-gray-600 hover:text-indigo-400 transition-colors"
-                                      title="Copier l'ancre"
-                                    >
-                                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" className="w-3.5 h-3.5"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M2 11V3a1 1 0 011-1h8"/></svg>
-                                    </button>
-                                  </div>
-                                  <p className="text-gray-600 text-xs">Placement : {s.placement}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Pages orphelines */}
-                        {linkingResult.orphan_pages.length > 0 && (
-                          <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Pages orphelines ({linkingResult.orphan_pages.length})</p>
-                            <div className="flex flex-col gap-1.5">
-                              {linkingResult.orphan_pages.slice(0, 4).map((p, i) => (
-                                <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/5 border border-red-500/15">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
-                                  <span className="text-gray-300 text-xs truncate flex-1">{p.title}</span>
-                                  <span className="text-gray-600 text-xs flex-shrink-0 hidden sm:block">{p.reason}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Opportunités */}
-                        {linkingResult.opportunities.length > 0 && (
-                          <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Opportunités</p>
-                            <ul className="flex flex-col gap-1">
-                              {linkingResult.opportunities.map((opp, i) => (
-                                <li key={i} className="flex items-start gap-2 text-xs text-gray-400">
-                                  <span className="text-indigo-400 mt-0.5 flex-shrink-0">→</span>
-                                  {opp}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-
-                {/* ── Row 2 : Graphique publications ───────────────────── */}
-                <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up delay-200 overflow-hidden">
-                  {/* Halo orange en bas à droite */}
-                  <div className="absolute bottom-0 right-0 w-64 h-40 pointer-events-none"
-                    style={{ background: "radial-gradient(ellipse at bottom right, rgba(249,115,22,0.08) 0%, transparent 70%)" }} />
-
+                  {/* Header */}
                   <div className="flex items-center justify-between mb-6 relative">
                     <div>
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Publications automatisées</p>
-                      <p className="text-xl font-black text-white">Historique sur 30 jours</p>
+                      <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.15em]">Score SEO global</p>
+                      <p className="text-white font-black text-xl mt-0.5">{data?.site?.business_name}</p>
                     </div>
-                    {/* Badge avec sweep shimmer */}
-                    <span className="relative overflow-hidden text-xs bg-orange-500/10 text-orange-400 font-bold px-3 py-1.5 rounded-full">
-                      <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]"
-                        style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.25), transparent)" }} />
-                      {kpis?.totalArticles ?? 0} articles au total
-                    </span>
+                    {(kpis?.streak ?? 0) >= 2 && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.2)" }}>
+                        <span className="text-sm">{(kpis?.streak ?? 0) >= 7 ? "🔥" : "⚡"}</span>
+                        <span className="text-orange-400 text-xs font-black">{kpis?.streak} jours</span>
+                      </div>
+                    )}
                   </div>
 
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={data.pubsChart} margin={{ top: 12, right: 5, left: -20, bottom: 0 }}>
-                      <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
-                      <XAxis
-                        dataKey="date"
-                        tick={{ fill: "#4b5563", fontSize: 10 }}
-                        axisLine={false} tickLine={false}
-                        interval={4}
-                      />
-                      <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(249,115,22,0.04)" }} />
-                      <Bar
-                        dataKey="articles"
-                        shape={<GlowBar />}
-                        isAnimationActive={true}
-                        animationDuration={1200}
-                        animationEasing="ease-out"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {/* Score ring + stats grid */}
+                  <div className="grid grid-cols-12 gap-4 md:gap-6 items-center">
+                    <div className="col-span-12 sm:col-span-4 lg:col-span-3 flex justify-center">
+                      <ScoreRing score={animScore} />
+                    </div>
+                    <div className="col-span-12 sm:col-span-8 lg:col-span-9 grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {([
+                        { label: "Ce mois", value: animMonth, sub: "articles publiés" },
+                        { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, sub: "articles publiés" },
+                        { label: "Mots-clés couverts", value: `${animKw}/${kpis?.totalKeywords ?? 0}`, sub: "configurés" },
+                        { label: "Total publié", value: kpis?.totalArticles ?? 0, sub: "articles" },
+                      ] as const).map((s, i) => (
+                        <div key={s.label} className="flex flex-col gap-1.5 p-4 rounded-xl animate-fade-in-up" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", animationDelay: `${i * 80 + 300}ms` }}>
+                          <span className="text-gray-500 text-xs font-bold truncate">{s.label}</span>
+                          <span className="text-white font-black text-2xl leading-none">{s.value}</span>
+                          <span className="text-gray-600 text-xs">{s.sub}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Countdown footer */}
+                  {kpis?.nextPublicationAt && (
+                    <div className="mt-6 pt-5 border-t border-white/[0.06]">
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-3">Prochaine publication automatique</p>
+                      <CountdownTimer targetIso={kpis.nextPublicationAt} />
+                    </div>
+                  )}
                 </div>
 
-                {/* ── Row 3 : Couverture mots-clés + Infos site ────────── */}
-                <div className="grid grid-cols-12 gap-4">
+                {/* ── Roadmap (left) + Potentiel (right) ───────────────── */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-                  {/* Couverture mots-clés */}
-                  <div className="col-span-12 lg:col-span-7 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up delay-300">
-                    <div className="flex items-center justify-between mb-5">
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Couverture des mots-clés</p>
-                      <span className="text-xs text-orange-400 font-bold">{kpis?.coveredKeywords}/{kpis?.totalKeywords} couverts</span>
-                    </div>
-                    {data.keywordStats.length === 0 ? (
-                      <p className="text-gray-600 text-sm">Aucun mot-clé configuré</p>
-                    ) : (
-                      <div className="flex flex-col gap-4">
-                        {data.keywordStats.map((kw) => (
-                          <KeywordBar key={kw.keyword} kw={kw} max={maxKeywordCount} />
-                        ))}
-                      </div>
-                    )}
-                    {data.uncoveredKeywords.length > 0 && (
-                      <div className="mt-5 pt-4 border-t border-white/[0.05]">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">À couvrir en priorité</p>
-                          <span className="text-xs text-orange-400 font-bold">{data.uncoveredKeywords.length} restant{data.uncoveredKeywords.length > 1 ? "s" : ""}</span>
+                  {/* ── Roadmap SEO — LEFT ────────────────────────────── */}
+                  <div
+                    className="lg:col-span-7 relative rounded-2xl overflow-hidden animate-fade-in-up delay-150 flex flex-col"
+                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(167,139,250,0.15)", minHeight: 420 }}
+                  >
+                    <div className="absolute top-0 left-0 w-72 h-52 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.1), transparent 65%)" }} />
+                    <div className="absolute bottom-0 right-0 w-48 h-36 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(96,165,250,0.05), transparent 65%)" }} />
+
+                    <div className="relative p-6 flex flex-col flex-1">
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa" }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: "#a78bfa" }}>Roadmap SEO</p>
+                            <p className="text-white font-black text-xl">Plan éditorial — 40 articles</p>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {data.uncoveredKeywords.slice(0, 3).map(kw => (
-                            <span key={kw.keyword} className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs px-3 py-1.5 rounded-full font-medium">
-                              <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse flex-shrink-0" />
-                              {kw.keyword}
-                              {kw.impressions !== null && (
-                                <span className="text-orange-500/70 font-normal">{kw.impressions.toLocaleString("fr-FR")} imp.</span>
-                              )}
-                            </span>
-                          ))}
-                          {data.uncoveredKeywords.slice(3).map(kw => (
-                            <span key={kw.keyword} className="bg-white/[0.04] border border-white/[0.08] text-gray-500 text-xs px-3 py-1.5 rounded-full">
-                              {kw.keyword}
-                            </span>
-                          ))}
+                        <div className="relative group flex-shrink-0">
+                          <button className="w-7 h-7 rounded-full flex items-center justify-center text-gray-600 hover:text-violet-400 transition-colors text-xs font-black" style={{ background: "rgba(255,255,255,0.04)" }}>?</button>
+                          <div className="absolute right-0 top-9 w-64 bg-[#111] border border-violet-500/20 rounded-xl p-3 text-xs text-gray-400 leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-30 shadow-xl">
+                            Générez votre plan éditorial SEO sur 40 articles, priorisés par potentiel de trafic. RankPill publie automatiquement chaque article selon la roadmap.
+                          </div>
                         </div>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Infos site */}
-                  <div className="col-span-12 lg:col-span-5 space-y-4 animate-fade-in-up delay-400">
-
-                    {/* Statut connexion */}
-                    <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 card-hover">
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4">Statut de la connexion</p>
-                      <div className="flex flex-col gap-3">
-                        {[
-                          { label: "CMS connecté", ok: !!data.site, value: cmsLabel(data.site?.cms) },
-                          { label: "Site URL", ok: !!data.site?.site_url, value: data.site?.site_url ? "Configuré" : "Non défini" },
-                          { label: "Automatisation SEO", ok: true, value: "Active" },
-                          { label: "Publication auto", ok: true, value: `${data.site?.frequency ?? 1}×/jour` },
-                        ].map(row => (
-                          <div key={row.label} className="flex items-center justify-between">
-                            <span className="text-gray-400 text-sm">{row.label}</span>
-                            <div className="flex items-center gap-2">
-                              <span className={`w-1.5 h-1.5 rounded-full ${row.ok ? "bg-green-400" : "bg-red-400"}`} />
-                              <span className="text-white text-sm font-medium">{row.value}</span>
+                      {roadmapRecord ? (
+                        (() => {
+                          const publishedKw = new Set((data?.recentPublications ?? []).map(p => p.keyword?.toLowerCase()));
+                          const allArticles = (roadmapRecord.data.articles ?? []) as { title: string; keyword: string; priority: number }[];
+                          const remaining = allArticles.filter(a => !publishedKw.has(a.keyword?.toLowerCase())).sort((a, b) => a.priority - b.priority);
+                          const total = allArticles.length;
+                          const done = kpis?.totalArticles ?? 0;
+                          const pct = Math.round((done / Math.max(total, 1)) * 100);
+                          return (
+                            <div className="flex flex-col gap-4 flex-1">
+                              <div>
+                                <div className="flex items-center justify-between mb-1.5 text-xs">
+                                  <span className="text-gray-400 font-bold">{done} / {total} publiés</span>
+                                  <span className="font-black" style={{ color: "#a78bfa" }}>{pct}%</span>
+                                </div>
+                                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(167,139,250,0.1)" }}>
+                                  <div className="h-full rounded-full relative overflow-hidden transition-all duration-1000" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #7c3aed, #a78bfa, #60a5fa)" }}>
+                                    <div className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)" }} />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex-1 flex flex-col gap-1 overflow-y-auto max-h-72">
+                                {remaining.slice(0, 20).map((a, i) => (
+                                  <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-all group/item" style={{ borderLeft: i === 0 ? "2px solid rgba(167,139,250,0.7)" : i < 3 ? "2px solid rgba(167,139,250,0.25)" : "2px solid rgba(167,139,250,0.06)" }}>
+                                    <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black" style={{ background: i === 0 ? "linear-gradient(135deg,#7c3aed,#a78bfa)" : "rgba(255,255,255,0.04)", color: i === 0 ? "white" : "#6b7280" }}>{i + 1}</span>
+                                    <span className="flex-1 text-xs truncate" style={{ color: i === 0 ? "rgba(255,255,255,0.92)" : i < 3 ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.22)", fontWeight: i === 0 ? 600 : 400 }}>{a.title}</span>
+                                    <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full truncate max-w-[80px] opacity-0 group-hover/item:opacity-100 transition-opacity" style={{ background: "rgba(167,139,250,0.1)", color: "#c4b5fd" }}>{a.keyword}</span>
+                                  </div>
+                                ))}
+                                {remaining.length === 0 && <p className="text-green-400 text-xs text-center py-4 font-bold">🎉 Tous les articles sont publiés !</p>}
+                                {remaining.length > 20 && <p className="text-center text-gray-600 text-xs py-2">+{remaining.length - 20} articles</p>}
+                              </div>
+                              <div className="flex gap-2 pt-3 border-t border-white/[0.06]">
+                                <button onClick={() => setShowRoadmapModal(true)} className="flex-1 text-xs font-bold py-2.5 rounded-xl transition-all hover:opacity-80" style={{ background: "rgba(167,139,250,0.12)", color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.2)" }}>
+                                  Voir la roadmap complète →
+                                </button>
+                                <button onClick={generateRoadmap} disabled={roadmapLoading} className="px-4 text-xs text-gray-600 hover:text-violet-400 transition-colors disabled:opacity-40 rounded-xl border border-white/[0.06] hover:border-violet-500/20">
+                                  {roadmapLoading ? <span className="w-3.5 h-3.5 border-2 border-violet-400/30 border-t-violet-400 rounded-full animate-spin inline-block" /> : "↺"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="flex flex-col gap-5 flex-1 justify-between">
+                          <div className="flex flex-col gap-4">
+                            <p className="text-gray-400 text-sm leading-relaxed">
+                              Générez votre plan éditorial sur <span className="text-white font-bold">40 articles SEO</span>, classés par potentiel de trafic et facilité de classement Google.
+                            </p>
+                            <div className="grid grid-cols-3 gap-3">
+                              {[
+                                { label: "Articles planifiés", value: "40", color: "#a78bfa" },
+                                { label: "Mots-clés ciblés", value: String(kpis?.totalKeywords ?? 0), color: "#818cf8" },
+                                { label: "Phases SEO", value: "3", color: "#60a5fa" },
+                              ].map(s => (
+                                <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.1)" }}>
+                                  <p className="font-black text-2xl leading-none mb-1" style={{ color: s.color }}>{s.value}</p>
+                                  <p className="text-gray-500 text-[10px] leading-tight mt-1">{s.label}</p>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="space-y-2 p-4 rounded-xl" style={{ background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.08)" }}>
+                              {["Articles priorisés par potentiel de trafic", "Alignés sur vos mots-clés configurés", "Publication automatique selon la roadmap"].map((f, i) => (
+                                <div key={i} className="flex items-center gap-2 text-xs text-gray-400">
+                                  <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#a78bfa" }} />
+                                  {f}
+                                </div>
+                              ))}
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          <button
+                            onClick={generateRoadmap}
+                            disabled={roadmapLoading}
+                            className="relative w-full overflow-hidden py-4 rounded-xl font-black text-white text-sm uppercase tracking-wide transition-all disabled:opacity-60 group"
+                            style={{ background: "linear-gradient(135deg, #7c3aed, #a78bfa)", boxShadow: "0 8px 32px rgba(124,58,237,0.35)" }}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                            <span className="relative flex items-center justify-center gap-2">
+                              {roadmapLoading ? (
+                                <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Génération en cours…</>
+                              ) : (
+                                <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Calculer ma roadmap SEO</>
+                              )}
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
+                  </div>
 
-                    {/* Secteur */}
-                    {data.site && (
-                      <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5">
-                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-3">Profil de l'entreprise</p>
-                        <p className="text-white font-black text-lg">{data.site.business_name}</p>
-                        <p className="text-gray-400 text-sm mt-1">{data.site.industry}</p>
-                        <div className="mt-3 flex items-center gap-2">
-                          <span className="bg-orange-500/10 text-orange-400 text-xs font-bold px-3 py-1 rounded-full">
-                            {cmsLabel(data.site.cms)}
-                          </span>
-                          <span className="bg-white/[0.05] text-gray-400 text-xs px-3 py-1 rounded-full">
-                            {data.site.frequency} article{(data.site.frequency ?? 1) > 1 ? "s" : ""}/jour
-                          </span>
+                  {/* ── Potentiel de croissance — RIGHT ──────────────── */}
+                  <div
+                    className="lg:col-span-5 relative rounded-2xl overflow-hidden animate-fade-in-up delay-200 flex flex-col"
+                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(34,197,94,0.15)", minHeight: 420 }}
+                  >
+                    <div className="absolute top-0 right-0 w-56 h-44 pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(34,197,94,0.09), transparent 65%)" }} />
+                    <div className="absolute bottom-0 left-0 w-48 h-32 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom left, rgba(249,115,22,0.04), transparent 65%)" }} />
+
+                    <div className="relative p-6 flex flex-col flex-1">
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80" }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: "#4ade80" }}>Potentiel SEO</p>
+                            <p className="text-white font-black text-xl">Croissance organique</p>
+                          </div>
+                        </div>
+                        <div className="relative group flex-shrink-0">
+                          <button className="w-7 h-7 rounded-full flex items-center justify-center text-gray-600 hover:text-green-400 transition-colors text-xs font-black" style={{ background: "rgba(255,255,255,0.04)" }}>?</button>
+                          <div className="absolute right-0 top-9 w-60 bg-[#111] border border-green-500/20 rounded-xl p-3 text-xs text-gray-400 leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-30 shadow-xl">
+                            Analysez vos mots-clés pour estimer le gain de trafic additionnel atteignable avec votre stratégie SEO actuelle.
+                          </div>
                         </div>
                       </div>
-                    )}
+
+                      {projections ? (
+                        <div className="flex flex-col gap-4 flex-1">
+                          <div className="p-4 rounded-xl" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)" }}>
+                            <p className="text-gray-400 text-xs mb-1">Gain de trafic estimé / mois</p>
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <p className="text-white font-black text-3xl leading-none">+{projections.total_estimated_gain.low.toLocaleString("fr-FR")}</p>
+                              <p className="text-gray-500 text-sm font-bold">à +{projections.total_estimated_gain.high.toLocaleString("fr-FR")} clics</p>
+                            </div>
+                            <p className="text-green-400 text-xs font-bold mt-1">clics organiques / mois</p>
+                            <p className="text-gray-600 text-xs mt-1">{projections.has_gsc_data ? "Basé sur vos données GSC" : "Estimation — connectez GSC pour plus de précision"}</p>
+                          </div>
+                          <div className="flex-1 flex flex-col gap-1.5">
+                            <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider mb-1">Top opportunités</p>
+                            {projections.estimated_results.slice(0, 5).map((item, i) => {
+                              const diffColor = item.difficulty === "easy" ? "#4ade80" : item.difficulty === "medium" ? "#fb923c" : "#f87171";
+                              return (
+                                <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-all" style={{ borderLeft: `2px solid ${diffColor}30` }}>
+                                  <span className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black" style={{ background: i === 0 ? "linear-gradient(135deg,#22c55e,#4ade80)" : "rgba(255,255,255,0.05)", color: i === 0 ? "white" : "#6b7280" }}>{i + 1}</span>
+                                  <span className="flex-1 text-xs truncate" style={{ color: "rgba(255,255,255,0.65)" }}>{item.keyword}</span>
+                                  <span className="flex-shrink-0 text-green-400 font-black text-xs">+{item.estimated_gain.toLocaleString("fr-FR")}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <button onClick={generateProjections} disabled={projectionsLoading} className="text-center text-xs text-gray-600 hover:text-green-400 transition-colors disabled:opacity-40 py-1">
+                            {projectionsLoading ? "Recalcul…" : "↺ Recalculer"}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-5 flex-1 justify-between">
+                          <div className="flex flex-col gap-4">
+                            <p className="text-gray-400 text-sm leading-relaxed">
+                              Estimez le <span className="text-white font-bold">gain de trafic organique</span> que vous pouvez atteindre sur chacun de vos mots-clés cibles.
+                            </p>
+                            <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.12)" }}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                              <p className="text-gray-400 text-xs">{(data?.keywordStats?.length ?? 0) + (data?.uncoveredKeywords?.length ?? 0)} mots-clés configurés à analyser</p>
+                            </div>
+                            <div className="space-y-2 p-4 rounded-xl" style={{ background: "rgba(34,197,94,0.04)", border: "1px solid rgba(34,197,94,0.08)" }}>
+                              {["Détection des opportunités par mot-clé", "Estimation de gain de clics / mois", "Classement par difficulté et potentiel"].map((f, i) => (
+                                <div key={i} className="flex items-center gap-2 text-xs text-gray-400">
+                                  <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#4ade80" }} />
+                                  {f}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <button
+                            onClick={generateProjections}
+                            disabled={projectionsLoading}
+                            className="relative w-full overflow-hidden py-4 rounded-xl font-black text-white text-sm uppercase tracking-wide transition-all disabled:opacity-60 group"
+                            style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", boxShadow: "0 8px 32px rgba(34,197,94,0.3)" }}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                            <span className="relative flex items-center justify-center gap-2">
+                              {projectionsLoading ? (
+                                <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Calcul en cours…</>
+                              ) : (
+                                <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>Calculer mon potentiel SEO</>
+                              )}
+                            </span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
+
                 </div>
               </div>
             )}
@@ -1634,56 +929,32 @@ export default function Dashboard() {
             {activeTab === "publications" && (
               <div className="space-y-5">
 
-                {/* Stat rapide */}
                 <div className="grid grid-cols-3 gap-4">
                   {[
-                    { label: "Total", value: kpis?.totalArticles ?? 0, icon: (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-                      </svg>), color: "#f97316", delay: "0ms" },
-                    { label: "Ce mois", value: kpis?.articlesThisMonth ?? 0, icon: (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                      </svg>), color: "#fb923c", delay: "100ms" },
-                    { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, icon: (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                      </svg>), color: "#ef4444", delay: "200ms" },
+                    { label: "Total", value: kpis?.totalArticles ?? 0, icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>), color: "#f97316", delay: "0ms" },
+                    { label: "Ce mois", value: kpis?.articlesThisMonth ?? 0, icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>), color: "#fb923c", delay: "100ms" },
+                    { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>), color: "#ef4444", delay: "200ms" },
                   ].map(s => (
-                    <div key={s.label}
-                      className="relative group bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden"
-                      style={{ animationDelay: s.delay }}
-                    >
-                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
-                        style={{ background: `radial-gradient(ellipse at top right, ${s.color}12, transparent 60%)` }} />
+                    <div key={s.label} className="relative group bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden" style={{ animationDelay: s.delay }}>
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl" style={{ background: `radial-gradient(ellipse at top right, ${s.color}12, transparent 60%)` }} />
                       <div className="flex items-center justify-between mb-4">
                         <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">{s.label}</p>
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
-                          style={{ background: `${s.color}15`, color: s.color }}>
-                          {s.icon}
-                        </div>
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style={{ background: `${s.color}15`, color: s.color }}>{s.icon}</div>
                       </div>
                       <p className="text-4xl font-black text-white tracking-tight">{s.value}</p>
-                      <div className="mt-3 h-0.5 bg-white/[0.04] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full animate-[sweep_3s_ease-in-out_infinite]"
-                          style={{ background: `linear-gradient(90deg, transparent, ${s.color}60, transparent)` }} />
-                      </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Graphique area */}
                 <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 overflow-hidden animate-fade-in-up delay-200">
-                  <div className="absolute bottom-0 left-0 w-72 h-48 pointer-events-none"
-                    style={{ background: "radial-gradient(ellipse at bottom left, rgba(249,115,22,0.07) 0%, transparent 70%)" }} />
+                  <div className="absolute bottom-0 left-0 w-72 h-48 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom left, rgba(249,115,22,0.07) 0%, transparent 70%)" }} />
                   <div className="flex items-center justify-between mb-5 relative">
                     <div>
                       <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Publications par jour</p>
                       <p className="text-xl font-black text-white">30 derniers jours</p>
                     </div>
                     <span className="relative overflow-hidden text-xs bg-orange-500/10 text-orange-400 font-bold px-3 py-1.5 rounded-full">
-                      <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]"
-                        style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.25), transparent)" }} />
+                      <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.25), transparent)" }} />
                       {kpis?.totalArticles ?? 0} au total
                     </span>
                   </div>
@@ -1703,47 +974,23 @@ export default function Dashboard() {
                       <XAxis dataKey="date" tick={{ fill: "#4b5563", fontSize: 10 }} axisLine={false} tickLine={false} interval={4} />
                       <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
                       <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(249,115,22,0.2)", strokeWidth: 1 }} />
-                      <Area type="monotone" dataKey="articles"
-                        stroke="#f97316" strokeWidth={2.5} fill="url(#areaGrad2)"
-                        filter="url(#areaGlow)"
-                        isAnimationActive={true} animationDuration={1400} animationEasing="ease-out"
-                      />
+                      <Area type="monotone" dataKey="articles" stroke="#f97316" strokeWidth={2.5} fill="url(#areaGrad2)" filter="url(#areaGlow)" isAnimationActive={true} animationDuration={1400} animationEasing="ease-out" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
 
-                {/* Table complète */}
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden animate-fade-in-up delay-300">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
-                    <div>
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-0.5">Tous les articles publiés</p>
-                    </div>
+                    <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Tous les articles publiés</p>
                     <div className="flex items-center gap-3">
                       {data.site?.gsc_connected && data.site?.gsc_site_url && (
-                        <button
-                          onClick={checkIndexation}
-                          disabled={indexationLoading}
-                          className="group flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 transition-all disabled:opacity-40"
-                        >
-                          {indexationLoading ? (
-                            <><span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" /> Vérification...</>
-                          ) : (
-                            <>
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform">
-                                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                              </svg>
-                              Vérifier l&apos;indexation
-                            </>
-                          )}
+                        <button onClick={checkIndexation} disabled={indexationLoading} className="group flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 transition-all disabled:opacity-40">
+                          {indexationLoading ? (<><span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" /> Vérification...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Vérifier l&apos;indexation</>)}
                         </button>
                       )}
-                      <Link href="/generate"
-                        className="group relative overflow-hidden flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 hover:border-orange-500/50 text-orange-400 hover:text-orange-300 transition-all">
-                        <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]"
-                          style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.15), transparent)" }} />
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 relative">
-                          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                        </svg>
+                      <Link href="/generate" className="group relative overflow-hidden flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 hover:border-orange-500/50 text-orange-400 hover:text-orange-300 transition-all">
+                        <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.15), transparent)" }} />
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 relative"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                         <span className="relative">+ Créer un article</span>
                       </Link>
                     </div>
@@ -1774,45 +1021,24 @@ export default function Dashboard() {
                           {data.recentPublications.map((pub, i) => {
                             const idx = pub.url ? indexationResults[pub.url] : null;
                             return (
-                            <tr key={pub.id} className={`border-b border-white/[0.04] hover:bg-white/[0.03] transition-all animate-fade-in-up ${i === data.recentPublications.length - 1 ? "border-b-0" : ""}`} style={{animationDelay: `${i * 60}ms`}}>
-                              <td className="px-6 py-4 text-white font-medium max-w-xs truncate text-sm">{pub.title}</td>
-                              <td className="px-6 py-4">
-                                <span className="bg-orange-500/10 text-orange-400 text-xs font-bold px-2.5 py-1 rounded-full">
-                                  {pub.keyword}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-gray-500 text-sm whitespace-nowrap">
-                                {new Date(pub.published_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className="flex items-center gap-1.5 text-xs font-bold text-green-400">
-                                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full" />
-                                  Publié
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                {!idx ? (
-                                  <span className="text-gray-700 text-xs">—</span>
-                                ) : idx.indexed === true ? (
-                                  <span className="flex items-center gap-1.5 text-xs font-bold text-green-400">
-                                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full" /> Indexé
-                                  </span>
-                                ) : idx.indexed === false ? (
-                                  <span className="flex items-center gap-1.5 text-xs font-bold text-red-400">
-                                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full" /> Non indexé
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-500 text-xs">Inconnu</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                {pub.url && (
-                                  <a href={pub.url} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors">
-                                    Voir →
-                                  </a>
-                                )}
-                              </td>
-                            </tr>
+                              <tr key={pub.id} className={`border-b border-white/[0.04] hover:bg-white/[0.03] transition-all animate-fade-in-up ${i === data.recentPublications.length - 1 ? "border-b-0" : ""}`} style={{animationDelay: `${i * 60}ms`}}>
+                                <td className="px-6 py-4 text-white font-medium max-w-xs truncate text-sm">{pub.title}</td>
+                                <td className="px-6 py-4"><span className="bg-orange-500/10 text-orange-400 text-xs font-bold px-2.5 py-1 rounded-full">{pub.keyword}</span></td>
+                                <td className="px-6 py-4 text-gray-500 text-sm whitespace-nowrap">{new Date(pub.published_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                                <td className="px-6 py-4"><span className="flex items-center gap-1.5 text-xs font-bold text-green-400"><span className="w-1.5 h-1.5 bg-green-400 rounded-full" />Publié</span></td>
+                                <td className="px-6 py-4">
+                                  {!idx ? (<span className="text-gray-700 text-xs">—</span>) : idx.indexed === true ? (
+                                    <span className="flex items-center gap-1.5 text-xs font-bold text-green-400"><span className="w-1.5 h-1.5 bg-green-400 rounded-full" /> Indexé</span>
+                                  ) : idx.indexed === false ? (
+                                    <span className="flex items-center gap-1.5 text-xs font-bold text-red-400"><span className="w-1.5 h-1.5 bg-red-400 rounded-full" /> Non indexé</span>
+                                  ) : (
+                                    <span className="text-gray-500 text-xs">Inconnu</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  {pub.url && <a href={pub.url} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors">Voir →</a>}
+                                </td>
+                              </tr>
                             );
                           })}
                         </tbody>
@@ -1828,8 +1054,6 @@ export default function Dashboard() {
             ════════════════════════════════════════════════════════════ */}
             {activeTab === "keywords" && (
               <div className="space-y-5">
-
-                {/* Résumé */}
                 <div className="grid grid-cols-3 gap-4">
                   {[
                     { label: "Mots-clés configurés", value: kpis?.totalKeywords ?? 0 },
@@ -1843,7 +1067,6 @@ export default function Dashboard() {
                   ))}
                 </div>
 
-                {/* Détail par mot-clé */}
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
                   <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-6">Performance par mot-clé</p>
                   {data.keywordStats.length === 0 ? (
@@ -1861,15 +1084,10 @@ export default function Dashboard() {
                             </span>
                           </div>
                           <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden mb-2">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500"
-                              style={{ width: `${maxKeywordCount > 0 ? (kw.count / maxKeywordCount) * 100 : 0}%`, transition: "width 1s ease" }}
-                            />
+                            <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500" style={{ width: `${maxKeywordCount > 0 ? (kw.count / maxKeywordCount) * 100 : 0}%`, transition: "width 1s ease" }} />
                           </div>
                           {kw.lastPublished ? (
-                            <p className="text-gray-600 text-xs">
-                              Dernier article : {new Date(kw.lastPublished).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
-                            </p>
+                            <p className="text-gray-600 text-xs">Dernier article : {new Date(kw.lastPublished).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</p>
                           ) : (
                             <p className="text-gray-600 text-xs">Pas encore publié — sera priorisé prochainement</p>
                           )}
@@ -1879,20 +1097,13 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-3">
                   <Link href="/settings" className="flex-1 bg-white/[0.03] border border-white/[0.07] hover:border-orange-500/30 rounded-xl p-4 text-center transition-colors group">
                     <p className="text-white font-bold group-hover:text-orange-400 transition-colors">⚙ Modifier les mots-clés</p>
                     <p className="text-gray-600 text-xs mt-1">Ajouter ou supprimer des mots-clés cibles</p>
                   </Link>
-                  <button
-                    onClick={() => handleManualPublish()}
-                    disabled={cronRunning}
-                    className="flex-1 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 hover:border-orange-500/40 rounded-xl p-4 text-center transition-colors disabled:opacity-40"
-                  >
-                    <p className="text-orange-400 font-bold">
-                      {cronRunning ? "⏳ En cours..." : "▶ Générer un article maintenant"}
-                    </p>
+                  <button onClick={() => handleManualPublish()} disabled={cronRunning} className="flex-1 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 hover:border-orange-500/40 rounded-xl p-4 text-center transition-colors disabled:opacity-40">
+                    <p className="text-orange-400 font-bold">{cronRunning ? "⏳ En cours..." : "▶ Générer un article maintenant"}</p>
                     <p className="text-gray-600 text-xs mt-1">Couvre le prochain mot-clé non traité</p>
                   </button>
                 </div>
@@ -1904,52 +1115,34 @@ export default function Dashboard() {
             ════════════════════════════════════════════════════════════ */}
             {activeTab === "calendar" && (
               <div className="space-y-5">
-
-                {/* Streak summary */}
                 <div className="grid grid-cols-3 gap-4">
-                  {/* Streak actuel */}
                   {(() => {
                     const streak = kpis?.streak ?? 0;
                     const color = streak >= 7 ? "#f97316" : streak >= 3 ? "#fb923c" : "#6b7280";
                     return (
-                      <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden group" style={{ animationDelay: "0ms" }}>
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
-                          style={{ background: `radial-gradient(ellipse at top right, ${color}12, transparent 60%)` }} />
-                        {streak > 0 && (
-                          <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none"
-                            style={{ background: `radial-gradient(ellipse at top right, ${color}10, transparent 65%)` }} />
-                        )}
+                      <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden group">
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl" style={{ background: `radial-gradient(ellipse at top right, ${color}12, transparent 60%)` }} />
                         <div className="flex items-center justify-between mb-4">
                           <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Streak actuel</p>
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
-                            style={{ background: `${color}18`, color }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                            </svg>
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style={{ background: `${color}18`, color }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                           </div>
                         </div>
                         <p className="text-4xl font-black text-white tracking-tight">{streak}<span className="text-xl text-gray-500 font-bold ml-1">j</span></p>
-                        <p className="text-xs mt-2 font-medium" style={{ color }}>
-                          {streak >= 7 ? "En feu 🔥 continue !" : streak >= 3 ? "Bonne dynamique" : streak > 0 ? "Lancé !" : "Publie aujourd'hui"}
-                        </p>
+                        <p className="text-xs mt-2 font-medium" style={{ color }}>{streak >= 7 ? "En feu 🔥 continue !" : streak >= 3 ? "Bonne dynamique" : streak > 0 ? "Lancé !" : "Publie aujourd'hui"}</p>
                       </div>
                     );
                   })()}
 
-                  {/* Meilleure streak */}
                   {(() => {
                     const best = kpis?.bestStreak ?? 0;
                     return (
                       <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden group" style={{ animationDelay: "120ms" }}>
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
-                          style={{ background: "radial-gradient(ellipse at top right, rgba(251,191,36,0.08), transparent 60%)" }} />
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl" style={{ background: "radial-gradient(ellipse at top right, rgba(251,191,36,0.08), transparent 60%)" }} />
                         <div className="flex items-center justify-between mb-4">
                           <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Meilleure streak</p>
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
-                            style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                            </svg>
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                           </div>
                         </div>
                         <p className="text-4xl font-black text-white tracking-tight">{best}<span className="text-xl text-gray-500 font-bold ml-1">j</span></p>
@@ -1958,29 +1151,22 @@ export default function Dashboard() {
                     );
                   })()}
 
-                  {/* Jours publiés */}
                   {(() => {
                     const days = data.calendarData.filter(d => d.count > 0).length;
                     const pct = Math.round((days / 90) * 100);
                     return (
                       <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden group" style={{ animationDelay: "240ms" }}>
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
-                          style={{ background: "radial-gradient(ellipse at top right, rgba(34,197,94,0.07), transparent 60%)" }} />
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl" style={{ background: "radial-gradient(ellipse at top right, rgba(34,197,94,0.07), transparent 60%)" }} />
                         <div className="flex items-center justify-between mb-4">
                           <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Jours publiés / 90j</p>
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
-                            style={{ background: "rgba(34,197,94,0.10)", color: "#22c55e" }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                              <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
-                            </svg>
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style={{ background: "rgba(34,197,94,0.10)", color: "#22c55e" }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
                           </div>
                         </div>
                         <p className="text-4xl font-black text-white tracking-tight">{days}</p>
                         <div className="mt-2">
                           <div className="h-1 bg-white/[0.05] rounded-full overflow-hidden">
-                            <div className="h-full rounded-full bg-gradient-to-r from-green-600 to-green-400"
-                              style={{ width: `${pct}%`, transition: "width 1.2s cubic-bezier(0.34,1.56,0.64,1) 0.3s" }} />
+                            <div className="h-full rounded-full bg-gradient-to-r from-green-600 to-green-400" style={{ width: `${pct}%`, transition: "width 1.2s cubic-bezier(0.34,1.56,0.64,1) 0.3s" }} />
                           </div>
                           <p className="text-xs mt-1.5 font-medium text-green-500/70">{pct}% de régularité</p>
                         </div>
@@ -1989,7 +1175,6 @@ export default function Dashboard() {
                   })()}
                 </div>
 
-                {/* Heatmap 90 jours */}
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover">
                   <div className="flex items-center justify-between mb-5">
                     <div>
@@ -2011,15 +1196,11 @@ export default function Dashboard() {
                           const cellIdx = weekIdx * 7 + dayIdx;
                           const entry = data.calendarData[cellIdx];
                           if (!entry) return <div key={dayIdx} className="w-full aspect-square" />;
-                          const intensity = entry.count === 0 ? 0 : entry.count === 1 ? 1 : entry.count === 2 ? 2 : entry.count >= 3 ? 3 : 3;
+                          const intensity = entry.count === 0 ? 0 : entry.count === 1 ? 1 : entry.count === 2 ? 2 : 3;
                           const colors = ["bg-white/[0.05]", "bg-orange-800/70", "bg-orange-600/80", "bg-orange-500"];
                           const isToday = entry.date === new Date().toISOString().split("T")[0];
                           return (
-                            <div
-                              key={dayIdx}
-                              title={`${entry.date} — ${entry.count} article${entry.count !== 1 ? "s" : ""}`}
-                              className={`w-full aspect-square rounded-sm ${colors[intensity]} ${isToday ? "ring-1 ring-orange-400" : ""} transition-all hover:scale-125 cursor-default`}
-                            />
+                            <div key={dayIdx} title={`${entry.date} — ${entry.count} article${entry.count !== 1 ? "s" : ""}`} className={`w-full aspect-square rounded-sm ${colors[intensity]} ${isToday ? "ring-1 ring-orange-400" : ""} transition-all hover:scale-125 cursor-default`} />
                           );
                         })}
                       </div>
@@ -2039,7 +1220,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Prochaines publications planifiées */}
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
                   <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-5">Prochaines publications planifiées</p>
                   <div className="space-y-3">
@@ -2047,9 +1227,7 @@ export default function Dashboard() {
                       const d = new Date();
                       d.setDate(d.getDate() + i + 1);
                       d.setHours(8, 0, 0, 0);
-                      const kwIndex = (data.uncoveredKeywords.length > 0)
-                        ? i % data.uncoveredKeywords.length
-                        : -1;
+                      const kwIndex = (data.uncoveredKeywords.length > 0) ? i % data.uncoveredKeywords.length : -1;
                       const kw = data.uncoveredKeywords[kwIndex]?.keyword ?? data.keywordStats[i % Math.max(data.keywordStats.length, 1)]?.keyword ?? "—";
                       return (
                         <div key={i} className="flex items-center gap-4 py-2.5 border-b border-white/[0.04] last:border-0">
@@ -2060,7 +1238,7 @@ export default function Dashboard() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60" />
-                              <p className="text-gray-400 text-sm">{typeof kw === "string" ? kw : kw}</p>
+                              <p className="text-gray-400 text-sm">{kw}</p>
                             </div>
                             <p className="text-gray-700 text-xs mt-0.5">Publication automatique à 8h00</p>
                           </div>
@@ -2070,7 +1248,6 @@ export default function Dashboard() {
                     })}
                   </div>
                 </div>
-
               </div>
             )}
           </>
