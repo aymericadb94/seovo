@@ -305,6 +305,49 @@ function ChoiceCard({
   );
 }
 
+// ─── TagInput ─────────────────────────────────────────────────────────────────
+
+function TagInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [input, setInput] = useState("");
+  const tags = value.split(",").map(k => k.trim()).filter(Boolean);
+
+  function addTag(raw: string) {
+    const val = raw.trim().replace(/,$/, "");
+    if (!val) return;
+    if (!tags.includes(val)) onChange([...tags, val].join(", "));
+    setInput("");
+  }
+
+  return (
+    <div>
+      <div
+        className="flex flex-wrap gap-2 min-h-[48px] w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-3 py-2.5 focus-within:border-violet-500/50 focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.08)] transition-all cursor-text"
+        onClick={(e) => (e.currentTarget as HTMLElement).querySelector("input")?.focus()}
+      >
+        {tags.map((tag, i) => (
+          <span key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium" style={{ background: "rgba(139,92,246,0.15)", color: "#c4b5fd", border: "1px solid rgba(139,92,246,0.25)" }}>
+            {tag}
+            <button type="button" onClick={() => onChange(tags.filter((_, idx) => idx !== i).join(", "))} className="text-violet-400/60 hover:text-violet-300 transition-colors leading-none">×</button>
+          </span>
+        ))}
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(input); }
+            else if (e.key === "Backspace" && !input && tags.length > 0) onChange(tags.slice(0, -1).join(", "));
+          }}
+          onBlur={() => { if (input.trim()) addTag(input); }}
+          placeholder={tags.length === 0 ? placeholder : ""}
+          className="flex-1 min-w-[140px] bg-transparent text-white placeholder-gray-600 text-sm outline-none py-0.5"
+        />
+      </div>
+      <p className="text-gray-600 text-xs mt-1.5">Appuyez sur <kbd className="px-1 py-0.5 rounded bg-white/[0.07] text-gray-400 font-mono text-[10px]">Entrée</kbd> pour valider</p>
+    </div>
+  );
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
@@ -315,7 +358,6 @@ export default function OnboardingPage() {
   const [error, setError] = useState("");
   const [animKey, setAnimKey] = useState(0);
   const [gscConnected, setGscConnected] = useState(false);
-  const [keywordInput, setKeywordInput] = useState("");
   const [gscProperties, setGscProperties] = useState<{ url: string }[]>([]);
   const [loadingGscSites, setLoadingGscSites] = useState(false);
   const FORM_STORAGE_KEY = "rankpill_onboarding_form";
@@ -967,51 +1009,11 @@ export default function OnboardingPage() {
                   <SectionLabel>Mots-clés & SEO</SectionLabel>
                   <div>
                     <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Mots-clés prioritaires <span className="text-red-400">*</span></label>
-                    {/* Tags */}
-                    <div
-                      className="flex flex-wrap gap-2 min-h-[48px] w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-3 py-2.5 focus-within:border-violet-500/50 focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.08)] transition-all cursor-text"
-                      onClick={(e) => {
-                        const input = (e.currentTarget as HTMLElement).querySelector("input");
-                        input?.focus();
-                      }}
-                    >
-                      {form.keywords.split(",").map(k => k.trim()).filter(Boolean).map((kw, i) => (
-                        <span key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium" style={{ background: "rgba(139,92,246,0.15)", color: "#c4b5fd", border: "1px solid rgba(139,92,246,0.25)" }}>
-                          {kw}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const tags = form.keywords.split(",").map(k => k.trim()).filter(Boolean);
-                              update("keywords", tags.filter((_, idx) => idx !== i).join(", "));
-                            }}
-                            className="text-violet-400/60 hover:text-violet-300 transition-colors leading-none"
-                          >×</button>
-                        </span>
-                      ))}
-                      <input
-                        type="text"
-                        value={keywordInput}
-                        onChange={(e) => setKeywordInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === ",") {
-                            e.preventDefault();
-                            const val = keywordInput.trim().replace(/,$/, "");
-                            if (!val) return;
-                            const existing = form.keywords.split(",").map(k => k.trim()).filter(Boolean);
-                            if (!existing.includes(val)) {
-                              update("keywords", [...existing, val].join(", "));
-                            }
-                            setKeywordInput("");
-                          } else if (e.key === "Backspace" && !keywordInput) {
-                            const tags = form.keywords.split(",").map(k => k.trim()).filter(Boolean);
-                            if (tags.length > 0) update("keywords", tags.slice(0, -1).join(", "));
-                          }
-                        }}
-                        placeholder={form.keywords ? "" : "ex: logiciel RH, gestion des congés…"}
-                        className="flex-1 min-w-[140px] bg-transparent text-white placeholder-gray-600 text-sm outline-none py-0.5"
-                      />
-                    </div>
-                    <p className="text-gray-600 text-xs mt-1.5">Appuyez sur <kbd className="px-1 py-0.5 rounded bg-white/[0.07] text-gray-400 font-mono text-[10px]">Entrée</kbd> pour valider chaque mot-clé</p>
+                    <TagInput
+                      value={form.keywords}
+                      onChange={(v) => update("keywords", v)}
+                      placeholder="ex: logiciel RH, gestion des congés…"
+                    />
                   </div>
                 </div>
 
@@ -1021,23 +1023,11 @@ export default function OnboardingPage() {
                   <div className="flex flex-col gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Ce qui vous rend unique <span className="text-red-400">*</span></label>
-                      <textarea
-                        value={form.strengths}
-                        onChange={(e) => update("strengths", e.target.value)}
-                        placeholder="ex: livraison 24h, fabrication française, SAV 7j/7, garantie 5 ans"
-                        rows={2}
-                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.08)] transition-all resize-none text-sm"
-                      />
+                      <TagInput value={form.strengths} onChange={(v) => update("strengths", v)} placeholder="ex: livraison 24h, fabrication française, SAV 7j/7…" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Différenciateurs <span className="text-gray-600 font-normal normal-case">(optionnel)</span></label>
-                      <textarea
-                        value={form.differentiators}
-                        onChange={(e) => update("differentiators", e.target.value)}
-                        placeholder="ex: technologie propriétaire, 15 ans d'expertise, certifications, labels"
-                        rows={2}
-                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition-all resize-none text-sm"
-                      />
+                      <TagInput value={form.differentiators} onChange={(v) => update("differentiators", v)} placeholder="ex: technologie propriétaire, 15 ans d'expertise…" />
                     </div>
                   </div>
                 </div>
@@ -1048,23 +1038,11 @@ export default function OnboardingPage() {
                   <div className="flex flex-col gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Concurrents principaux</label>
-                      <input
-                        type="text"
-                        value={form.competitors}
-                        onChange={(e) => update("competitors", e.target.value)}
-                        placeholder="ex: concurrent1.com, concurrent2.fr"
-                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition-all text-sm"
-                      />
+                      <TagInput value={form.competitors} onChange={(v) => update("competitors", v)} placeholder="ex: concurrent1.com, concurrent2.fr…" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Contraintes business / légales</label>
-                      <input
-                        type="text"
-                        value={form.constraints}
-                        onChange={(e) => update("constraints", e.target.value)}
-                        placeholder="ex: ne pas mentionner les prix, marché réglementé"
-                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition-all text-sm"
-                      />
+                      <TagInput value={form.constraints} onChange={(v) => update("constraints", v)} placeholder="ex: ne pas mentionner les prix…" />
                     </div>
                   </div>
                 </div>
