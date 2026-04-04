@@ -427,12 +427,13 @@ export default function Dashboard() {
     if (!data?.site?.seo_analysis_done) return;
     if (tutorialInitRef.current) return;
     tutorialInitRef.current = true;
+    // Si tutorialStep a déjà été défini (ex: par le modal close → 0), ne pas écraser
+    if (tutorialStep !== null) return;
     const saved = localStorage.getItem("rankpill_onboarding");
-    // Si pas de valeur sauvée et pas de modal qui vient de se fermer → dashboard libre
-    const step = saved !== null ? Math.min(parseInt(saved, 10), 4) : (seoModalWasOpenRef.current ? 0 : 4);
+    const step = saved !== null ? Math.min(parseInt(saved, 10), 4) : 4;
     setTutorialStep(step);
     setScoreBubbleStep(0);
-  }, [data?.site?.seo_analysis_done]);
+  }, [data?.site?.seo_analysis_done, tutorialStep]);
 
   async function handleLogout() {
     const supabase = createClient();
