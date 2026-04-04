@@ -40,7 +40,7 @@ export async function POST() {
     if (siteError) return Response.json({ error: siteError.message }, { status: 500 });
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
-    const [pubsResult, engineResult, projectionsResult] = await Promise.all([
+    const [pubsResult, engineResult, projectionsResult, cocoonResult] = await Promise.all([
       supabase
         .from("publications")
         .select("title, keyword")
@@ -59,11 +59,21 @@ export async function POST() {
         .select("data")
         .eq("user_id", user.id)
         .maybeSingle(),
+      supabase
+        .from("semantic_cocoons")
+        .select("data")
+        .eq("user_id", user.id)
+        .maybeSingle(),
     ]);
 
     const existingTitles = (pubsResult.data ?? []).map(p => p.title);
     const keywords = (site.keywords ?? []).join(", ") || "non configurés";
     const seoCtx = (site.seo_context ?? {}) as Record<string, unknown>;
+
+    // Extract cocoon data if available
+    type CocoonCluster = { name: string; priority: string; traffic_potential: number; pillar: { title: string; keyword: string; status: string }; support_pages: { title: string; keyword: string; status: string }[] };
+    type CocoonData = { clusters?: CocoonCluster[]; missing_pages?: { title: string; keyword: string; priority: string; reason: string }[]; optimization_actions?: { action: string; impact: string }[] };
+    const cocoon = (cocoonResult.data?.data ?? null) as CocoonData | null;
 
     // Extract projections data if available
     type ProjItem = { keyword: string; estimated_gain: number; difficulty: string; action: string; target_position: number; timeframe: string };
@@ -84,6 +94,23 @@ TOP OPPORTUNITÉS CLASSÉES PAR GAIN (à prioriser dans la roadmap) :
 ${topOpportunities.map((p, i) => `${i + 1}. "${p.keyword}" — +${p.estimated_gain} clics/mois estimés | Action: ${p.action} | Difficulté: ${p.difficulty} | Délai: ${p.timeframe}`).join("\n")}
 
 CONTRAINTE CRITIQUE : Les mots-clés ci-dessus classés "Facile" ou avec le plus fort gain estimé DOIVENT apparaître dans la PHASE 1 de la roadmap. C'est le chemin le plus direct vers la croissance organique.
+` : "";
+
+    // Extract cocoon structure
+    const cocoonClusters = cocoon?.clusters ?? [];
+    const cocoonSection = cocoonClusters.length > 0 ? `
+---
+
+COCON SÉMANTIQUE (architecture SEO validée par l'utilisateur) :
+${cocoonClusters.map((c, i) => `
+CLUSTER ${i + 1}: "${c.name}" (priorité: ${c.priority}, potentiel: +${c.traffic_potential} clics/mois)
+  - Page pilier: "${c.pillar.title}" (${c.pillar.keyword}) [${c.pillar.status}]
+  - Pages support: ${c.support_pages.map(p => `"${p.title}" (${p.keyword}) [${p.status}]`).join(", ")}
+`).join("")}
+${(cocoon?.missing_pages ?? []).length > 0 ? `PAGES MANQUANTES IDENTIFIÉES :
+${(cocoon?.missing_pages ?? []).map(p => `- "${p.title}" (${p.keyword}) — ${p.reason}`).join("\n")}` : ""}
+
+CONTRAINTE ABSOLUE : La roadmap DOIT suivre la structure du cocon sémantique ci-dessus. Chaque article de la roadmap doit correspondre à une page pilier ou support d'un cluster. Les pages manquantes identifiées doivent être incluses en priorité. Ne PAS inventer de nouveaux sujets hors du cocon.
 ` : "";
 
     // Extract SEO engine data if available
@@ -151,7 +178,7 @@ SECTEUR : ${site.industry}
 URL : ${site.site_url}
 MOTS-CLÉS CONFIGURÉS : ${keywords}
 ARTICLES DÉJÀ PUBLIÉS : ${existingTitles.length > 0 ? existingTitles.slice(0, 10).map(t => `"${t}"`).join(", ") : "aucun"}
-${intentSection}${projectionsSection}${engineSection}
+${intentSection}${cocoonSection}${projectionsSection}${engineSection}
 ---
 
 OBJECTIFS :

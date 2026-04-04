@@ -283,8 +283,10 @@ export default function Dashboard() {
   const [cocoonData, setCocoonData] = useState<CocoonData | null>(null);
   const [cocoonLoading, setCocoonLoading] = useState(false);
   const [cocoonExpanded, setCocoonExpanded] = useState<string | null>(null);
+  const [cocoonDetailsOpen, setCocoonDetailsOpen] = useState(false);
   const [cocoonProgress, setCocoonProgress] = useState(0);
   const cocoonProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [showCompletionPopup, setShowCompletionPopup] = useState(false);
 
   async function loadCocoon() {
     try {
@@ -352,6 +354,7 @@ export default function Dashboard() {
   function advanceTutorial(step: number) {
     setTutorialStep(step);
     localStorage.setItem("rankpill_onboarding", String(step));
+    if (step === 4) setShowCompletionPopup(true);
   }
 
   // ── Data loaders ───────────────────────────────────────────────────────────
@@ -546,6 +549,99 @@ export default function Dashboard() {
           onClose={() => setShowRoadmapModal(false)}
           onGenerate={generateRoadmap}
         />
+      )}
+
+      {/* Popup fin de tutoriel — confettis pilules */}
+      {showCompletionPopup && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          {/* Confettis pilules */}
+          <style>{`
+            @keyframes pillFall {
+              0% { transform: translateY(-100vh) rotate(var(--rot)) scale(0.8); opacity: 0; }
+              10% { opacity: 1; }
+              90% { opacity: 1; }
+              100% { transform: translateY(100vh) rotate(calc(var(--rot) + 360deg)) scale(0.6); opacity: 0; }
+            }
+          `}</style>
+          {Array.from({ length: 35 }).map((_, i) => {
+            const left = Math.random() * 100;
+            const delay = Math.random() * 2;
+            const dur = 3 + Math.random() * 2;
+            const rot = Math.random() * 360;
+            const size = 8 + Math.random() * 12;
+            const colors = ["#f97316", "#ef4444", "#fb923c", "#fbbf24", "#ff6b35"];
+            const color = colors[i % colors.length];
+            return (
+              <div
+                key={i}
+                className="fixed pointer-events-none"
+                style={{
+                  left: `${left}%`,
+                  top: 0,
+                  width: size,
+                  height: size * 2,
+                  borderRadius: size,
+                  background: `linear-gradient(180deg, ${color} 0%, ${color}90 45%, rgba(0,0,0,0.3) 50%, ${color}70 55%, ${color}40 100%)`,
+                  boxShadow: `0 0 ${size}px ${color}60`,
+                  ["--rot" as string]: `${rot}deg`,
+                  animation: `pillFall ${dur}s ease-in ${delay}s both`,
+                }}
+              />
+            );
+          })}
+
+          <div
+            className="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
+            style={{ animation: "modalPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.3s both" }}
+          >
+            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #1a0800 0%, #0d0d0d 50%, #1a0500 100%)" }} />
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at top, rgba(249,115,22,0.15), transparent 60%)" }} />
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom, rgba(239,68,68,0.08), transparent 60%)" }} />
+
+            <div className="relative p-8 text-center">
+              {/* Pilule animée */}
+              <div className="inline-flex items-center justify-center mb-6 relative">
+                <div
+                  className="relative overflow-hidden"
+                  style={{
+                    width: 48, height: 92, borderRadius: 24,
+                    background: "linear-gradient(160deg, #1a0a00, #0d0d0d 40%, #1a0500)",
+                    border: "1.5px solid rgba(249,115,22,0.5)",
+                    boxShadow: "0 0 40px rgba(249,115,22,0.3), 0 0 80px rgba(249,115,22,0.1)",
+                    animation: "float 2s ease-in-out infinite",
+                  }}
+                >
+                  <div className="absolute top-2 left-2 right-2" style={{ height: 36, borderRadius: "18px 18px 3px 3px", background: "linear-gradient(170deg, #ff8c00, #f97316, #ea580c)", boxShadow: "0 4px 16px rgba(249,115,22,0.5)" }} />
+                  <div className="absolute bottom-2 left-2 right-2" style={{ height: 36, borderRadius: "3px 3px 18px 18px", background: "linear-gradient(170deg, #1c0a00, #0d0500)", border: "1px solid rgba(249,115,22,0.15)" }} />
+                  <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2 h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.6), transparent)" }} />
+                </div>
+                <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: "rgba(249,115,22,0.3)", animationDuration: "2s" }} />
+              </div>
+
+              <h2 className="text-2xl font-black text-white mb-2">
+                Félicitations !
+              </h2>
+              <p className="text-lg font-bold mb-4">
+                <span className="bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
+                  Dashboard configuré
+                </span>
+              </p>
+              <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                Votre tableau de bord est maintenant opérationnel.<br />
+                Continuez d&apos;explorer tous les outils, et publiez votre première page dès maintenant !
+              </p>
+
+              <button
+                onClick={() => setShowCompletionPopup(false)}
+                className="relative w-full overflow-hidden py-4 rounded-xl font-black text-white text-sm uppercase tracking-wide transition-all group"
+                style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 8px 32px rgba(249,115,22,0.35)" }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                <span className="relative">Explorer mon dashboard →</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modale limite journalière */}
@@ -1060,8 +1156,20 @@ export default function Dashboard() {
                           ))}
                         </div>
 
+                        {/* Toggle détails */}
+                        <button
+                          onClick={() => setCocoonDetailsOpen(v => !v)}
+                          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold transition-all hover:bg-white/[0.03] mb-4"
+                          style={{ border: "1px solid rgba(249,115,22,0.12)", color: "#fb923c" }}
+                        >
+                          <svg className={`w-3.5 h-3.5 transition-transform ${cocoonDetailsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                          {cocoonDetailsOpen ? "Masquer les détails" : `Voir les ${cocoonData.clusters.length} clusters et actions recommandées`}
+                        </button>
+
+                        {cocoonDetailsOpen && (
+                        <>
                         {/* Clusters */}
-                        <div className="relative space-y-3">
+                        <div className="relative space-y-3 animate-fade-in-up">
                           {cocoonData.clusters.map((cluster, ci) => {
                             const isOpen = cocoonExpanded === cluster.name;
                             const existing = [cluster.pillar, ...cluster.support_pages].filter(p => p.status === "existing").length;
@@ -1181,6 +1289,9 @@ export default function Dashboard() {
                               })}
                             </div>
                           </div>
+                        )}
+
+                        </>
                         )}
 
                         {/* Regénérer */}
