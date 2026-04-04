@@ -755,6 +755,8 @@ export default function OnboardingPage() {
                       <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.siteUrl}</label>
                       <input
                         type="url"
+                        name="site-url-field"
+                        autoComplete="one-time-code"
                         value={form.site_url}
                         onChange={(e) => update("site_url", e.target.value)}
                         placeholder={form.cms === "shopify" ? "https://maboutique.myshopify.com" : "https://votresite.com"}
@@ -768,6 +770,8 @@ export default function OnboardingPage() {
                           <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.wpUsername}</label>
                           <input
                             type="text"
+                            name="wp-user-field"
+                            autoComplete="one-time-code"
                             value={form.wp_username}
                             onChange={(e) => update("wp_username", e.target.value)}
                             placeholder={t.onboarding.wpUsernamePlaceholder}
@@ -777,7 +781,9 @@ export default function OnboardingPage() {
                         <div>
                           <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.wpPassword}</label>
                           <input
-                            type="password"
+                            type="text"
+                            name="wp-app-pass-field"
+                            autoComplete="one-time-code"
                             value={form.wp_app_password}
                             onChange={(e) => update("wp_app_password", e.target.value)}
                             placeholder={t.onboarding.wpPasswordPlaceholder}
@@ -792,7 +798,9 @@ export default function OnboardingPage() {
                       <div>
                         <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.shopifyKey}</label>
                         <input
-                          type="password"
+                          type="text"
+                          name="shopify-key-field"
+                          autoComplete="one-time-code"
                           value={form.shopify_api_key}
                           onChange={(e) => update("shopify_api_key", e.target.value)}
                           placeholder={t.onboarding.shopifyKeyPlaceholder}
@@ -807,7 +815,9 @@ export default function OnboardingPage() {
                         <div>
                           <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.wixApiKey}</label>
                           <input
-                            type="password"
+                            type="text"
+                            name="wix-key-field"
+                            autoComplete="one-time-code"
                             value={form.wix_api_key}
                             onChange={(e) => update("wix_api_key", e.target.value)}
                             placeholder={t.onboarding.wixApiKeyPlaceholder}
@@ -818,6 +828,8 @@ export default function OnboardingPage() {
                           <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.wixSiteId}</label>
                           <input
                             type="text"
+                            name="wix-site-field"
+                            autoComplete="one-time-code"
                             value={form.wix_site_id}
                             onChange={(e) => update("wix_site_id", e.target.value)}
                             placeholder={t.onboarding.wixSiteIdPlaceholder}
@@ -834,7 +846,8 @@ export default function OnboardingPage() {
                           <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Endpoint URL</label>
                           <input
                             type="text"
-                            autoComplete="off"
+                            name="custom-endpoint-field"
+                            autoComplete="one-time-code"
                             value={form.custom_api_url}
                             onChange={(e) => update("custom_api_url", e.target.value)}
                             placeholder="https://votresite.com/api/publish"
@@ -844,8 +857,9 @@ export default function OnboardingPage() {
                         <div>
                           <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Clé API (Bearer) <span className="text-gray-600 font-normal normal-case">(optionnel)</span></label>
                           <input
-                            type="password"
-                            autoComplete="new-password"
+                            type="text"
+                            name="custom-apikey-field"
+                            autoComplete="one-time-code"
                             value={form.custom_api_key}
                             onChange={(e) => update("custom_api_key", e.target.value)}
                             placeholder="votre-clé-api-secrète"
