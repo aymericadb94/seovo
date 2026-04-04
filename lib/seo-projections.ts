@@ -159,22 +159,31 @@ export function computeProjections(
     const currentClicks = gsc ? gsc.clicks : 0;
 
     const action = classifyAction(currentPosition, hasGSCData);
-    const targetPosition = currentPosition ? getTargetPosition(currentPosition, seoScore) : 8;
+    // Sans données, viser top 5 (article neuf optimisé peut y arriver en 3-6 mois)
+    const targetPosition = currentPosition ? getTargetPosition(currentPosition, seoScore) : (seoScore >= 50 ? 4 : 6);
 
     let impressionsForCalc = currentImpressions;
     if (!hasGSCData || impressionsForCalc < 50) {
-      let medianImpressions = 200;
-      if (gscQueries.length > 0) {
+      // Pour les mots-clés sans données GSC, estimer un volume raisonnable
+      // Un mot-clé configuré manuellement a typiquement 200-2000 impressions/mois
+      let medianImpressions = 500;
+      if (gscQueries.length > 3) {
         const sorted = gscQueries.map((q) => q.impressions).sort((a, b) => a - b);
         const mid = Math.floor(sorted.length / 2);
-        medianImpressions = sorted[mid] ?? sorted[sorted.length - 1] ?? 200;
+        const gscMedian = sorted[mid] ?? sorted[sorted.length - 1] ?? 500;
+        // Ne pas descendre en dessous de 200 — les mots-clés configurés sont intentionnels
+        medianImpressions = Math.max(200, gscMedian);
       }
-      impressionsForCalc = Math.round(medianImpressions * 0.4);
+      impressionsForCalc = hasGSCData
+        ? Math.max(impressionsForCalc, Math.round(medianImpressions * 0.4))
+        : Math.round(medianImpressions * 0.6);
     }
 
     const ctrTarget = getCTR(targetPosition);
     const gainBrut = Math.max(0, impressionsForCalc * ctrTarget - currentClicks);
-    const difficulty = getDifficulty(currentPosition ?? 50, seoScore);
+    // Pour les mots-clés sans position GSC, simuler une position de départ réaliste (pas 50)
+    const simulatedPosition = currentPosition ?? (seoScore >= 40 ? 25 : 35);
+    const difficulty = getDifficulty(simulatedPosition, seoScore);
     const gainAdjusted = gainBrut * REALISM_COEFF[difficulty];
     const gainFinal = Math.round(gainAdjusted * getBusinessCoeff(keyword, keywords, seoContext));
 
@@ -196,7 +205,7 @@ export function computeProjections(
       estimated_gain: gainFinal,
       confidence_score: confidence,
       timeframe: getTimeframe(difficulty, action),
-      rationale: buildRationale(keyword, currentPosition, targetPosition, difficulty, action, gainFinal),
+      rationale: buildRationale(keyword, simulatedPosition, targetPosition, difficulty, action, gainFinal),
       difficulty,
     });
   }
