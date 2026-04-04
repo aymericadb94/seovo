@@ -227,7 +227,7 @@ export default function Dashboard() {
   const [cronRunning, setCronRunning] = useState(false);
   const [cronResult, setCronResult] = useState<string | null>(null);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "publications" | "keywords" | "calendar">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "performance" | "publications" | "keywords" | "calendar">("overview");
   const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null);
   const [indexationResults, setIndexationResults] = useState<Record<string, { indexed: boolean | null; verdict: string; coverage: string }>>({});
   const [indexationLoading, setIndexationLoading] = useState(false);
@@ -790,9 +790,9 @@ export default function Dashboard() {
         {/* Tabs */}
         <div className="border-t border-white/[0.04]">
           <div className="max-w-screen-xl mx-auto px-6 flex items-center gap-1 py-0">
-            {(["overview", "publications", "keywords", "calendar"] as const).map((tab) => {
+            {(["overview", "performance", "publications", "keywords", "calendar"] as const).map((tab) => {
               const isLocked = (tutorialStep ?? 0) < 4 && tab !== "overview";
-              const labels: Record<string, string> = { overview: "Vue d'ensemble", publications: "Publications", keywords: "Mots-clés", calendar: "Calendrier" };
+              const labels: Record<string, string> = { overview: "Vue d'ensemble", performance: "Performance", publications: "Publications", keywords: "Mots-clés", calendar: "Calendrier" };
               return (
                 <button
                   key={tab}
@@ -898,14 +898,19 @@ export default function Dashboard() {
                       </div>
                       <div className="col-span-12 sm:col-span-8 lg:col-span-9 grid grid-cols-2 md:grid-cols-4 gap-3">
                         {([
-                          { label: "Ce mois", value: animMonth, sub: "articles publiés" },
-                          { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, sub: "articles publiés" },
-                          { label: "Mots-clés couverts", value: `${animKw}/${kpis?.totalKeywords ?? 0}`, sub: "configurés" },
-                          { label: "Total publié", value: kpis?.totalArticles ?? 0, sub: "articles" },
-                        ] as const).map((s, i) => (
-                          <div key={s.label} className="flex flex-col gap-1.5 p-4 rounded-xl animate-fade-in-up" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", animationDelay: `${i * 80 + 300}ms` }}>
+                          { label: "Ce mois", value: animMonth, sub: "articles publiés", color: "" },
+                          { label: "Mots-clés couverts", value: `${animKw}/${kpis?.totalKeywords ?? 0}`, sub: "configurés", color: "" },
+                          ...(gscPerf ? [
+                            { label: "Clics (30j)", value: gscPerf.totalClicks.toLocaleString("fr-FR"), sub: "Google Search", color: "#34A853" },
+                            { label: "Position moy.", value: gscPerf.avgPosition.toFixed(1), sub: `CTR ${(gscPerf.avgCtr * 100).toFixed(1)}%`, color: "#4285F4" },
+                          ] : [
+                            { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, sub: "articles publiés", color: "" },
+                            { label: "Total publié", value: kpis?.totalArticles ?? 0, sub: "articles", color: "" },
+                          ]),
+                        ] as { label: string; value: string | number; sub: string; color: string }[]).map((s, i) => (
+                          <div key={s.label} className="flex flex-col gap-1.5 p-4 rounded-xl animate-fade-in-up" style={{ background: s.color ? `${s.color}08` : "rgba(255,255,255,0.03)", border: s.color ? `1px solid ${s.color}18` : "1px solid rgba(255,255,255,0.06)", animationDelay: `${i * 80 + 300}ms` }}>
                             <span className="text-gray-500 text-xs font-bold truncate">{s.label}</span>
-                            <span className="text-white font-black text-2xl leading-none">{s.value}</span>
+                            <span className="font-black text-2xl leading-none" style={{ color: s.color || "white" }}>{s.value}</span>
                             <span className="text-gray-600 text-xs">{s.sub}</span>
                           </div>
                         ))}
@@ -1645,136 +1650,194 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* ── PERFORMANCE GSC (après tutoriel, si connecté) ────────── */}
-                {(tutorialStep ?? 0) >= 4 && data?.site?.gsc_connected && gscPerf && (() => {
-                  // Insights automatiques
-                  const nearTop3 = gscPerf.pages.filter(p => p.position > 3 && p.position <= 10);
-                  const lowCtr = gscPerf.pages.filter(p => p.impressions > 20 && p.ctr < 2);
-                  const highPotential = gscPerf.pages.filter(p => p.position > 5 && p.position <= 20 && p.impressions > 30);
-
-                  // Opportunité principale : page avec le plus haut ratio impressions/position
-                  const topOpp = [...gscPerf.pages]
-                    .filter(p => p.position > 3 && p.position <= 25)
-                    .sort((a, b) => (b.impressions / b.position) - (a.impressions / a.position))[0] ?? null;
-
-                  const potentialGain = topOpp ? Math.round(topOpp.impressions * 0.15 - topOpp.clicks) : 0;
-
-                  // Score impacts
-                  const scoreImpacts: string[] = [];
-                  if (lowCtr.length > 0) scoreImpacts.push(`CTR faible sur ${lowCtr.length} page${lowCtr.length > 1 ? "s" : ""}`);
-                  if (nearTop3.length > 0) scoreImpacts.push(`${nearTop3.length} mot${nearTop3.length > 1 ? "s" : ""}-clé${nearTop3.length > 1 ? "s" : ""} proche${nearTop3.length > 1 ? "s" : ""} du top 3`);
-                  if (gscPerf.avgPosition > 15) scoreImpacts.push("Position moyenne trop éloignée du top 10");
-                  if (gscPerf.totalClicks < 50) scoreImpacts.push("Volume de clics insuffisant pour l'autorité");
-
-                  return (
-                    <div className="relative rounded-2xl overflow-hidden animate-fade-in-up" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(66,133,244,0.15)" }}>
-                      <div className="absolute top-0 right-0 w-72 h-48 pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(66,133,244,0.08), transparent 65%)" }} />
-                      <div className="absolute bottom-0 left-0 w-56 h-36 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom left, rgba(52,168,83,0.05), transparent 65%)" }} />
-
-                      <div className="relative p-6">
-                        {/* Header */}
-                        <div className="flex items-center justify-between mb-5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(66,133,244,0.12)" }}>
-                              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                              </svg>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: "#4285F4" }}>Performance SEO</p>
-                              <p className="text-white font-black text-xl">Google Search Console</p>
-                            </div>
-                          </div>
-                          <span className="text-gray-600 text-[10px] font-bold uppercase">30 derniers jours</span>
-                        </div>
-
-                        {/* Snapshot — 4 métriques sur une ligne */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-                          {[
-                            { icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z", value: gscPerf.totalImpressions.toLocaleString("fr-FR"), label: "Impressions", color: "#4285F4" },
-                            { icon: "M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122M5.98 11.95l-2.121 2.122", value: gscPerf.totalClicks.toLocaleString("fr-FR"), label: "Clics", color: "#34A853" },
-                            { icon: "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6", value: `${(gscPerf.avgCtr * 100).toFixed(1)}%`, label: "CTR moyen", color: "#FBBC05" },
-                            { icon: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z", value: gscPerf.avgPosition.toFixed(1), label: "Position moy.", color: "#EA4335" },
-                          ].map((m) => (
-                            <div key={m.label} className="group relative rounded-xl p-4 text-center overflow-hidden transition-transform hover:scale-[1.02]" style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${m.color}15` }}>
-                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: `radial-gradient(ellipse at center, ${m.color}08, transparent 70%)` }} />
-                              <svg viewBox="0 0 24 24" fill="none" stroke={m.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 mx-auto mb-2 opacity-50"><path d={m.icon} /></svg>
-                              <p className="text-xl font-black relative" style={{ color: m.color }}>{m.value}</p>
-                              <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1 relative">{m.label}</p>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Insights automatiques */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5">
-                          {[
-                            { value: nearTop3.length, label: "Proches du top 3", color: "#34A853", icon: "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" },
-                            { value: lowCtr.length, label: "CTR faible", color: "#FBBC05", icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" },
-                            { value: highPotential.length, label: "Haut potentiel", color: "#4285F4", icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" },
-                            { value: gscPerf.pages.length, label: "Pages indexées", color: "#EA4335", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
-                          ].map((ins) => (
-                            <div key={ins.label} className="flex items-center gap-2.5 rounded-xl p-3" style={{ background: `${ins.color}08`, border: `1px solid ${ins.color}12` }}>
-                              <svg viewBox="0 0 24 24" fill="none" stroke={ins.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0 opacity-70"><path d={ins.icon} /></svg>
-                              <div>
-                                <p className="font-black text-lg leading-none" style={{ color: ins.color }}>{ins.value}</p>
-                                <p className="text-gray-500 text-[9px] font-bold uppercase tracking-wide">{ins.label}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Opportunité principale + Score impact */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {/* Opportunité */}
-                          {topOpp && potentialGain > 0 && (
-                            <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: "rgba(34,168,83,0.06)", border: "1px solid rgba(34,168,83,0.15)" }}>
-                              <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(34,168,83,0.1), transparent 70%)" }} />
-                              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-green-400/70 mb-2">Opportunité principale</p>
-                              <p className="text-white font-bold text-sm mb-1 truncate">{new URL(topOpp.url).pathname}</p>
-                              <div className="flex items-center gap-3 text-xs mb-3">
-                                <span className="text-gray-400">Position <span className="text-white font-bold">{topOpp.position}</span></span>
-                                <span className="text-green-400 font-bold">+{potentialGain} clics/mois estimés</span>
-                              </div>
-                              <button
-                                onClick={() => handleManualPublish()}
-                                className="w-full py-2 rounded-lg text-xs font-black text-white transition-all hover:opacity-90"
-                                style={{ background: "linear-gradient(135deg, #34A853, #22c55e)", boxShadow: "0 4px 16px rgba(34,168,83,0.25)" }}
-                              >
-                                Optimiser automatiquement →
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Impact sur le score */}
-                          {scoreImpacts.length > 0 && (
-                            <div className="rounded-xl p-4" style={{ background: "rgba(66,133,244,0.04)", border: "1px solid rgba(66,133,244,0.1)" }}>
-                              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-blue-400/70 mb-3">Impact sur votre score SEO</p>
-                              <div className="space-y-2">
-                                {scoreImpacts.map((impact, i) => (
-                                  <div key={i} className="flex items-start gap-2">
-                                    <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: i === 0 ? "#EA4335" : i === 1 ? "#FBBC05" : "#4285F4" }} />
-                                    <p className="text-gray-400 text-xs leading-relaxed">{impact}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Confiance */}
-                        <p className="text-center text-gray-600 text-[10px] mt-4 font-medium">
-                          Analyse basée sur vos données Google Search Console — {gscPerf.pages.length} pages analysées
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
 
               </div>
             )}
+
+            {/* ════════════════════════════════════════════════════════════
+                TAB 1.5 — PERFORMANCE GSC
+            ════════════════════════════════════════════════════════════ */}
+            {activeTab === "performance" && (() => {
+              if (!data?.site?.gsc_connected || !gscPerf) {
+                return (
+                  <div className="text-center py-20">
+                    <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(66,133,244,0.1)", border: "1px solid rgba(66,133,244,0.15)" }}>
+                      <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" opacity="0.4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" opacity="0.4"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" opacity="0.4"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" opacity="0.4"/>
+                      </svg>
+                    </div>
+                    <p className="text-white font-bold text-lg mb-2">Google Search Console non connecté</p>
+                    <p className="text-gray-500 text-sm mb-5 max-w-md mx-auto">Connectez GSC pour voir vos clics, impressions, positions et opportunités SEO en temps réel.</p>
+                    <a href="/api/auth/google" className="inline-block bg-gradient-to-r from-blue-500 to-blue-600 text-white font-black text-sm px-6 py-3 rounded-xl uppercase tracking-wide shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-shadow">
+                      Connecter Google Search Console →
+                    </a>
+                  </div>
+                );
+              }
+
+              const nearTop3 = gscPerf.pages.filter(p => p.position > 3 && p.position <= 10);
+              const lowCtr = gscPerf.pages.filter(p => p.impressions > 20 && p.ctr < 2);
+              const highPotential = gscPerf.pages.filter(p => p.position > 5 && p.position <= 20 && p.impressions > 30);
+              const topOpp = [...gscPerf.pages]
+                .filter(p => p.position > 3 && p.position <= 25)
+                .sort((a, b) => (b.impressions / b.position) - (a.impressions / a.position))[0] ?? null;
+              const potentialGain = topOpp ? Math.max(0, Math.round(topOpp.impressions * 0.15 - topOpp.clicks)) : 0;
+
+              const scoreImpacts: string[] = [];
+              if (lowCtr.length > 0) scoreImpacts.push(`CTR faible sur ${lowCtr.length} page${lowCtr.length > 1 ? "s" : ""}`);
+              if (nearTop3.length > 0) scoreImpacts.push(`${nearTop3.length} mot${nearTop3.length > 1 ? "s" : ""}-clé${nearTop3.length > 1 ? "s" : ""} proche${nearTop3.length > 1 ? "s" : ""} du top 3`);
+              if (gscPerf.avgPosition > 15) scoreImpacts.push("Position moyenne trop éloignée du top 10");
+              if (gscPerf.totalClicks < 50) scoreImpacts.push("Volume de clics insuffisant pour l'autorité");
+
+              return (
+                <div className="space-y-5">
+                  {/* Snapshot — 4 métriques */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { value: gscPerf.totalImpressions.toLocaleString("fr-FR"), label: "Impressions", sub: "30 derniers jours", color: "#4285F4" },
+                      { value: gscPerf.totalClicks.toLocaleString("fr-FR"), label: "Clics", sub: "trafic organique", color: "#34A853" },
+                      { value: `${(gscPerf.avgCtr * 100).toFixed(1)}%`, label: "CTR moyen", sub: "taux de clics", color: "#FBBC05" },
+                      { value: gscPerf.avgPosition.toFixed(1), label: "Position moyenne", sub: "sur Google", color: "#EA4335" },
+                    ].map((m, i) => (
+                      <div key={m.label} className="group relative bg-white/[0.03] rounded-2xl p-6 overflow-hidden card-hover animate-fade-in-up" style={{ border: `1px solid ${m.color}18`, animationDelay: `${i * 80}ms` }}>
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: `radial-gradient(ellipse at top right, ${m.color}10, transparent 60%)` }} />
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-3 relative">{m.label}</p>
+                        <p className="text-4xl font-black tracking-tight relative" style={{ color: m.color }}>{m.value}</p>
+                        <p className="text-gray-600 text-xs mt-1 relative">{m.sub}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Insights + Opportunité */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                    {/* Insights */}
+                    <div className="lg:col-span-7 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 animate-fade-in-up delay-200">
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4">Insights automatiques</p>
+                      <div className="grid grid-cols-2 gap-3 mb-5">
+                        {[
+                          { value: nearTop3.length, label: "Proches du top 3", desc: "Position 4 à 10", color: "#34A853" },
+                          { value: lowCtr.length, label: "CTR faible", desc: "< 2% avec impressions", color: "#FBBC05" },
+                          { value: highPotential.length, label: "Haut potentiel", desc: "Position 5-20, bon volume", color: "#4285F4" },
+                          { value: gscPerf.pages.length, label: "Pages actives", desc: "Vues dans Google", color: "#EA4335" },
+                        ].map((ins) => (
+                          <div key={ins.label} className="flex items-center gap-3 rounded-xl p-4" style={{ background: `${ins.color}06`, border: `1px solid ${ins.color}12` }}>
+                            <p className="text-3xl font-black leading-none" style={{ color: ins.color }}>{ins.value}</p>
+                            <div>
+                              <p className="text-white text-xs font-bold">{ins.label}</p>
+                              <p className="text-gray-600 text-[10px]">{ins.desc}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Impact score */}
+                      {scoreImpacts.length > 0 && (
+                        <div className="rounded-xl p-4" style={{ background: "rgba(66,133,244,0.04)", border: "1px solid rgba(66,133,244,0.1)" }}>
+                          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-blue-400/70 mb-2">Impact sur votre score SEO</p>
+                          <div className="space-y-1.5">
+                            {scoreImpacts.map((impact, i) => (
+                              <div key={i} className="flex items-center gap-2 text-xs text-gray-400">
+                                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: ["#EA4335", "#FBBC05", "#4285F4", "#34A853"][i] }} />
+                                {impact}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Opportunité principale */}
+                    <div className="lg:col-span-5 space-y-5">
+                      {topOpp && potentialGain > 0 && (
+                        <div className="relative bg-white/[0.03] rounded-2xl p-6 overflow-hidden animate-fade-in-up delay-300" style={{ border: "1px solid rgba(34,168,83,0.15)" }}>
+                          <div className="absolute top-0 right-0 w-40 h-40 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(34,168,83,0.08), transparent 70%)" }} />
+                          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-green-400/70 mb-4 relative">Opportunité principale</p>
+                          <p className="text-white font-bold text-lg mb-1 relative truncate">{(() => { try { return new URL(topOpp.url).pathname; } catch { return topOpp.url; } })()}</p>
+                          <div className="flex items-center gap-4 text-sm mb-4 relative">
+                            <div>
+                              <p className="text-gray-500 text-[10px] font-bold uppercase">Position</p>
+                              <p className="text-white font-black text-2xl">{topOpp.position}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 text-[10px] font-bold uppercase">Impressions</p>
+                              <p className="text-white font-black text-2xl">{topOpp.impressions}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 text-[10px] font-bold uppercase">Gain estimé</p>
+                              <p className="text-green-400 font-black text-2xl">+{potentialGain}</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleManualPublish()}
+                            className="relative w-full overflow-hidden py-3 rounded-xl font-black text-white text-sm transition-all group"
+                            style={{ background: "linear-gradient(135deg, #34A853, #22c55e)", boxShadow: "0 8px 24px rgba(34,168,83,0.25)" }}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                            <span className="relative">Optimiser automatiquement →</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Confiance */}
+                      <div className="rounded-xl p-4 text-center" style={{ background: "rgba(66,133,244,0.04)", border: "1px solid rgba(66,133,244,0.08)" }}>
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                          </svg>
+                          <span className="text-gray-500 text-xs font-bold">Données Google Search Console</span>
+                        </div>
+                        <p className="text-gray-600 text-[10px]">{gscPerf.pages.length} pages analysées — 30 derniers jours</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Top pages */}
+                  <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden animate-fade-in-up delay-400">
+                    <div className="px-6 py-4 border-b border-white/[0.06]">
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Top pages par clics</p>
+                    </div>
+                    <div className="divide-y divide-white/[0.04]">
+                      {gscPerf.pages.slice(0, 10).map((page, i) => {
+                        const path = (() => { try { return new URL(page.url).pathname; } catch { return page.url; } })();
+                        const posColor = page.position <= 3 ? "#34A853" : page.position <= 10 ? "#FBBC05" : page.position <= 20 ? "#EA4335" : "#6b7280";
+                        return (
+                          <div key={i} className="flex items-center gap-4 px-6 py-3 hover:bg-white/[0.02] transition-colors">
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black" style={{ background: i === 0 ? "linear-gradient(135deg, #4285F4, #34A853)" : "rgba(255,255,255,0.05)", color: i === 0 ? "white" : "#6b7280" }}>{i + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white text-sm font-medium truncate">{path}</p>
+                            </div>
+                            <div className="flex items-center gap-5 flex-shrink-0 text-xs">
+                              <div className="text-right w-16">
+                                <p className="text-white font-bold">{page.clicks}</p>
+                                <p className="text-gray-600 text-[9px]">clics</p>
+                              </div>
+                              <div className="text-right w-16">
+                                <p className="text-gray-400 font-bold">{page.impressions}</p>
+                                <p className="text-gray-600 text-[9px]">impr.</p>
+                              </div>
+                              <div className="text-right w-12">
+                                <p className="font-bold" style={{ color: posColor }}>{page.position}</p>
+                                <p className="text-gray-600 text-[9px]">pos.</p>
+                              </div>
+                              <div className="text-right w-12">
+                                <p className="text-gray-400 font-bold">{page.ctr}%</p>
+                                <p className="text-gray-600 text-[9px]">CTR</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ════════════════════════════════════════════════════════════
                 TAB 2 — PUBLICATIONS
