@@ -406,6 +406,8 @@ export default function Dashboard() {
       seoModalWasOpenRef.current = false;
       localStorage.removeItem("rankpill_onboarding");
       tutorialInitRef.current = false;
+      setTutorialStep(0);
+      setScoreBubbleStep(0);
     }
   }, [showSeoModal]);
 
