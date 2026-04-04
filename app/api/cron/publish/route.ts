@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { sendArticlePublishedEmail } from "@/lib/email";
 import { publishToWix, analyzeWixSite } from "@/lib/wix";
@@ -6,8 +5,7 @@ import { publishToCustomApi } from "@/lib/custom";
 import { fetchPexelsImage } from "@/lib/pexels";
 import { emitEvent, createPublicationEvent, createMilestoneEvent } from "@/lib/seo-events";
 import { recordAction } from "@/lib/seo-feedback";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiCall, parseAiJson } from "@/lib/ai-router";
 
 function createAdminClient() {
   return createClient(
@@ -54,12 +52,14 @@ async function extractStyleGuide(articles: { title: string; excerpt: string }[])
       .map((a, i) => `Article ${i + 1} — "${a.title}":\n${a.excerpt}`)
       .join("\n\n---\n\n");
 
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 600,
-      messages: [{
-        role: "user",
-        content: `Analyze these blog article excerpts and extract the editorial style guide in 6-8 concise bullet points. Cover: tone (formal/casual/friendly), use of "vous" or "tu", sentence length and rhythm, introduction style, how H2/H3 titles are phrased, use of lists vs paragraphs, vocabulary register, and any recurring stylistic patterns.
+    // style_extraction → Haiku
+    const aiResult = await aiCall(
+      { task: "style_extraction" },
+      {
+        max_tokens: 600,
+        messages: [{
+          role: "user",
+          content: `Analyze these blog article excerpts and extract the editorial style guide in 6-8 concise bullet points. Cover: tone (formal/casual/friendly), use of "vous" or "tu", sentence length and rhythm, introduction style, how H2/H3 titles are phrased, use of lists vs paragraphs, vocabulary register, and any recurring stylistic patterns.
 
 ${samplesText}
 
@@ -67,11 +67,11 @@ Respond ONLY with bullet points, no intro or conclusion:
 - [style observation]
 - [style observation]
 ...`,
-      }],
-    });
+        }],
+      }
+    );
 
-    const text = message.content[0].type === "text" ? message.content[0].text : "";
-    return text.trim();
+    return aiResult.text.trim();
   } catch {
     return "";
   }
@@ -199,25 +199,25 @@ RESPONSE FORMAT: Valid JSON only, no text before or after.
 
 HTML content must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. No <html>, <body>, <head>.`;
 
-  const message = await anthropic.messages.create({
-    model: "claude-opus-4-6",
-    max_tokens: 6000,
-    system: `You are the world's best SEO content writer. Every article you produce is unique, creative, and generates real organic traffic. You never produce generic or repetitive content. You think like a specialized press editor who wants to captivate the reader while satisfying Google's algorithms. You always write in the language specified in the LANGUAGE field — this is non-negotiable.`,
-    messages: [{ role: "user", content: prompt }],
-  });
+  // content_generation → Sonnet (execution task, not strategic)
+  const aiResult = await aiCall(
+    { task: "content_generation" },
+    {
+      system: `You are the world's best SEO content writer. Every article you produce is unique, creative, and generates real organic traffic. You never produce generic or repetitive content. You think like a specialized press editor who wants to captivate the reader while satisfying Google's algorithms. You always write in the language specified in the LANGUAGE field — this is non-negotiable.`,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 6000,
+    }
+  );
 
-  const raw = message.content[0].type === "text" ? message.content[0].text : "";
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) throw new Error("Format de réponse Claude invalide");
-
-  const parsed = JSON.parse(raw.slice(start, end + 1)) as {
+  const parsed = parseAiJson<{
     title: string;
     meta_description: string;
     content: string;
     cover_image_query?: string;
     cover_alt_text?: string;
-  };
+  }>(aiResult.text);
+
+  if (!parsed) throw new Error("Format de réponse Claude invalide");
 
   return parsed;
 }
