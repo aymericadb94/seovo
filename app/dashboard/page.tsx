@@ -354,6 +354,18 @@ export default function Dashboard() {
     return () => window.removeEventListener("focus", loadData);
   }, []);
 
+  // Détecte la fermeture du modal d'analyse → réinitialise le tutoriel
+  const seoModalWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (showSeoModal === true) {
+      seoModalWasOpenRef.current = true;
+    } else if (showSeoModal === false && seoModalWasOpenRef.current) {
+      seoModalWasOpenRef.current = false;
+      localStorage.removeItem("rankpill_onboarding");
+      tutorialInitRef.current = false;
+    }
+  }, [showSeoModal]);
+
   // Initialise le tutoriel une seule fois après que l'analyse soit faite
   useEffect(() => {
     if (!data?.site?.seo_analysis_done) return;
