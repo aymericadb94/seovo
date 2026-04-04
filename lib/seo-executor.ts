@@ -22,6 +22,7 @@ import {
 import { emitEvent, type SeoEvent } from "@/lib/seo-events";
 import { recordAction } from "@/lib/seo-feedback";
 import { assessRisk, getModificationHistory, type ActionContext, type RiskAssessment } from "@/lib/seo-risk";
+import { analyzeLinking } from "@/lib/seo-linking";
 import type { GSCQuery } from "@/lib/seo-projections";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -91,20 +92,10 @@ export async function planSeoActions(
     return actions; // Not enough data to plan actions
   }
 
-  // 2. Build URL → post mapping
-  const urlToPost = new Map<string, CmsPost>();
-  const urlToPub = new Map<string, { title: string; keyword: string }>();
-  for (const post of cmsPosts) {
-    urlToPost.set(normalizeUrl(post.url), post);
-  }
-  for (const pub of publications) {
-    if (pub.wordpress_url) {
-      urlToPub.set(normalizeUrl(pub.wordpress_url), { title: pub.title, keyword: pub.keyword });
-    }
-  }
-
-  // 3. Plan internal linking actions
-  const linkActions = planInternalLinks(cocoon, cmsPosts, publications, urlToPost, urlToPub);
+  // 2. Plan internal linking actions (using intelligent linking engine)
+  const linkActions = await planInternalLinksIntelligent(
+    supabase, userId, cmsPosts, gscQueries, creds.site_url, cocoon, publications
+  );
   actions.push(...linkActions);
 
   // 4. Plan meta optimizations (CTR anomalies)
@@ -143,139 +134,75 @@ export async function planSeoActions(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// INTERNAL LINKING PLANNER
+// INTERNAL LINKING PLANNER — Uses intelligent seo-linking engine
 // ══════════════════════════════════════════════════════════════════════════════
 
-function planInternalLinks(
-  cocoon: CocoonData,
+async function planInternalLinksIntelligent(
+  supabase: SupabaseClient,
+  userId: string,
   cmsPosts: CmsPost[],
-  publications: { title: string; keyword: string; wordpress_url: string | null }[],
-  urlToPost: Map<string, CmsPost>,
-  urlToPub: Map<string, { title: string; keyword: string }>
-): SeoAction[] {
+  gscQueries: GSCQuery[],
+  siteUrl: string,
+  cocoon: CocoonData | null,
+  publications: { title: string; keyword: string; wordpress_url: string | null }[]
+): Promise<SeoAction[]> {
   const actions: SeoAction[] = [];
-  let totalPagesTargeted = 0;
 
-  for (const cluster of cocoon.clusters) {
-    if (totalPagesTargeted >= MAX_PAGES_PER_RUN) break;
+  // Run the intelligent linking analysis
+  const analysis = await analyzeLinking(supabase, userId, cmsPosts, gscQueries, siteUrl);
 
-    // Find published pages in this cluster
-    const clusterPages: { title: string; keyword: string; url: string; role: "pillar" | "support" }[] = [];
+  // Convert high/medium priority suggestions into executable actions
+  // Only take automatic-safe suggestions (risk_score <= 30)
+  const executableSuggestions = analysis.suggestions
+    .filter(s => s.risk_score <= 30 && (s.priority === "haute" || s.priority === "moyenne"))
+    .slice(0, MAX_PAGES_PER_RUN * MAX_LINKS_PER_PAGE); // Cap total links
 
-    // Check pillar
-    if (cluster.pillar.status === "existing" && cluster.pillar.url) {
-      clusterPages.push({
-        title: cluster.pillar.title,
-        keyword: cluster.pillar.keyword,
-        url: cluster.pillar.url,
-        role: "pillar",
-      });
-    }
+  // Group suggestions by source page
+  const bySource = new Map<string, typeof executableSuggestions>();
+  for (const s of executableSuggestions) {
+    const existing = bySource.get(s.from_url) ?? [];
+    existing.push(s);
+    bySource.set(s.from_url, existing);
+  }
 
-    // Check support pages
-    for (const sp of cluster.support_pages) {
-      if (sp.status === "existing" && sp.url) {
-        clusterPages.push({
-          title: sp.title,
-          keyword: sp.keyword,
-          url: sp.url,
-          role: "support",
-        });
-      }
-    }
+  let pagesTargeted = 0;
+  for (const [sourceUrl, suggestions] of bySource) {
+    if (pagesTargeted >= MAX_PAGES_PER_RUN) break;
 
-    // Also match by keyword from publications
-    for (const pub of publications) {
-      if (!pub.wordpress_url) continue;
-      const pubKw = pub.keyword.toLowerCase();
-      const alreadyMapped = clusterPages.some(p => normalizeUrl(p.url) === normalizeUrl(pub.wordpress_url!));
-      if (alreadyMapped) continue;
+    const post = findPostByUrl(cmsPosts, sourceUrl);
+    if (!post) continue;
+    if (post.content.length < MIN_CONTENT_LENGTH) continue;
 
-      if (cluster.pillar.keyword.toLowerCase() === pubKw) {
-        clusterPages.push({ title: pub.title, keyword: pub.keyword, url: pub.wordpress_url, role: "pillar" });
-      } else if (cluster.support_pages.some(sp => sp.keyword.toLowerCase() === pubKw)) {
-        clusterPages.push({ title: pub.title, keyword: pub.keyword, url: pub.wordpress_url, role: "support" });
-      }
-    }
+    const existingLinks = countInternalLinks(post.content, cmsPosts.map(p => p.url));
+    if (existingLinks >= 5) continue;
 
-    if (clusterPages.length < 2) continue; // Need at least 2 pages to link
+    // Cap links per page
+    const capped = suggestions.slice(0, MAX_LINKS_PER_PAGE);
+    const linksToAdd: LinkInjection[] = capped.map(s => ({
+      anchor: s.anchor,
+      target_url: s.to_url,
+      target_title: s.to_title,
+    }));
 
-    // Find pillar page
-    const pillar = clusterPages.find(p => p.role === "pillar");
-    const supports = clusterPages.filter(p => p.role === "support");
+    // Find cluster name from page profile
+    const profile = analysis.page_profiles.find(p => p.url === sourceUrl);
+    const clusterName = profile?.cluster ?? "inconnu";
 
-    // Generate link injections for each page
-    for (const page of clusterPages) {
-      if (totalPagesTargeted >= MAX_PAGES_PER_RUN) break;
-
-      const post = findPostByUrl(cmsPosts, page.url);
-      if (!post) continue;
-      if (post.content.length < MIN_CONTENT_LENGTH) continue;
-
-      // Count existing internal links in content
-      const existingLinks = countInternalLinks(post.content, cmsPosts.map(p => p.url));
-      if (existingLinks >= 5) continue; // Already well-linked
-
-      const linksToAdd: LinkInjection[] = [];
-
-      // Rule: support → pillar (mandatory)
-      if (page.role === "support" && pillar) {
-        const alreadyLinked = post.content.toLowerCase().includes(pillar.url.toLowerCase());
-        if (!alreadyLinked) {
-          linksToAdd.push({
-            anchor: pillar.keyword,
-            target_url: pillar.url,
-            target_title: pillar.title,
-          });
-        }
-      }
-
-      // Rule: pillar → supports
-      if (page.role === "pillar") {
-        for (const sp of supports.slice(0, 3)) {
-          const alreadyLinked = post.content.toLowerCase().includes(sp.url.toLowerCase());
-          if (!alreadyLinked) {
-            linksToAdd.push({
-              anchor: sp.keyword,
-              target_url: sp.url,
-              target_title: sp.title,
-            });
-          }
-        }
-      }
-
-      // Rule: support → other support in same cluster (max 1)
-      if (page.role === "support") {
-        const otherSupports = supports.filter(s => s.url !== page.url);
-        for (const other of otherSupports.slice(0, 1)) {
-          const alreadyLinked = post.content.toLowerCase().includes(other.url.toLowerCase());
-          if (!alreadyLinked) {
-            linksToAdd.push({
-              anchor: other.keyword,
-              target_url: other.url,
-              target_title: other.title,
-            });
-          }
-        }
-      }
-
-      if (linksToAdd.length > 0) {
-        actions.push({
-          type: "add_internal_links",
-          level: "automatic", // Link injection is safe and reversible
-          target_post_id: post.id,
-          target_url: page.url,
-          target_title: page.title,
-          details: {
-            cluster: cluster.name,
-            links: linksToAdd,
-            existing_internal_links: existingLinks,
-          },
-          reason: `${linksToAdd.length} lien(s) interne(s) manquant(s) dans le cluster "${cluster.name}"`,
-        });
-        totalPagesTargeted++;
-      }
-    }
+    actions.push({
+      type: "add_internal_links",
+      level: "automatic",
+      target_post_id: post.id,
+      target_url: sourceUrl,
+      target_title: post.title,
+      details: {
+        cluster: clusterName,
+        links: linksToAdd,
+        existing_internal_links: existingLinks,
+        justifications: capped.map(s => s.justification),
+      },
+      reason: `${linksToAdd.length} lien(s) suggéré(s) par l'analyse de maillage (cluster "${clusterName}")`,
+    });
+    pagesTargeted++;
   }
 
   return actions;

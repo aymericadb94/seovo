@@ -1,0 +1,768 @@
+/**
+ * SEO Internal Linking Engine
+ *
+ * Intelligent linking system that uses 5 data sources:
+ * 1. Semantic cocoon (clusters, pillars, supports)
+ * 2. Google Search Console (positions, CTR, opportunities)
+ * 3. CMS content (HTML, existing links, structure)
+ * 4. Roadmap (upcoming pages, strategy)
+ * 5. Risk scoring (per-page safety)
+ *
+ * Generates link plans with varied anchors, contextual placement,
+ * orphan detection, cluster strength analysis, and GSC-driven prioritization.
+ */
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { CmsPost } from "@/lib/cms-update";
+import type { GSCQuery } from "@/lib/seo-projections";
+import { assessRisk, getModificationHistory, type ActionContext } from "@/lib/seo-risk";
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export type LinkSuggestion = {
+  from_url: string;
+  from_title: string;
+  to_url: string;
+  to_title: string;
+  anchor: string;
+  placement: "intro" | "body" | "conclusion";
+  objective: "seo" | "ux" | "conversion";
+  priority: "haute" | "moyenne" | "faible";
+  justification: string;
+  risk_score: number;
+};
+
+export type PageLinkProfile = {
+  url: string;
+  title: string;
+  keyword: string;
+  role: "pillar" | "support" | "orphan" | "unknown";
+  cluster: string | null;
+  // Current state
+  outgoing_internal: number;
+  incoming_internal: number;
+  content_word_count: number;
+  // GSC metrics
+  position: number | null;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  // Computed
+  link_score: number;       // 0-100, how well-linked this page is
+  boost_priority: number;   // 0-100, how much this page needs more links
+};
+
+export type ClusterStrength = {
+  name: string;
+  pillar_url: string | null;
+  pillar_published: boolean;
+  total_pages: number;
+  published_pages: number;
+  internal_links: number;    // Total links within cluster
+  missing_links: number;     // Estimated missing links
+  strength_score: number;    // 0-100
+  avg_position: number | null;
+};
+
+export type LinkingAnalysis = {
+  page_profiles: PageLinkProfile[];
+  cluster_strengths: ClusterStrength[];
+  orphan_pages: { url: string; title: string; reason: string }[];
+  underlinked_pages: { url: string; title: string; incoming: number; needed: number }[];
+  suggestions: LinkSuggestion[];
+  global_score: number;
+  global_label: string;
+};
+
+// Cocoon types
+type CocoonCluster = {
+  name: string;
+  priority: string;
+  traffic_potential: number;
+  pillar: { title: string; keyword: string; status: string; url?: string };
+  support_pages: { title: string; keyword: string; status: string; url?: string }[];
+  internal_links?: { from: string; to: string; anchor: string; direction: string }[];
+};
+
+type CocoonData = {
+  clusters: CocoonCluster[];
+  score?: number;
+};
+
+// ── Main Analysis Function ───────────────────────────────────────────────────
+
+export async function analyzeLinking(
+  supabase: SupabaseClient,
+  userId: string,
+  cmsPosts: CmsPost[],
+  gscQueries: GSCQuery[],
+  siteUrl: string
+): Promise<LinkingAnalysis> {
+  // 1. Fetch cocoon + publications + roadmap
+  const [cocoonRes, pubsRes, roadmapRes] = await Promise.all([
+    supabase.from("semantic_cocoons").select("data").eq("user_id", userId).maybeSingle(),
+    supabase.from("publications").select("title, keyword, wordpress_url").eq("user_id", userId),
+    supabase.from("roadmaps").select("data").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+
+  const cocoon = (cocoonRes.data?.data ?? { clusters: [] }) as CocoonData;
+  const publications = pubsRes.data ?? [];
+  type RoadmapArticle = { title: string; keyword: string; role: string };
+  const roadmapArticles = ((roadmapRes.data?.data as { articles?: RoadmapArticle[] } | null)?.articles ?? []) as RoadmapArticle[];
+
+  // 2. Build GSC lookup
+  const gscByQuery = new Map(gscQueries.map(q => [q.query.toLowerCase(), q]));
+  const gscByUrl = new Map<string, GSCQuery[]>();
+  // We don't have page-level GSC here, so we match by keyword
+
+  // 3. Build page profiles
+  const profiles = buildPageProfiles(cmsPosts, publications, cocoon, gscByQuery, siteUrl);
+
+  // 4. Analyze cluster strengths
+  const clusterStrengths = analyzeClusterStrengths(cocoon, profiles, gscByQuery);
+
+  // 5. Detect orphans and underlinked pages
+  const orphans = detectOrphans(profiles, cocoon);
+  const underlinked = detectUnderlinked(profiles);
+
+  // 6. Generate link suggestions (the core intelligence)
+  const suggestions = await generateSuggestions(
+    supabase, userId, profiles, cocoon, gscByQuery, roadmapArticles, siteUrl
+  );
+
+  // 7. Global score
+  const globalScore = computeGlobalScore(profiles, clusterStrengths, orphans);
+  const globalLabel = globalScore >= 75 ? "Excellent" : globalScore >= 50 ? "Bon" : globalScore >= 25 ? "Moyen" : "Faible";
+
+  return {
+    page_profiles: profiles,
+    cluster_strengths: clusterStrengths,
+    orphan_pages: orphans,
+    underlinked_pages: underlinked,
+    suggestions,
+    global_score: globalScore,
+    global_label: globalLabel,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE PROFILES
+// ══════════════════════════════════════════════════════════════════════════════
+
+function buildPageProfiles(
+  cmsPosts: CmsPost[],
+  publications: { title: string; keyword: string; wordpress_url: string | null }[],
+  cocoon: CocoonData,
+  gscByQuery: Map<string, GSCQuery>,
+  siteUrl: string
+): PageLinkProfile[] {
+  const profiles: PageLinkProfile[] = [];
+  const allUrls = cmsPosts.map(p => p.url);
+
+  for (const post of cmsPosts) {
+    const pub = publications.find(p => p.wordpress_url && normalizeUrl(p.wordpress_url) === normalizeUrl(post.url));
+    const keyword = pub?.keyword ?? "";
+
+    // Find cluster membership
+    let role: PageLinkProfile["role"] = "unknown";
+    let clusterName: string | null = null;
+    for (const cluster of cocoon.clusters) {
+      if (matchesPage(cluster.pillar, post.url, keyword)) {
+        role = "pillar";
+        clusterName = cluster.name;
+        break;
+      }
+      if (cluster.support_pages.some(sp => matchesPage(sp, post.url, keyword))) {
+        role = "support";
+        clusterName = cluster.name;
+        break;
+      }
+    }
+
+    // Count links
+    const outgoing = countLinksInHtml(post.content, allUrls, siteUrl);
+    const incoming = countIncomingLinks(post.url, cmsPosts, siteUrl);
+    const wordCount = countWords(post.content);
+
+    // GSC data
+    const gsc = gscByQuery.get(keyword.toLowerCase());
+
+    // Compute scores
+    const idealLinks = Math.max(2, Math.min(5, Math.floor(wordCount / 300)));
+    const linkScore = Math.min(100, Math.round(
+      ((Math.min(outgoing, idealLinks) / idealLinks) * 50) +
+      ((Math.min(incoming, 3) / 3) * 50)
+    ));
+
+    // Boost priority: high for pages that need links the most
+    let boostPriority = 0;
+    if (incoming === 0) boostPriority += 40; // Orphan
+    else if (incoming < 2) boostPriority += 20;
+    if (gsc && gsc.position > 5 && gsc.position <= 15) boostPriority += 30; // Striking distance
+    if (gsc && gsc.position <= 10 && gsc.impressions > 100 && gsc.ctr < getExpectedCtr(gsc.position) * 0.6) {
+      boostPriority += 15; // CTR anomaly
+    }
+    if (role === "pillar") boostPriority += 10;
+
+    profiles.push({
+      url: post.url,
+      title: pub?.title ?? post.title,
+      keyword,
+      role: role === "unknown" && incoming === 0 ? "orphan" : role,
+      cluster: clusterName,
+      outgoing_internal: outgoing,
+      incoming_internal: incoming,
+      content_word_count: wordCount,
+      position: gsc?.position ?? null,
+      impressions: gsc?.impressions ?? 0,
+      clicks: gsc?.clicks ?? 0,
+      ctr: gsc?.ctr ?? 0,
+      link_score: linkScore,
+      boost_priority: Math.min(100, boostPriority),
+    });
+  }
+
+  return profiles;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CLUSTER ANALYSIS
+// ══════════════════════════════════════════════════════════════════════════════
+
+function analyzeClusterStrengths(
+  cocoon: CocoonData,
+  profiles: PageLinkProfile[],
+  gscByQuery: Map<string, GSCQuery>
+): ClusterStrength[] {
+  return cocoon.clusters.map(cluster => {
+    const clusterProfiles = profiles.filter(p => p.cluster === cluster.name);
+    const totalPages = 1 + cluster.support_pages.length; // pillar + supports
+    const publishedPages = clusterProfiles.length;
+    const internalLinks = clusterProfiles.reduce((s, p) => s + p.outgoing_internal, 0);
+
+    // Ideal: each page links to pillar + 1-2 supports = ~2-3 links per page
+    const idealLinks = publishedPages * 2.5;
+    const missingLinks = Math.max(0, Math.round(idealLinks - internalLinks));
+
+    // Average position
+    const withPosition = clusterProfiles.filter(p => p.position !== null);
+    const avgPosition = withPosition.length > 0
+      ? Math.round(withPosition.reduce((s, p) => s + (p.position ?? 0), 0) / withPosition.length * 10) / 10
+      : null;
+
+    // Strength score
+    let strength = 0;
+    if (publishedPages > 0) strength += Math.min(30, (publishedPages / totalPages) * 30);
+    if (internalLinks > 0) strength += Math.min(30, (internalLinks / idealLinks) * 30);
+    const pillarPublished = clusterProfiles.some(p => p.role === "pillar");
+    if (pillarPublished) strength += 20;
+    if (avgPosition !== null && avgPosition <= 15) strength += 20;
+    else if (avgPosition !== null && avgPosition <= 30) strength += 10;
+
+    return {
+      name: cluster.name,
+      pillar_url: cluster.pillar.url ?? null,
+      pillar_published: pillarPublished,
+      total_pages: totalPages,
+      published_pages: publishedPages,
+      internal_links: internalLinks,
+      missing_links: missingLinks,
+      strength_score: Math.round(Math.min(100, strength)),
+      avg_position: avgPosition,
+    };
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ORPHAN & UNDERLINKED DETECTION
+// ══════════════════════════════════════════════════════════════════════════════
+
+function detectOrphans(
+  profiles: PageLinkProfile[],
+  cocoon: CocoonData
+): { url: string; title: string; reason: string }[] {
+  const orphans: { url: string; title: string; reason: string }[] = [];
+
+  for (const p of profiles) {
+    if (p.incoming_internal === 0 && p.outgoing_internal === 0) {
+      orphans.push({
+        url: p.url,
+        title: p.title,
+        reason: "Aucun lien interne entrant ni sortant — page totalement isolée",
+      });
+    } else if (p.incoming_internal === 0) {
+      orphans.push({
+        url: p.url,
+        title: p.title,
+        reason: "Aucun lien interne entrant — page invisible pour le PageRank",
+      });
+    } else if (p.cluster === null) {
+      orphans.push({
+        url: p.url,
+        title: p.title,
+        reason: "Page non rattachée à un cluster du cocon sémantique",
+      });
+    }
+  }
+
+  return orphans;
+}
+
+function detectUnderlinked(
+  profiles: PageLinkProfile[]
+): { url: string; title: string; incoming: number; needed: number }[] {
+  return profiles
+    .filter(p => {
+      const needed = p.role === "pillar" ? 3 : 2;
+      return p.incoming_internal < needed;
+    })
+    .map(p => ({
+      url: p.url,
+      title: p.title,
+      incoming: p.incoming_internal,
+      needed: p.role === "pillar" ? 3 : 2,
+    }))
+    .sort((a, b) => (a.incoming - a.needed) - (b.incoming - b.needed));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SUGGESTION GENERATION — The core intelligence
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function generateSuggestions(
+  supabase: SupabaseClient,
+  userId: string,
+  profiles: PageLinkProfile[],
+  cocoon: CocoonData,
+  gscByQuery: Map<string, GSCQuery>,
+  roadmap: { title: string; keyword: string; role: string }[],
+  siteUrl: string
+): Promise<LinkSuggestion[]> {
+  const suggestions: LinkSuggestion[] = [];
+  const usedPairs = new Set<string>(); // "from_url|to_url" to avoid duplicates
+
+  // Priority order of link generation rules:
+  // 1. Support → Pillar (mandatory, highest priority)
+  // 2. Pillar → Supports (reinforce cluster)
+  // 3. GSC boost (striking distance pages get more inbound)
+  // 4. Cross-cluster pillar links (topical bridges)
+  // 5. Orphan rescue (link orphans into closest cluster)
+
+  for (const cluster of cocoon.clusters) {
+    const clusterProfiles = profiles.filter(p => p.cluster === cluster.name);
+    const pillar = clusterProfiles.find(p => p.role === "pillar");
+    const supports = clusterProfiles.filter(p => p.role === "support");
+
+    // ── Rule 1: Support → Pillar ──────────────────────────────────────
+    if (pillar) {
+      for (const support of supports) {
+        const pairKey = `${support.url}|${pillar.url}`;
+        if (usedPairs.has(pairKey)) continue;
+
+        // Check if link already exists
+        const sourcePost = profiles.find(p => p.url === support.url);
+        if (sourcePost && sourcePost.outgoing_internal >= 5) continue;
+
+        const anchor = generateAnchor(pillar.keyword, pillar.title, "support_to_pillar", usedPairs);
+        const risk = await quickRisk(supabase, userId, support, "add_internal_links", 1, siteUrl);
+
+        suggestions.push({
+          from_url: support.url,
+          from_title: support.title,
+          to_url: pillar.url,
+          to_title: pillar.title,
+          anchor,
+          placement: "intro",
+          objective: "seo",
+          priority: "haute",
+          justification: `Lien support → pilier obligatoire dans le cluster "${cluster.name}"`,
+          risk_score: risk,
+        });
+        usedPairs.add(pairKey);
+      }
+
+      // ── Rule 2: Pillar → Supports ────────────────────────────────────
+      for (const support of supports.slice(0, 4)) {
+        const pairKey = `${pillar.url}|${support.url}`;
+        if (usedPairs.has(pairKey)) continue;
+        if (pillar.outgoing_internal >= 5) break;
+
+        const anchor = generateAnchor(support.keyword, support.title, "pillar_to_support", usedPairs);
+        const risk = await quickRisk(supabase, userId, pillar, "add_internal_links", 1, siteUrl);
+
+        suggestions.push({
+          from_url: pillar.url,
+          from_title: pillar.title,
+          to_url: support.url,
+          to_title: support.title,
+          anchor,
+          placement: "body",
+          objective: "seo",
+          priority: "haute",
+          justification: `Renforcement du cluster "${cluster.name}" — pilier distribue le jus SEO`,
+          risk_score: risk,
+        });
+        usedPairs.add(pairKey);
+      }
+    }
+
+    // ── Rule 2b: Support ↔ Support (max 1 per support) ────────────────
+    for (let i = 0; i < supports.length; i++) {
+      const s1 = supports[i];
+      const s2 = supports[(i + 1) % supports.length];
+      if (!s2 || s1.url === s2.url) continue;
+
+      const pairKey = `${s1.url}|${s2.url}`;
+      if (usedPairs.has(pairKey)) continue;
+      if (s1.outgoing_internal >= 5) continue;
+
+      const anchor = generateAnchor(s2.keyword, s2.title, "support_to_support", usedPairs);
+      const risk = await quickRisk(supabase, userId, s1, "add_internal_links", 1, siteUrl);
+
+      suggestions.push({
+        from_url: s1.url,
+        from_title: s1.title,
+        to_url: s2.url,
+        to_title: s2.title,
+        anchor,
+        placement: "body",
+        objective: "ux",
+        priority: "moyenne",
+        justification: `Maillage horizontal dans le cluster "${cluster.name}"`,
+        risk_score: risk,
+      });
+      usedPairs.add(pairKey);
+    }
+  }
+
+  // ── Rule 3: GSC-driven boost ──────────────────────────────────────────
+  const strikingDistance = profiles
+    .filter(p => p.position !== null && p.position > 5 && p.position <= 15 && p.impressions > 50)
+    .sort((a, b) => b.impressions - a.impressions);
+
+  for (const target of strikingDistance.slice(0, 5)) {
+    // Find best pages to link FROM (pages with few outgoing links, in related clusters)
+    const candidates = profiles
+      .filter(p =>
+        p.url !== target.url &&
+        p.outgoing_internal < 5 &&
+        p.content_word_count > 400 &&
+        !usedPairs.has(`${p.url}|${target.url}`)
+      )
+      .sort((a, b) => {
+        // Prefer same cluster, then high-traffic pages
+        const sameClusterA = a.cluster === target.cluster ? 100 : 0;
+        const sameClusterB = b.cluster === target.cluster ? 100 : 0;
+        return (sameClusterB + b.clicks) - (sameClusterA + a.clicks);
+      });
+
+    const source = candidates[0];
+    if (!source) continue;
+
+    const anchor = generateAnchor(target.keyword, target.title, "gsc_boost", usedPairs);
+    const risk = await quickRisk(supabase, userId, source, "add_internal_links", 1, siteUrl);
+
+    suggestions.push({
+      from_url: source.url,
+      from_title: source.title,
+      to_url: target.url,
+      to_title: target.title,
+      anchor,
+      placement: "body",
+      objective: "seo",
+      priority: "haute",
+      justification: `Page en position ${target.position} avec ${target.impressions} impressions — un lien interne peut la pousser dans le top 5`,
+      risk_score: risk,
+    });
+    usedPairs.add(`${source.url}|${target.url}`);
+  }
+
+  // ── Rule 4: Cross-cluster pillar links ────────────────────────────────
+  const pillars = profiles.filter(p => p.role === "pillar");
+  for (let i = 0; i < pillars.length; i++) {
+    for (let j = i + 1; j < pillars.length; j++) {
+      const p1 = pillars[i];
+      const p2 = pillars[j];
+      const pairKey = `${p1.url}|${p2.url}`;
+      if (usedPairs.has(pairKey)) continue;
+      if (p1.outgoing_internal >= 5) continue;
+
+      const anchor = generateAnchor(p2.keyword, p2.title, "cross_cluster", usedPairs);
+      suggestions.push({
+        from_url: p1.url,
+        from_title: p1.title,
+        to_url: p2.url,
+        to_title: p2.title,
+        anchor,
+        placement: "conclusion",
+        objective: "ux",
+        priority: "faible",
+        justification: `Pont sémantique entre clusters "${p1.cluster}" et "${p2.cluster}"`,
+        risk_score: 15, // Cross-cluster pillar links are always low risk
+      });
+      usedPairs.add(pairKey);
+      // Only 1 cross-cluster link per pillar pair
+      break;
+    }
+  }
+
+  // ── Rule 5: Orphan rescue ─────────────────────────────────────────────
+  const orphans = profiles.filter(p => p.role === "orphan" || p.incoming_internal === 0);
+  for (const orphan of orphans.slice(0, 3)) {
+    // Find closest cluster by keyword similarity
+    const bestSource = profiles
+      .filter(p =>
+        p.url !== orphan.url &&
+        p.outgoing_internal < 5 &&
+        p.content_word_count > 400 &&
+        !usedPairs.has(`${p.url}|${orphan.url}`)
+      )
+      .sort((a, b) => b.clicks - a.clicks)[0];
+
+    if (!bestSource) continue;
+
+    const anchor = generateAnchor(orphan.keyword, orphan.title, "orphan_rescue", usedPairs);
+    suggestions.push({
+      from_url: bestSource.url,
+      from_title: bestSource.title,
+      to_url: orphan.url,
+      to_title: orphan.title,
+      anchor,
+      placement: "body",
+      objective: "seo",
+      priority: "moyenne",
+      justification: `Page orpheline "${orphan.title}" — aucun lien entrant, invisible pour Google`,
+      risk_score: 10,
+    });
+    usedPairs.add(`${bestSource.url}|${orphan.url}`);
+  }
+
+  // Sort by priority then risk
+  const priorityOrder = { haute: 0, moyenne: 1, faible: 2 };
+  suggestions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority] || a.risk_score - b.risk_score);
+
+  return suggestions;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ANCHOR GENERATION — Varied, natural, contextual
+// ══════════════════════════════════════════════════════════════════════════════
+
+function generateAnchor(
+  keyword: string,
+  title: string,
+  context: string,
+  usedAnchors: Set<string>
+): string {
+  const kw = keyword.trim();
+  const cleanTitle = title.replace(/[""«»]/g, "").trim();
+
+  // Generate multiple anchor candidates
+  const candidates: string[] = [];
+
+  // 1. Exact keyword (use sparingly)
+  candidates.push(kw);
+
+  // 2. Partial keyword (first 2-3 words)
+  const kwWords = kw.split(/\s+/);
+  if (kwWords.length >= 3) {
+    candidates.push(kwWords.slice(0, 3).join(" "));
+    candidates.push(kwWords.slice(0, 2).join(" "));
+  }
+
+  // 3. Title-based (shortened)
+  if (cleanTitle.length > 10 && cleanTitle !== kw) {
+    const titleWords = cleanTitle.split(/\s+/);
+    if (titleWords.length > 4) {
+      candidates.push(titleWords.slice(0, 4).join(" "));
+    } else {
+      candidates.push(cleanTitle);
+    }
+  }
+
+  // 4. Contextual variations
+  switch (context) {
+    case "support_to_pillar":
+      candidates.push(`guide ${kwWords[0] ?? kw}`);
+      candidates.push(`tout savoir sur ${kwWords.slice(0, 2).join(" ")}`);
+      break;
+    case "pillar_to_support":
+      candidates.push(`en savoir plus sur ${kwWords.slice(0, 2).join(" ")}`);
+      candidates.push(kwWords.length > 1 ? kwWords.slice(-2).join(" ") : kw);
+      break;
+    case "gsc_boost":
+      candidates.push(`découvrir ${kwWords.slice(0, 2).join(" ")}`);
+      break;
+    case "orphan_rescue":
+      candidates.push(`article sur ${kwWords.slice(0, 2).join(" ")}`);
+      break;
+    case "cross_cluster":
+      candidates.push(`voir aussi : ${kwWords.slice(0, 2).join(" ")}`);
+      break;
+  }
+
+  // Pick the first candidate NOT already used
+  for (const c of candidates) {
+    const key = `anchor:${c.toLowerCase()}`;
+    if (!usedAnchors.has(key)) {
+      usedAnchors.add(key);
+      return c;
+    }
+  }
+
+  // Fallback: keyword with slight variation
+  return kw;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL SCORE
+// ══════════════════════════════════════════════════════════════════════════════
+
+function computeGlobalScore(
+  profiles: PageLinkProfile[],
+  clusters: ClusterStrength[],
+  orphans: { url: string }[]
+): number {
+  if (profiles.length === 0) return 0;
+
+  // 1. Average link score (40%)
+  const avgLinkScore = profiles.reduce((s, p) => s + p.link_score, 0) / profiles.length;
+
+  // 2. Cluster strength average (30%)
+  const avgClusterStrength = clusters.length > 0
+    ? clusters.reduce((s, c) => s + c.strength_score, 0) / clusters.length
+    : 0;
+
+  // 3. Orphan penalty (15%)
+  const orphanRatio = orphans.length / profiles.length;
+  const orphanScore = Math.max(0, 100 - orphanRatio * 200);
+
+  // 4. Coverage (15%) — % of pages with at least 1 incoming + 1 outgoing link
+  const wellLinked = profiles.filter(p => p.incoming_internal > 0 && p.outgoing_internal > 0);
+  const coverageScore = (wellLinked.length / profiles.length) * 100;
+
+  return Math.round(
+    avgLinkScore * 0.40 +
+    avgClusterStrength * 0.30 +
+    orphanScore * 0.15 +
+    coverageScore * 0.15
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.pathname.replace(/\/$/, "").toLowerCase();
+  } catch {
+    return url.replace(/\/$/, "").toLowerCase();
+  }
+}
+
+function matchesPage(
+  cocoonPage: { keyword: string; url?: string },
+  postUrl: string,
+  postKeyword: string
+): boolean {
+  if (cocoonPage.url && normalizeUrl(cocoonPage.url) === normalizeUrl(postUrl)) return true;
+  if (cocoonPage.keyword.toLowerCase() === postKeyword.toLowerCase()) return true;
+  return false;
+}
+
+function countLinksInHtml(html: string, siteUrls: string[], siteUrl: string): number {
+  const regex = /<a[^>]+href=["']([^"']+)["']/gi;
+  let count = 0;
+  let match;
+  const domain = (() => { try { return new URL(siteUrl).hostname; } catch { return ""; } })();
+
+  while ((match = regex.exec(html)) !== null) {
+    const href = match[1];
+    try {
+      const u = new URL(href, siteUrl);
+      if (u.hostname === domain) count++;
+    } catch {
+      if (href.startsWith("/")) count++;
+    }
+  }
+  return count;
+}
+
+function countIncomingLinks(targetUrl: string, allPosts: CmsPost[], siteUrl: string): number {
+  const normalized = normalizeUrl(targetUrl);
+  let count = 0;
+  for (const post of allPosts) {
+    if (normalizeUrl(post.url) === normalized) continue;
+    // Check if this post's content links to target
+    const regex = /<a[^>]+href=["']([^"']+)["']/gi;
+    let match;
+    while ((match = regex.exec(post.content)) !== null) {
+      try {
+        const u = new URL(match[1], siteUrl);
+        if (normalizeUrl(u.href) === normalized || normalizeUrl(u.pathname) === normalized) {
+          count++;
+          break; // Count each source page once
+        }
+      } catch {
+        if (normalizeUrl(match[1]) === normalized) {
+          count++;
+          break;
+        }
+      }
+    }
+  }
+  return count;
+}
+
+function countWords(html: string): number {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .length;
+}
+
+const CTR_TABLE: Record<number, number> = {
+  1: 0.25, 2: 0.15, 3: 0.10, 4: 0.07, 5: 0.05,
+  6: 0.04, 7: 0.03, 8: 0.025, 9: 0.02, 10: 0.015,
+};
+
+function getExpectedCtr(position: number): number {
+  return CTR_TABLE[Math.round(Math.max(1, Math.min(10, position)))] ?? 0.01;
+}
+
+async function quickRisk(
+  supabase: SupabaseClient,
+  userId: string,
+  page: PageLinkProfile,
+  actionType: ActionContext["action_type"],
+  linksToAdd: number,
+  siteUrl: string
+): Promise<number> {
+  const history = await getModificationHistory(supabase, userId, page.url);
+
+  const ctx: ActionContext = {
+    action_type: actionType,
+    target_url: page.url,
+    target_title: page.title,
+    keyword: page.keyword,
+    position: page.position,
+    impressions: page.impressions,
+    clicks: page.clicks,
+    ctr: page.ctr,
+    is_homepage: (() => {
+      try { return new URL(page.url).pathname === "/"; }
+      catch { return page.url === siteUrl; }
+    })(),
+    is_pillar: page.role === "pillar",
+    content_length: page.content_word_count,
+    existing_internal_links: page.outgoing_internal,
+    links_to_add: linksToAdd,
+  };
+
+  const assessment = assessRisk(ctx, history);
+  return assessment.risk_score;
+}

@@ -1,5 +1,17 @@
+/**
+ * Internal Linking API
+ *
+ * GET  — Retrieve saved linking analysis
+ * POST — Run data-driven linking analysis (seo-linking engine + Claude enrichment)
+ */
+
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { getValidAccessToken } from "@/lib/google";
+import { fetchGscData } from "@/lib/seo-events";
+import { listCmsPosts, type CmsCredentials } from "@/lib/cms-update";
+import { analyzeLinking, type LinkingAnalysis } from "@/lib/seo-linking";
+import type { GSCQuery } from "@/lib/seo-projections";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -33,133 +45,101 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
 
-    // Récupérer le site
+    // Fetch site config
     const { data: site } = await supabase
       .from("sites")
-      .select("business_name, industry, site_url, keywords")
+      .select("id, business_name, industry, site_url, keywords, gsc_site_url, cms, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
-    // Récupérer les publications
-    const { data: pubs } = await supabase
-      .from("publications")
-      .select("id, title, keyword, wordpress_url, published_at")
-      .eq("user_id", user.id)
-      .order("published_at", { ascending: false });
+    // Build CMS credentials
+    const creds: CmsCredentials = {
+      cms: site.cms,
+      site_url: site.site_url,
+      wp_username: site.wp_username,
+      wp_app_password: site.wp_app_password,
+      shopify_api_key: site.shopify_api_key,
+      wix_api_key: site.wix_api_key,
+      wix_site_id: site.wix_site_id,
+      custom_api_url: site.custom_api_url,
+      custom_api_key: site.custom_api_key,
+    };
 
-    const articles = pubs ?? [];
-
-    if (articles.length < 5) {
-      return Response.json({ error: "Pas assez d'articles (minimum 5)" }, { status: 400 });
+    // Fetch CMS posts
+    const cmsPosts = await listCmsPosts(creds, 100);
+    if (cmsPosts.length < 3) {
+      return Response.json({ error: "Pas assez de pages CMS (minimum 3)" }, { status: 400 });
     }
 
-    // Récupérer la roadmap si disponible
-    const { data: roadmapRec } = await supabase
-      .from("roadmaps")
-      .select("data")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    type RoadmapArticle = { title: string; keyword: string; role: string; phase?: number };
-    const roadmapArticles: RoadmapArticle[] = (roadmapRec?.data as { articles?: RoadmapArticle[] } | null)?.articles?.slice(0, 20) ?? [];
-
-    const pagesContext = articles.map((a, i) =>
-      `${i + 1}. "${a.title}" — mot-clé: "${a.keyword}" — URL: ${a.wordpress_url ?? "/article-" + a.id}`
-    ).join("\n");
-
-    const roadmapContext = roadmapArticles.length > 0
-      ? `\n\nROADMAP SEO (pages à venir — à inclure dans les suggestions de maillage futur) :\n${roadmapArticles.map((a, i) => `${i + 1}. "${a.title}" (${a.keyword}) — rôle: ${a.role}`).join("\n")}`
-      : "";
-
-    const prompt = `Tu es un expert senior en référencement SEO spécialisé dans le maillage interne avancé, le cocon sémantique et la distribution du PageRank interne.
-
-SITE : ${site.business_name} — ${site.industry} — ${site.site_url}
-MOTS-CLÉS CONFIGURÉS : ${(site.keywords ?? []).join(", ")}
-
-PAGES EXISTANTES (articles publiés) :
-${pagesContext}${roadmapContext}
-
----
-
-MISSION : Analyse ce site et génère un maillage interne intelligent.
-
-OBJECTIFS :
-1. Identifier les clusters sémantiques parmi les pages existantes
-2. Détecter les pages piliers vs pages secondaires
-3. Identifier les pages orphelines (peu ou pas liées)
-4. Générer des suggestions de liens concrètes et actionnables (avec anchres prêtes à copier)
-5. Calculer un score de maillage global (0-100)
-
-RÈGLES STRICTES :
-- Max 3 à 5 liens par page
-- Anchres naturelles et variées (pas de sur-optimisation)
-- Cohérence thématique obligatoire
-- Qualité > quantité
-- Penser comme un expert SEO humain, pas une machine
-
-FORMAT DE RÉPONSE : JSON valide uniquement, aucun texte avant ou après.
-
-{
-  "score": <number 0-100, score global de maillage actuel>,
-  "score_label": "Faible|Moyen|Bon|Excellent",
-  "score_comment": "Diagnostic en 1-2 phrases du maillage actuel",
-  "cluster_analysis": [
-    {
-      "name": "Nom du cluster thématique",
-      "pillar": "Titre de la page pilier",
-      "pages": ["Titre page 1", "Titre page 2"],
-      "missing_links": <number, liens manquants estimés dans ce cluster>
-    }
-  ],
-  "suggestions": [
-    {
-      "from_title": "Titre de la page source",
-      "from_url": "URL de la page source",
-      "to_title": "Titre de la page cible",
-      "to_url": "URL de la page cible",
-      "anchor": "Texte d'ancre naturel prêt à copier",
-      "placement": "intro|body|conclusion",
-      "objective": "SEO|navigation|conversion",
-      "priority": "haute|moyenne|faible"
-    }
-  ],
-  "orphan_pages": [
-    {
-      "title": "Titre de la page orpheline",
-      "url": "URL",
-      "reason": "Pourquoi cette page est orpheline"
-    }
-  ],
-  "opportunities": [
-    "Opportunité d'optimisation 1 en 1 phrase",
-    "Opportunité 2",
-    "Opportunité 3"
-  ]
-}`;
-
-    const msg = await client.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 4000,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start === -1 || end === -1) {
-      return Response.json({ error: "Réponse Claude invalide" }, { status: 500 });
+    // Fetch GSC data if available
+    let gscQueries: GSCQuery[] = [];
+    if (site.gsc_site_url) {
+      try {
+        const token = await getValidAccessToken(user.id);
+        if (token) {
+          const gsc = await fetchGscData(token, site.gsc_site_url, 30);
+          gscQueries = gsc.queries;
+        }
+      } catch { /* non-fatal — analysis works without GSC */ }
     }
 
-    let result: unknown;
-    try {
-      result = JSON.parse(raw.slice(start, end + 1));
-    } catch {
-      return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
-    }
+    // ── Run data-driven analysis ──────────────────────────────────────────
+    const analysis = await analyzeLinking(
+      supabase,
+      user.id,
+      cmsPosts,
+      gscQueries,
+      site.site_url
+    );
 
-    // Sauvegarder (upsert — silencieux si la table n'existe pas encore)
+    // ── Enrich with Claude for opportunities & commentary ─────────────────
+    const opportunities = await enrichWithClaude(site, analysis);
+
+    // ── Build final result (matches existing frontend format) ─────────────
+    const result = {
+      score: analysis.global_score,
+      score_label: analysis.global_label,
+      score_comment: buildScoreComment(analysis),
+      cluster_analysis: analysis.cluster_strengths.map(c => ({
+        name: c.name,
+        pillar: c.pillar_url ?? "Non publié",
+        pages: analysis.page_profiles
+          .filter(p => p.cluster === c.name)
+          .map(p => p.title),
+        missing_links: c.missing_links,
+        strength_score: c.strength_score,
+        avg_position: c.avg_position,
+      })),
+      suggestions: analysis.suggestions.map(s => ({
+        from_title: s.from_title,
+        from_url: s.from_url,
+        to_title: s.to_title,
+        to_url: s.to_url,
+        anchor: s.anchor,
+        placement: s.placement,
+        objective: s.objective,
+        priority: s.priority,
+        justification: s.justification,
+        risk_score: s.risk_score,
+      })),
+      orphan_pages: analysis.orphan_pages,
+      underlinked_pages: analysis.underlinked_pages,
+      page_profiles: analysis.page_profiles.map(p => ({
+        url: p.url,
+        title: p.title,
+        role: p.role,
+        cluster: p.cluster,
+        outgoing: p.outgoing_internal,
+        incoming: p.incoming_internal,
+        link_score: p.link_score,
+        position: p.position,
+      })),
+      opportunities: opportunities ?? [],
+    };
+
+    // Persist
     try {
       await supabase
         .from("internal_linking")
@@ -173,4 +153,67 @@ FORMAT DE RÉPONSE : JSON valide uniquement, aucun texte avant ou après.
   } catch (err: unknown) {
     return Response.json({ error: err instanceof Error ? err.message : "Erreur inconnue" }, { status: 500 });
   }
+}
+
+// ── Claude enrichment — adds strategic opportunities ────────────────────────
+
+async function enrichWithClaude(
+  site: { business_name: string; industry: string; site_url: string },
+  analysis: LinkingAnalysis
+): Promise<string[] | null> {
+  try {
+    const prompt = `Tu es un expert SEO senior. Voici l'analyse de maillage interne d'un site.
+
+SITE : ${site.business_name} — ${site.industry} — ${site.site_url}
+SCORE GLOBAL : ${analysis.global_score}/100 (${analysis.global_label})
+PAGES ORPHELINES : ${analysis.orphan_pages.length}
+PAGES SOUS-LIÉES : ${analysis.underlinked_pages.length}
+SUGGESTIONS GÉNÉRÉES : ${analysis.suggestions.length}
+
+CLUSTERS :
+${analysis.cluster_strengths.map(c =>
+  `- ${c.name}: ${c.published_pages}/${c.total_pages} publiées, force ${c.strength_score}/100, ${c.missing_links} liens manquants${c.avg_position ? `, pos moy ${c.avg_position}` : ""}`
+).join("\n")}
+
+TOP SUGGESTIONS (5 premières) :
+${analysis.suggestions.slice(0, 5).map(s =>
+  `- ${s.from_title} → ${s.to_title} (${s.priority}, risque ${s.risk_score}): ${s.justification}`
+).join("\n")}
+
+MISSION : Génère 3-5 opportunités stratégiques d'amélioration du maillage interne. Sois concis et actionnable.
+
+RÉPONSE JSON : ["Opportunité 1", "Opportunité 2", ...]`;
+
+    const msg = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 500,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+    const start = raw.indexOf("[");
+    const end = raw.lastIndexOf("]");
+    if (start !== -1 && end !== -1) {
+      return JSON.parse(raw.slice(start, end + 1)) as string[];
+    }
+  } catch {
+    // Non-fatal — opportunities are optional
+  }
+  return null;
+}
+
+function buildScoreComment(analysis: LinkingAnalysis): string {
+  const { global_score, orphan_pages, underlinked_pages, suggestions, cluster_strengths } = analysis;
+
+  if (global_score >= 75) {
+    return `Maillage interne solide avec ${suggestions.length} optimisation(s) possibles.`;
+  }
+  if (global_score >= 50) {
+    const weakClusters = cluster_strengths.filter(c => c.strength_score < 40);
+    return `Maillage correct mais ${underlinked_pages.length} page(s) sous-liée(s)${weakClusters.length > 0 ? ` et ${weakClusters.length} cluster(s) faible(s)` : ""}.`;
+  }
+  if (global_score >= 25) {
+    return `Maillage insuffisant : ${orphan_pages.length} page(s) orpheline(s), ${suggestions.length} liens à ajouter en priorité.`;
+  }
+  return `Maillage quasi inexistant — ${orphan_pages.length} page(s) orpheline(s). Restructuration urgente du cocon sémantique nécessaire.`;
 }
