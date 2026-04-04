@@ -11,6 +11,16 @@ type SiteConfig = {
   target_languages: Locale[];
 };
 
+type SuggestedKeyword = {
+  keyword: string;
+  source: "roadmap" | "cocoon" | "settings";
+  role: "pillar" | "support" | "unknown";
+  cluster: string | null;
+  phase: number | null;
+  priority: "haute" | "moyenne" | "faible";
+  reason: string;
+};
+
 type GeneratedArticle = {
   title: string;
   content: string;
@@ -63,8 +73,15 @@ const STEPS = [
   },
 ];
 
+const SOURCE_BADGES: Record<string, { label: string; color: string; bg: string }> = {
+  roadmap: { label: "Roadmap", color: "#f97316", bg: "rgba(249,115,22,0.12)" },
+  cocoon: { label: "Cocon", color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
+  settings: { label: "Config", color: "#6b7280", bg: "rgba(107,114,128,0.12)" },
+};
+
 export default function GeneratePage() {
   const [site, setSite] = useState<SiteConfig | null>(null);
+  const [smartKeywords, setSmartKeywords] = useState<SuggestedKeyword[]>([]);
   const [keyword, setKeyword] = useState("");
   const [customKeyword, setCustomKeyword] = useState("");
   const [language, setLanguage] = useState<Locale>("fr");
@@ -74,28 +91,35 @@ export default function GeneratePage() {
   const [generated, setGenerated] = useState<GeneratedArticle | null>(null);
   const [result, setResult] = useState<{ title: string; url: string; meta?: string } | null>(null);
   const [error, setError] = useState("");
+  const [kwFilter, setKwFilter] = useState<"all" | "roadmap" | "cocoon">("all");
 
   useEffect(() => {
-    fetch("/api/settings")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.error) {
-          setSite({
-            business_name: data.business_name ?? "",
-            industry: data.industry ?? "",
-            keywords: Array.isArray(data.keywords) ? data.keywords : [],
-            target_languages: Array.isArray(data.target_languages) && data.target_languages.length > 0
-              ? data.target_languages
-              : ["fr"],
-          });
-          if (Array.isArray(data.target_languages) && data.target_languages.length > 0) {
-            setLanguage(data.target_languages[0]);
-          }
-          if (Array.isArray(data.keywords) && data.keywords.length > 0) {
-            setKeyword(data.keywords[0]);
-          }
+    // Load site config + smart keywords in parallel
+    Promise.all([
+      fetch("/api/settings").then(r => r.json()),
+      fetch("/api/keywords/suggest").then(r => r.json()),
+    ]).then(([settingsData, kwData]) => {
+      if (!settingsData.error) {
+        setSite({
+          business_name: settingsData.business_name ?? "",
+          industry: settingsData.industry ?? "",
+          keywords: Array.isArray(settingsData.keywords) ? settingsData.keywords : [],
+          target_languages: Array.isArray(settingsData.target_languages) && settingsData.target_languages.length > 0
+            ? settingsData.target_languages
+            : ["fr"],
+        });
+        if (Array.isArray(settingsData.target_languages) && settingsData.target_languages.length > 0) {
+          setLanguage(settingsData.target_languages[0]);
         }
-      });
+      }
+      if (!kwData.error && kwData.suggestions) {
+        setSmartKeywords(kwData.suggestions);
+        // Auto-select the first suggestion
+        if (kwData.suggestions.length > 0) {
+          setKeyword(kwData.suggestions[0].keyword);
+        }
+      }
+    });
   }, []);
 
   const [elapsed, setElapsed] = useState(0);
@@ -109,6 +133,11 @@ export default function GeneratePage() {
   }, [status]);
 
   const activeKeyword = customKeyword.trim() || keyword;
+
+  // Filtered keywords
+  const filteredKeywords = kwFilter === "all"
+    ? smartKeywords
+    : smartKeywords.filter(k => k.source === kwFilter);
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -155,7 +184,7 @@ export default function GeneratePage() {
         setCurrentStep(2);
         setStatus("preview");
       } else {
-        await publishArticle({ title, content, meta_description });
+        await publishArticle({ title, content, meta_description, cover_image_query, cover_alt_text });
       }
     } catch (err: unknown) {
       clearInterval(stepTimer);
@@ -182,13 +211,18 @@ export default function GeneratePage() {
         }),
       });
 
+      const data = await pubRes.json();
+
       if (!pubRes.ok) {
-        const data = await pubRes.json();
         throw new Error(data.error || "Erreur lors de la publication");
       }
 
-      const { url } = await pubRes.json();
-      setResult({ title: article.title, url, meta: article.meta_description });
+      // Warn if publication succeeded but database recording failed
+      if (data.warning) {
+        console.warn("[publish] Warning:", data.warning);
+      }
+
+      setResult({ title: article.title, url: data.url, meta: article.meta_description });
       setStatus("done");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
@@ -234,12 +268,77 @@ export default function GeneratePage() {
         {status === "idle" || status === "error" ? (
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
-            {/* Keyword picker */}
+            {/* Keyword picker — Smart suggestions */}
             <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-4">
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-3">
                 1. Mot-clé cible
               </label>
-              {site && site.keywords.length > 0 && (
+
+              {/* Source filters */}
+              {smartKeywords.length > 0 && (
+                <div className="flex items-center gap-2 mb-4">
+                  {([
+                    { key: "all" as const, label: "Tous", count: smartKeywords.length },
+                    { key: "roadmap" as const, label: "Roadmap SEO", count: smartKeywords.filter(k => k.source === "roadmap").length },
+                    { key: "cocoon" as const, label: "Cocon", count: smartKeywords.filter(k => k.source === "cocoon").length },
+                  ]).filter(f => f.count > 0).map(f => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setKwFilter(f.key)}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                        kwFilter === f.key
+                          ? "bg-orange-500/15 text-orange-400 border border-orange-500/30"
+                          : "bg-white/[0.04] text-gray-500 border border-white/[0.06] hover:text-gray-300"
+                      }`}
+                    >
+                      {f.label} ({f.count})
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Keywords grid */}
+              {filteredKeywords.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {filteredKeywords.map((kw) => {
+                    const badge = SOURCE_BADGES[kw.source];
+                    const isSelected = keyword === kw.keyword && !customKeyword.trim();
+                    return (
+                      <button
+                        key={kw.keyword}
+                        type="button"
+                        onClick={() => { setKeyword(kw.keyword); setCustomKeyword(""); }}
+                        className={`group relative px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                          isSelected
+                            ? "bg-orange-500/20 border-orange-500/50 text-orange-300"
+                            : "bg-white/[0.04] border-white/[0.1] text-gray-400 hover:border-orange-500/30 hover:text-orange-400"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {kw.keyword}
+                          {kw.source !== "settings" && (
+                            <span
+                              className="text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase"
+                              style={{ background: badge.bg, color: badge.color }}
+                            >
+                              {kw.role === "pillar" ? "Pilier" : badge.label}
+                            </span>
+                          )}
+                          {kw.priority === "haute" && (
+                            <span className="text-red-400 text-[9px]">●</span>
+                          )}
+                        </span>
+                        {/* Tooltip on hover */}
+                        <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#111] border border-white/10 text-gray-300 text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          {kw.reason}{kw.cluster ? ` · ${kw.cluster}` : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : site && site.keywords.length > 0 ? (
+                /* Fallback: raw site keywords */
                 <div className="flex flex-wrap gap-2 mb-4">
                   {site.keywords.map((kw) => (
                     <button
@@ -256,7 +355,8 @@ export default function GeneratePage() {
                     </button>
                   ))}
                 </div>
-              )}
+              ) : null}
+
               <div className="relative">
                 <input
                   type="text"
@@ -347,7 +447,7 @@ export default function GeneratePage() {
               disabled={!activeKeyword}
               className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl transition-all uppercase tracking-wide shadow-lg shadow-orange-500/20 text-sm"
             >
-              {previewMode ? "✦ Générer et prévisualiser" : "✦ Générer et publier l'article"}
+              {previewMode ? "Générer et prévisualiser" : "Générer et publier l'article"}
             </button>
           </form>
 

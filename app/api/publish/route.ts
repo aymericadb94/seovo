@@ -197,8 +197,12 @@ export async function POST(request: Request) {
     });
 
     if (insertError) {
-      console.error("[publish] failed to record publication:", insertError.message);
-      // On retourne quand même l'URL — l'article est publié même si l'enregistrement échoue
+      console.error("[publish] failed to record publication:", insertError.message, insertError);
+      // Article publié sur le CMS mais pas enregistré en base — on le signale
+      return Response.json({
+        url,
+        warning: `Article publié mais non enregistré dans le dashboard : ${insertError.message}`,
+      });
     }
 
     return Response.json({ url });
