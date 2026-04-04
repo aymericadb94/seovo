@@ -663,15 +663,13 @@ export default function Dashboard() {
                   className="relative"
                   style={{ zIndex: tutorialStep === 0 ? 10 : "auto" }}
                 >
-                  {/* Glow animée derrière la carte */}
-                  {tutorialStep === 0 && (
-                    <div
-                      className="absolute -inset-1 rounded-2xl z-0 pointer-events-none"
-                      style={{ background: "linear-gradient(135deg,rgba(249,115,22,.75),rgba(239,68,68,.55))", filter: "blur(12px)", animation: "glowPulse 2s ease-in-out infinite" }}
-                    />
-                  )}
-
-                  <div className="relative z-[1] bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 md:p-8 overflow-hidden animate-fade-in-up">
+                  <div
+                    className="relative z-[1] bg-white/[0.03] rounded-2xl p-6 md:p-8 overflow-hidden animate-fade-in-up"
+                    style={tutorialStep === 0
+                      ? { border: "1px solid rgba(249,115,22,0.3)", animation: "fadeInUp 0.5s cubic-bezier(0.16,1,0.3,1) both, borderGlowOrange 2.5s ease-in-out 0.5s infinite" }
+                      : { border: "1px solid rgba(255,255,255,0.07)" }
+                    }
+                  >
                     <div className="absolute top-0 left-0 w-[500px] h-[250px] pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(249,115,22,0.07), transparent 65%)" }} />
                     <div className="absolute bottom-0 right-0 w-[300px] h-[200px] pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(239,68,68,0.04), transparent 65%)" }} />
 
@@ -842,19 +840,14 @@ export default function Dashboard() {
                         className="lg:col-span-7 relative animate-fade-in-up"
                         style={{ zIndex: tutorialStep === 2 ? 10 : "auto" }}
                       >
-                        {tutorialStep === 2 && (
-                          <div
-                            className="absolute -inset-1 rounded-2xl z-0 pointer-events-none"
-                            style={{ background: "linear-gradient(135deg,rgba(167,139,250,.75),rgba(96,165,250,.55))", filter: "blur(12px)", animation: "glowPulse 2s ease-in-out infinite" }}
-                          />
-                        )}
                         <div
                           className="relative z-[1] rounded-2xl overflow-hidden flex flex-col"
                           style={{
                             background: "rgba(255,255,255,0.03)",
-                            border: tutorialStep === 2 ? "1px solid rgba(167,139,250,0.45)" : "1px solid rgba(167,139,250,0.15)",
                             minHeight: 420,
-                            transition: "border-color 0.3s ease",
+                            ...(tutorialStep === 2
+                              ? { border: "1px solid rgba(167,139,250,0.2)", animation: "borderGlowViolet 2.5s ease-in-out infinite" }
+                              : { border: "1px solid rgba(167,139,250,0.15)" }),
                           }}
                         >
                           <div className="absolute top-0 left-0 w-72 h-52 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.1), transparent 65%)" }} />
@@ -1007,19 +1000,14 @@ export default function Dashboard() {
                       className="lg:col-span-5 relative animate-fade-in-up"
                       style={{ zIndex: tutorialStep === 1 ? 10 : "auto" }}
                     >
-                      {tutorialStep === 1 && (
-                        <div
-                          className="absolute -inset-1 rounded-2xl z-0 pointer-events-none"
-                          style={{ background: "linear-gradient(135deg,rgba(34,197,94,.75),rgba(74,222,128,.55))", filter: "blur(12px)", animation: "glowPulse 2s ease-in-out infinite" }}
-                        />
-                      )}
                       <div
                         className="relative z-[1] rounded-2xl overflow-hidden flex flex-col"
                         style={{
                           background: "rgba(255,255,255,0.03)",
-                          border: tutorialStep === 1 ? "1px solid rgba(34,197,94,0.45)" : "1px solid rgba(34,197,94,0.15)",
                           minHeight: 420,
-                          transition: "border-color 0.3s ease",
+                          ...(tutorialStep === 1
+                            ? { border: "1px solid rgba(34,197,94,0.25)", animation: "borderGlowGreen 2.5s ease-in-out infinite" }
+                            : { border: "1px solid rgba(34,197,94,0.15)" }),
                         }}
                       >
                         <div className="absolute top-0 right-0 w-56 h-44 pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(34,197,94,0.09), transparent 65%)" }} />
