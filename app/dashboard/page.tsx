@@ -285,6 +285,11 @@ export default function Dashboard() {
     optimization_actions: { action: string; impact: string; effort: string; cluster: string }[];
     traffic_potential: { current_estimated: number; potential_6_months: number; growth_percentage: number };
   };
+  // ── GSC Performance ────────────────────────────────────────────────────────
+  type GscPage = { url: string; clicks: number; impressions: number; ctr: number; position: number };
+  type GscPerf = { totalClicks: number; totalImpressions: number; avgCtr: number; avgPosition: number; pages: GscPage[] };
+  const [gscPerf, setGscPerf] = useState<GscPerf | null>(null);
+
   const [cocoonData, setCocoonData] = useState<CocoonData | null>(null);
   const [cocoonLoading, setCocoonLoading] = useState(false);
   const [cocoonExpanded, setCocoonExpanded] = useState<string | null>(null);
@@ -299,6 +304,15 @@ export default function Dashboard() {
       const json = await res.json();
       if (json.result?.data) setCocoonData(json.result.data as CocoonData);
     } catch { /* ignore */ }
+  }
+
+  async function loadGscPerf() {
+    try {
+      const res = await fetch("/api/gsc/data");
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.totalClicks !== undefined) setGscPerf(json as GscPerf);
+    } catch { /* GSC non connecté — silencieux */ }
   }
 
   const [cocoonError, setCocoonError] = useState<string | null>(null);
@@ -430,6 +444,7 @@ export default function Dashboard() {
     loadRoadmap();
     loadProjections();
     loadCocoon();
+    loadGscPerf();
     window.addEventListener("focus", loadData);
     return () => window.removeEventListener("focus", loadData);
   }, []);
@@ -1629,6 +1644,134 @@ export default function Dashboard() {
 
                   </div>
                 )}
+
+                {/* ── PERFORMANCE GSC (après tutoriel, si connecté) ────────── */}
+                {(tutorialStep ?? 0) >= 4 && data?.site?.gsc_connected && gscPerf && (() => {
+                  // Insights automatiques
+                  const nearTop3 = gscPerf.pages.filter(p => p.position > 3 && p.position <= 10);
+                  const lowCtr = gscPerf.pages.filter(p => p.impressions > 20 && p.ctr < 2);
+                  const highPotential = gscPerf.pages.filter(p => p.position > 5 && p.position <= 20 && p.impressions > 30);
+
+                  // Opportunité principale : page avec le plus haut ratio impressions/position
+                  const topOpp = [...gscPerf.pages]
+                    .filter(p => p.position > 3 && p.position <= 25)
+                    .sort((a, b) => (b.impressions / b.position) - (a.impressions / a.position))[0] ?? null;
+
+                  const potentialGain = topOpp ? Math.round(topOpp.impressions * 0.15 - topOpp.clicks) : 0;
+
+                  // Score impacts
+                  const scoreImpacts: string[] = [];
+                  if (lowCtr.length > 0) scoreImpacts.push(`CTR faible sur ${lowCtr.length} page${lowCtr.length > 1 ? "s" : ""}`);
+                  if (nearTop3.length > 0) scoreImpacts.push(`${nearTop3.length} mot${nearTop3.length > 1 ? "s" : ""}-clé${nearTop3.length > 1 ? "s" : ""} proche${nearTop3.length > 1 ? "s" : ""} du top 3`);
+                  if (gscPerf.avgPosition > 15) scoreImpacts.push("Position moyenne trop éloignée du top 10");
+                  if (gscPerf.totalClicks < 50) scoreImpacts.push("Volume de clics insuffisant pour l'autorité");
+
+                  return (
+                    <div className="relative rounded-2xl overflow-hidden animate-fade-in-up" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(66,133,244,0.15)" }}>
+                      <div className="absolute top-0 right-0 w-72 h-48 pointer-events-none" style={{ background: "radial-gradient(ellipse at top right, rgba(66,133,244,0.08), transparent 65%)" }} />
+                      <div className="absolute bottom-0 left-0 w-56 h-36 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom left, rgba(52,168,83,0.05), transparent 65%)" }} />
+
+                      <div className="relative p-6">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(66,133,244,0.12)" }}>
+                              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: "#4285F4" }}>Performance SEO</p>
+                              <p className="text-white font-black text-xl">Google Search Console</p>
+                            </div>
+                          </div>
+                          <span className="text-gray-600 text-[10px] font-bold uppercase">30 derniers jours</span>
+                        </div>
+
+                        {/* Snapshot — 4 métriques sur une ligne */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                          {[
+                            { icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z", value: gscPerf.totalImpressions.toLocaleString("fr-FR"), label: "Impressions", color: "#4285F4" },
+                            { icon: "M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122M5.98 11.95l-2.121 2.122", value: gscPerf.totalClicks.toLocaleString("fr-FR"), label: "Clics", color: "#34A853" },
+                            { icon: "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6", value: `${(gscPerf.avgCtr * 100).toFixed(1)}%`, label: "CTR moyen", color: "#FBBC05" },
+                            { icon: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z", value: gscPerf.avgPosition.toFixed(1), label: "Position moy.", color: "#EA4335" },
+                          ].map((m) => (
+                            <div key={m.label} className="group relative rounded-xl p-4 text-center overflow-hidden transition-transform hover:scale-[1.02]" style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${m.color}15` }}>
+                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: `radial-gradient(ellipse at center, ${m.color}08, transparent 70%)` }} />
+                              <svg viewBox="0 0 24 24" fill="none" stroke={m.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 mx-auto mb-2 opacity-50"><path d={m.icon} /></svg>
+                              <p className="text-xl font-black relative" style={{ color: m.color }}>{m.value}</p>
+                              <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1 relative">{m.label}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Insights automatiques */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5">
+                          {[
+                            { value: nearTop3.length, label: "Proches du top 3", color: "#34A853", icon: "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" },
+                            { value: lowCtr.length, label: "CTR faible", color: "#FBBC05", icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" },
+                            { value: highPotential.length, label: "Haut potentiel", color: "#4285F4", icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" },
+                            { value: gscPerf.pages.length, label: "Pages indexées", color: "#EA4335", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
+                          ].map((ins) => (
+                            <div key={ins.label} className="flex items-center gap-2.5 rounded-xl p-3" style={{ background: `${ins.color}08`, border: `1px solid ${ins.color}12` }}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke={ins.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0 opacity-70"><path d={ins.icon} /></svg>
+                              <div>
+                                <p className="font-black text-lg leading-none" style={{ color: ins.color }}>{ins.value}</p>
+                                <p className="text-gray-500 text-[9px] font-bold uppercase tracking-wide">{ins.label}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Opportunité principale + Score impact */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {/* Opportunité */}
+                          {topOpp && potentialGain > 0 && (
+                            <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: "rgba(34,168,83,0.06)", border: "1px solid rgba(34,168,83,0.15)" }}>
+                              <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(34,168,83,0.1), transparent 70%)" }} />
+                              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-green-400/70 mb-2">Opportunité principale</p>
+                              <p className="text-white font-bold text-sm mb-1 truncate">{new URL(topOpp.url).pathname}</p>
+                              <div className="flex items-center gap-3 text-xs mb-3">
+                                <span className="text-gray-400">Position <span className="text-white font-bold">{topOpp.position}</span></span>
+                                <span className="text-green-400 font-bold">+{potentialGain} clics/mois estimés</span>
+                              </div>
+                              <button
+                                onClick={() => handleManualPublish()}
+                                className="w-full py-2 rounded-lg text-xs font-black text-white transition-all hover:opacity-90"
+                                style={{ background: "linear-gradient(135deg, #34A853, #22c55e)", boxShadow: "0 4px 16px rgba(34,168,83,0.25)" }}
+                              >
+                                Optimiser automatiquement →
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Impact sur le score */}
+                          {scoreImpacts.length > 0 && (
+                            <div className="rounded-xl p-4" style={{ background: "rgba(66,133,244,0.04)", border: "1px solid rgba(66,133,244,0.1)" }}>
+                              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-blue-400/70 mb-3">Impact sur votre score SEO</p>
+                              <div className="space-y-2">
+                                {scoreImpacts.map((impact, i) => (
+                                  <div key={i} className="flex items-start gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: i === 0 ? "#EA4335" : i === 1 ? "#FBBC05" : "#4285F4" }} />
+                                    <p className="text-gray-400 text-xs leading-relaxed">{impact}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Confiance */}
+                        <p className="text-center text-gray-600 text-[10px] mt-4 font-medium">
+                          Analyse basée sur vos données Google Search Console — {gscPerf.pages.length} pages analysées
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
 
               </div>
             )}
