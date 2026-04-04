@@ -260,6 +260,48 @@ export default function Dashboard() {
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
   const [roadmapLoading, setRoadmapLoading] = useState(false);
 
+  // ── Cocon sémantique ───────────────────────────────────────────────────────
+  type CocoonCluster = {
+    name: string;
+    objective: string;
+    priority: "haute" | "moyenne" | "faible";
+    traffic_potential: number;
+    pillar: { title: string; keyword: string; status: "existing" | "to_create"; url: string };
+    support_pages: { title: string; keyword: string; status: "existing" | "to_create"; url: string }[];
+    internal_links: { from: string; to: string; anchor: string; direction: string }[];
+  };
+  type CocoonData = {
+    score: number;
+    score_label: string;
+    diagnosis: string;
+    clusters: CocoonCluster[];
+    orphan_pages: { title: string; url: string; recommendation: string }[];
+    missing_pages: { title: string; keyword: string; cluster: string; priority: string; reason: string }[];
+    optimization_actions: { action: string; impact: string; effort: string; cluster: string }[];
+    traffic_potential: { current_estimated: number; potential_6_months: number; growth_percentage: number };
+  };
+  const [cocoonData, setCocoonData] = useState<CocoonData | null>(null);
+  const [cocoonLoading, setCocoonLoading] = useState(false);
+  const [cocoonExpanded, setCocoonExpanded] = useState<string | null>(null);
+
+  async function loadCocoon() {
+    try {
+      const res = await fetch("/api/semantic-cocoon");
+      const json = await res.json();
+      if (json.result?.data) setCocoonData(json.result.data as CocoonData);
+    } catch { /* ignore */ }
+  }
+
+  async function generateCocoon() {
+    setCocoonLoading(true);
+    try {
+      const res = await fetch("/api/semantic-cocoon", { method: "POST" });
+      const json = await res.json();
+      if (json.result) setCocoonData(json.result as CocoonData);
+    } catch { /* ignore */ }
+    finally { setCocoonLoading(false); }
+  }
+
   // ── Projections ────────────────────────────────────────────────────────────
   type ProjectionItem = {
     keyword: string; action: string; current_position: number | null;
@@ -350,6 +392,7 @@ export default function Dashboard() {
     loadAudit();
     loadRoadmap();
     loadProjections();
+    loadCocoon();
     window.addEventListener("focus", loadData);
     return () => window.removeEventListener("focus", loadData);
   }, []);
@@ -826,6 +869,228 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
+
+                {/* ── COCON SÉMANTIQUE ────────────────────────────────── */}
+                {tutorialStep >= 3 && (
+                  <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 md:p-8 animate-fade-in-up overflow-hidden">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.15em]">Architecture SEO</p>
+                        <p className="text-white font-black text-xl mt-0.5">Cocon Sémantique</p>
+                      </div>
+                      {cocoonData && (
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="px-3 py-1.5 rounded-full text-xs font-black"
+                            style={{
+                              background: cocoonData.score >= 70 ? "rgba(34,197,94,0.1)" : cocoonData.score >= 40 ? "rgba(249,115,22,0.1)" : "rgba(239,68,68,0.1)",
+                              border: `1px solid ${cocoonData.score >= 70 ? "rgba(34,197,94,0.25)" : cocoonData.score >= 40 ? "rgba(249,115,22,0.25)" : "rgba(239,68,68,0.25)"}`,
+                              color: cocoonData.score >= 70 ? "#22c55e" : cocoonData.score >= 40 ? "#f97316" : "#ef4444",
+                            }}
+                          >
+                            {cocoonData.score}/100 — {cocoonData.score_label}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {!cocoonData && !cocoonLoading && (
+                      <div className="text-center py-12">
+                        <div className="text-4xl mb-4">🕸️</div>
+                        <p className="text-gray-400 mb-2 text-sm">Aucun cocon sémantique généré</p>
+                        <p className="text-gray-600 text-xs mb-6 max-w-md mx-auto">
+                          Analysez la structure SEO de votre site pour créer un cocon sémantique intelligent qui connecte toutes vos pages.
+                        </p>
+                        <button
+                          onClick={generateCocoon}
+                          className="relative overflow-hidden px-6 py-3 rounded-xl text-sm font-black text-white transition-all hover:opacity-90 active:scale-[0.98]"
+                          style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)", boxShadow: "0 6px 28px rgba(139,92,246,0.35)" }}
+                        >
+                          <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }} />
+                          <span className="relative">Générer mon cocon sémantique →</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {cocoonLoading && (
+                      <div className="text-center py-16">
+                        <div className="inline-flex items-center gap-3 px-5 py-3 rounded-xl" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
+                          <svg className="animate-spin h-4 w-4 text-violet-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                          <span className="text-violet-300 text-sm font-bold">Analyse en cours... (30-60s)</span>
+                        </div>
+                        <p className="text-gray-600 text-xs mt-3">Clusterisation des mots-clés, structure du cocon, maillage interne...</p>
+                      </div>
+                    )}
+
+                    {cocoonData && !cocoonLoading && (
+                      <>
+                        {/* Diagnostic */}
+                        <p className="text-gray-400 text-sm mb-6 leading-relaxed">{cocoonData.diagnosis}</p>
+
+                        {/* Stats rapides */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                          <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-center">
+                            <p className="text-2xl font-black text-violet-400">{cocoonData.clusters.length}</p>
+                            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1">Clusters</p>
+                          </div>
+                          <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-center">
+                            <p className="text-2xl font-black text-green-400">
+                              {cocoonData.clusters.reduce((s, c) => s + 1 + c.support_pages.length, 0)}
+                            </p>
+                            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1">Pages totales</p>
+                          </div>
+                          <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-center">
+                            <p className="text-2xl font-black text-orange-400">
+                              {cocoonData.clusters.reduce((s, c) => s + c.support_pages.filter(p => p.status === "to_create").length + (c.pillar.status === "to_create" ? 1 : 0), 0)}
+                            </p>
+                            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1">Pages manquantes</p>
+                          </div>
+                          <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-center">
+                            <p className="text-2xl font-black text-emerald-400">+{cocoonData.traffic_potential.growth_percentage}%</p>
+                            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mt-1">Potentiel trafic</p>
+                          </div>
+                        </div>
+
+                        {/* Clusters */}
+                        <div className="space-y-3">
+                          {cocoonData.clusters.map((cluster) => {
+                            const isOpen = cocoonExpanded === cluster.name;
+                            const existing = [cluster.pillar, ...cluster.support_pages].filter(p => p.status === "existing").length;
+                            const total = 1 + cluster.support_pages.length;
+                            const pct = Math.round((existing / total) * 100);
+                            const priorityColors: Record<string, string> = {
+                              haute: "text-red-400 bg-red-500/10 border-red-500/20",
+                              moyenne: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+                              faible: "text-gray-400 bg-white/[0.04] border-white/[0.08]",
+                            };
+                            return (
+                              <div key={cluster.name} className="border border-white/[0.06] rounded-xl overflow-hidden transition-all">
+                                <button
+                                  onClick={() => setCocoonExpanded(isOpen ? null : cluster.name)}
+                                  className="w-full flex items-center gap-4 p-4 text-left hover:bg-white/[0.02] transition-colors"
+                                >
+                                  {/* Icone expand */}
+                                  <svg className={`w-4 h-4 text-gray-500 transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+
+                                  {/* Nom + badge priorité */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-white font-bold text-sm truncate">{cluster.name}</span>
+                                      <span className={`text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full border ${priorityColors[cluster.priority] ?? priorityColors.faible}`}>
+                                        {cluster.priority}
+                                      </span>
+                                    </div>
+                                    <p className="text-gray-500 text-xs truncate">{cluster.objective}</p>
+                                  </div>
+
+                                  {/* Barre de complétion */}
+                                  <div className="flex items-center gap-3 flex-shrink-0">
+                                    <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                                      <div
+                                        className="h-full rounded-full transition-all"
+                                        style={{ width: `${pct}%`, background: pct >= 80 ? "#22c55e" : pct >= 40 ? "#f97316" : "#ef4444" }}
+                                      />
+                                    </div>
+                                    <span className="text-gray-500 text-xs font-mono w-10 text-right">{existing}/{total}</span>
+                                  </div>
+
+                                  {/* Trafic estimé */}
+                                  <span className="text-violet-400/80 text-xs font-bold flex-shrink-0">
+                                    +{cluster.traffic_potential} clics/mois
+                                  </span>
+                                </button>
+
+                                {/* Contenu expandé */}
+                                {isOpen && (
+                                  <div className="border-t border-white/[0.05] p-4 bg-white/[0.01] animate-fade-in">
+                                    {/* Pillar page */}
+                                    <div className="mb-4">
+                                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-violet-400 mb-2">Page pilier</p>
+                                      <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.15)" }}>
+                                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cluster.pillar.status === "existing" ? "bg-green-400" : "bg-orange-400"}`} />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-white text-sm font-semibold truncate">{cluster.pillar.title}</p>
+                                          <p className="text-gray-500 text-xs">{cluster.pillar.keyword}</p>
+                                        </div>
+                                        <span className={`text-[10px] font-bold uppercase ${cluster.pillar.status === "existing" ? "text-green-400" : "text-orange-400"}`}>
+                                          {cluster.pillar.status === "existing" ? "Existant" : "A créer"}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Support pages */}
+                                    <div className="mb-4">
+                                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-2">Pages support ({cluster.support_pages.length})</p>
+                                      <div className="space-y-1.5">
+                                        {cluster.support_pages.map((page, idx) => (
+                                          <div key={idx} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${page.status === "existing" ? "bg-green-400" : "bg-orange-400"}`} />
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-gray-300 text-sm truncate">{page.title}</p>
+                                              <p className="text-gray-600 text-xs">{page.keyword}</p>
+                                            </div>
+                                            <span className={`text-[10px] font-bold uppercase ${page.status === "existing" ? "text-green-400" : "text-orange-400"}`}>
+                                              {page.status === "existing" ? "Existant" : "A créer"}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* Liens internes */}
+                                    {cluster.internal_links.length > 0 && (
+                                      <div>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-2">Maillage interne ({cluster.internal_links.length} liens)</p>
+                                        <div className="space-y-1">
+                                          {cluster.internal_links.map((link, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 text-xs text-gray-500">
+                                              <span className="text-gray-400 truncate max-w-[35%]">{link.from}</span>
+                                              <svg className="w-3 h-3 text-violet-400/60 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                              <span className="text-gray-400 truncate max-w-[35%]">{link.to}</span>
+                                              <span className="text-violet-400/50 ml-auto flex-shrink-0">&quot;{link.anchor}&quot;</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Actions d'optimisation */}
+                        {cocoonData.optimization_actions.length > 0 && (
+                          <div className="mt-6 pt-5 border-t border-white/[0.05]">
+                            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-3">Actions recommandées</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {cocoonData.optimization_actions.slice(0, 6).map((action, idx) => {
+                                const impactColor = action.impact === "fort" ? "text-green-400" : action.impact === "moyen" ? "text-orange-400" : "text-gray-500";
+                                return (
+                                  <div key={idx} className="flex items-start gap-2 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                    <span className={`text-[10px] font-black uppercase mt-0.5 ${impactColor}`}>{action.impact}</span>
+                                    <p className="text-gray-400 text-xs leading-relaxed">{action.action}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bouton regénérer */}
+                        <div className="mt-5 flex justify-end">
+                          <button
+                            onClick={generateCocoon}
+                            className="text-xs text-gray-500 hover:text-violet-400 transition-colors font-medium"
+                          >
+                            ↻ Régénérer le cocon
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* ── GRILLE : ROADMAP (gauche) + POTENTIEL (droite) ──── */}
                 {tutorialStep >= 1 && (
