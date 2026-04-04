@@ -410,6 +410,51 @@ export default function Dashboard() {
   const [popup2Loading, setPopup2Loading] = useState(false);
   const tutorialChecked = useRef(false);
 
+  // Maillage interne
+  type LinkingSuggestion = {
+    from_title: string; from_url: string;
+    to_title: string; to_url: string;
+    anchor: string; placement: string;
+    objective: string; priority: string;
+  };
+  type LinkingCluster = { name: string; pillar: string; pages: string[]; missing_links: number };
+  type LinkingOrphan = { title: string; url: string; reason: string };
+  type LinkingResult = {
+    score: number; score_label: string; score_comment: string;
+    cluster_analysis: LinkingCluster[];
+    suggestions: LinkingSuggestion[];
+    orphan_pages: LinkingOrphan[];
+    opportunities: string[];
+  };
+  const [linkingResult, setLinkingResult] = useState<LinkingResult | null>(null);
+  const [linkingLoading, setLinkingLoading] = useState(false);
+  const [linkingGenerated, setLinkingGenerated] = useState(false);
+  const LINKING_MIN_ARTICLES = 5;
+
+  async function loadLinking() {
+    try {
+      const res = await fetch("/api/internal-linking");
+      const json = await res.json();
+      if (!json.error && json.result?.data) {
+        setLinkingResult(json.result.data as LinkingResult);
+        setLinkingGenerated(true);
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function generateLinking() {
+    setLinkingLoading(true);
+    try {
+      const res = await fetch("/api/internal-linking", { method: "POST" });
+      const json = await res.json();
+      if (!json.error) {
+        setLinkingResult(json.result as LinkingResult);
+        setLinkingGenerated(true);
+      }
+    } catch { /* ignore */ }
+    setLinkingLoading(false);
+  }
+
   // SEO Projections
   type ProjectionItem = {
     keyword: string; action: string; current_position: number | null;
@@ -483,6 +528,7 @@ export default function Dashboard() {
     loadAudit();
     loadRoadmap();
     loadProjections();
+    loadLinking();
     window.addEventListener("focus", loadData);
     return () => window.removeEventListener("focus", loadData);
   }, []);
@@ -1539,6 +1585,159 @@ export default function Dashboard() {
                         </p>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* ── Maillage interne ─────────────────────────────────── */}
+                {data.site?.seo_analysis_done && (
+                  <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 animate-fade-in-up delay-200 overflow-hidden">
+                    <div className="absolute top-0 left-0 w-72 h-36 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(99,102,241,0.07), transparent 65%)" }} />
+
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-5 relative">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(99,102,241,0.12)", color: "#818cf8" }}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                            <circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/>
+                            <path d="M8 6h8M7 8l4 8M17 8l-4 8"/>
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Maillage interne</p>
+                          {linkingResult ? (
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-white font-black text-xl">{linkingResult.score}/100</p>
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{
+                                background: linkingResult.score >= 70 ? "rgba(34,197,94,0.12)" : linkingResult.score >= 40 ? "rgba(249,115,22,0.12)" : "rgba(239,68,68,0.12)",
+                                color: linkingResult.score >= 70 ? "#4ade80" : linkingResult.score >= 40 ? "#fb923c" : "#f87171",
+                              }}>{linkingResult.score_label}</span>
+                            </div>
+                          ) : (
+                            <p className="text-white font-black text-lg mt-0.5">Analysez votre maillage interne</p>
+                          )}
+                        </div>
+                      </div>
+                      {linkingResult && (
+                        <button
+                          onClick={generateLinking}
+                          disabled={linkingLoading}
+                          className="text-xs text-indigo-400/70 hover:text-indigo-300 transition-colors disabled:opacity-40"
+                        >
+                          {linkingLoading ? "Analyse…" : "↺ Relancer"}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Barre de progression si < 5 articles */}
+                    {(kpis?.totalArticles ?? 0) < LINKING_MIN_ARTICLES ? (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-400">Articles publiés pour débloquer l'analyse</span>
+                          <span className="text-white font-bold">{kpis?.totalArticles ?? 0} / {LINKING_MIN_ARTICLES}</span>
+                        </div>
+                        <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${Math.min(((kpis?.totalArticles ?? 0) / LINKING_MIN_ARTICLES) * 100, 100)}%`,
+                              background: "linear-gradient(90deg, #6366f1, #818cf8)",
+                            }}
+                          />
+                        </div>
+                        <p className="text-gray-600 text-xs">
+                          Encore {LINKING_MIN_ARTICLES - (kpis?.totalArticles ?? 0)} article{LINKING_MIN_ARTICLES - (kpis?.totalArticles ?? 0) > 1 ? "s" : ""} à publier pour débloquer l'analyse de maillage.
+                        </p>
+                      </div>
+                    ) : !linkingGenerated ? (
+                      /* CTA génération */
+                      <div className="flex flex-col gap-4">
+                        <p className="text-gray-500 text-sm">
+                          {kpis?.totalArticles} articles analysables — détectez vos pages orphelines, clusters sémantiques et opportunités de liens.
+                        </p>
+                        <button
+                          onClick={generateLinking}
+                          disabled={linkingLoading}
+                          className="self-start flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+                          style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}
+                        >
+                          {linkingLoading ? (
+                            <><span className="w-4 h-4 rounded-full border-2 border-indigo-400/30 border-t-indigo-400 animate-spin" />Analyse en cours…</>
+                          ) : (
+                            <><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-4 h-4"><path d="M8 1v6M5 4l3-3 3 3M1 11h14M4 11v4M8 11v4M12 11v4" strokeLinecap="round" strokeLinejoin="round"/></svg>Analyser le maillage</>
+                          )}
+                        </button>
+                      </div>
+                    ) : linkingResult ? (
+                      /* Résultats */
+                      <div className="flex flex-col gap-5">
+                        {/* Score comment */}
+                        <p className="text-gray-400 text-sm leading-relaxed">{linkingResult.score_comment}</p>
+
+                        {/* Suggestions prioritaires */}
+                        {linkingResult.suggestions.filter(s => s.priority === "haute").length > 0 && (
+                          <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Liens à ajouter en priorité</p>
+                            <div className="flex flex-col gap-2">
+                              {linkingResult.suggestions.filter(s => s.priority === "haute").slice(0, 5).map((s, i) => (
+                                <div key={i} className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                                    <span className="truncate max-w-[35%] text-gray-300 font-medium">{s.from_title}</span>
+                                    <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 flex-shrink-0"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <span className="truncate max-w-[35%] text-gray-300 font-medium">{s.to_title}</span>
+                                    <span className="ml-auto flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-bold" style={{
+                                      background: s.objective === "SEO" ? "rgba(99,102,241,0.15)" : s.objective === "conversion" ? "rgba(249,115,22,0.12)" : "rgba(255,255,255,0.05)",
+                                      color: s.objective === "SEO" ? "#818cf8" : s.objective === "conversion" ? "#fb923c" : "#9ca3af",
+                                    }}>{s.objective}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <code className="text-xs text-indigo-300 bg-indigo-500/10 px-2 py-1 rounded-lg flex-1 truncate">"{s.anchor}"</code>
+                                    <button
+                                      onClick={() => navigator.clipboard.writeText(s.anchor)}
+                                      className="flex-shrink-0 text-gray-600 hover:text-indigo-400 transition-colors"
+                                      title="Copier l'ancre"
+                                    >
+                                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" className="w-3.5 h-3.5"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M2 11V3a1 1 0 011-1h8"/></svg>
+                                    </button>
+                                  </div>
+                                  <p className="text-gray-600 text-xs">Placement : {s.placement}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pages orphelines */}
+                        {linkingResult.orphan_pages.length > 0 && (
+                          <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Pages orphelines ({linkingResult.orphan_pages.length})</p>
+                            <div className="flex flex-col gap-1.5">
+                              {linkingResult.orphan_pages.slice(0, 4).map((p, i) => (
+                                <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/5 border border-red-500/15">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                                  <span className="text-gray-300 text-xs truncate flex-1">{p.title}</span>
+                                  <span className="text-gray-600 text-xs flex-shrink-0 hidden sm:block">{p.reason}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Opportunités */}
+                        {linkingResult.opportunities.length > 0 && (
+                          <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Opportunités</p>
+                            <ul className="flex flex-col gap-1">
+                              {linkingResult.opportunities.map((opp, i) => (
+                                <li key={i} className="flex items-start gap-2 text-xs text-gray-400">
+                                  <span className="text-indigo-400 mt-0.5 flex-shrink-0">→</span>
+                                  {opp}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 )}
 
