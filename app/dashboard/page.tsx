@@ -157,8 +157,13 @@ function CountdownTimer({ targetIso }: { targetIso: string | null }) {
   const [time, setTime] = useState({ h: 0, m: 0, s: 0, ms: 0 });
   const [glow, setGlow] = useState(false);
   const prevSec = useRef(-1);
+  const totalDurationRef = useRef(0);
 
   useEffect(() => {
+    if (targetIso) {
+      const initial = new Date(targetIso).getTime() - Date.now();
+      if (initial > 0) totalDurationRef.current = initial;
+    }
     function calc() {
       if (!targetIso) { setTime({ h: 0, m: 0, s: 0, ms: 0 }); return; }
       const diff = new Date(targetIso).getTime() - Date.now();
@@ -177,8 +182,8 @@ function CountdownTimer({ targetIso }: { targetIso: string | null }) {
   }, [targetIso]);
 
   const hasTime = time.ms > 0 && targetIso;
-  const windowMs = Math.min(time.ms, 3600000);
-  const progress = targetIso && time.ms > 0 ? Math.max(2, Math.min(100, 100 - (windowMs / 3600000) * 100)) : 0;
+  const total = totalDurationRef.current || time.ms || 1;
+  const progress = hasTime ? Math.max(2, Math.min(98, ((total - time.ms) / total) * 100)) : 0;
 
   return (
     <div className="flex flex-col gap-4 w-full">
