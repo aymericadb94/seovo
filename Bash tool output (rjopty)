@@ -1,0 +1,17 @@
+[main cbd03c3] fix: déplacer cover_image_query avant content dans le JSON Claude
+ Committer: Aymeric Audebert <aymeric@macbook-pro-de-aymeric-1.home>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+To https://github.com/aymericadb94/seovo.git
+   e2c714f..cbd03c3  main -> main

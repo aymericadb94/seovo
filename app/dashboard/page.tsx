@@ -227,8 +227,8 @@ export default function Dashboard() {
   const [indexationResults, setIndexationResults] = useState<Record<string, { indexed: boolean | null; verdict: string; coverage: string }>>({});
   const [indexationLoading, setIndexationLoading] = useState(false);
 
-  // ── Tutorial (0=score, 1=potentiel, 2=roadmap, 3=libre) ──────────────────────
-  const [tutorialStep, setTutorialStep] = useState(3);
+  // ── Tutorial (0=score, 1=cocon, 2=potentiel, 3=roadmap, 4=libre) ─────────────
+  const [tutorialStep, setTutorialStep] = useState(4);
   const [scoreBubbleStep, setScoreBubbleStep] = useState(0);
   const tutorialInitRef = useRef(false);
 
@@ -301,7 +301,13 @@ export default function Dashboard() {
       const res = await fetch("/api/semantic-cocoon", { method: "POST" });
       const json = await res.json();
       if (json.error) { setCocoonError(json.error); return; }
-      if (json.result) setCocoonData(json.result as CocoonData);
+      if (json.result) {
+        setCocoonData(json.result as CocoonData);
+        setTutorialStep(prev => {
+          if (prev === 1) { localStorage.setItem("rankpill_onboarding", "2"); return 2; }
+          return prev;
+        });
+      }
     } catch (err) {
       setCocoonError(err instanceof Error ? err.message : "Erreur réseau");
     } finally { setCocoonLoading(false); }
@@ -347,7 +353,7 @@ export default function Dashboard() {
       if (!json.error) {
         setProjections(json.projections);
         setTutorialStep(prev => {
-          if (prev === 1) { localStorage.setItem("rankpill_onboarding", "2"); return 2; }
+          if (prev === 2) { localStorage.setItem("rankpill_onboarding", "3"); return 3; }
           return prev;
         });
       }
@@ -372,7 +378,7 @@ export default function Dashboard() {
       if (json.error) throw new Error(json.error);
       setRoadmapRecord(json.roadmap);
       setTutorialStep(prev => {
-        if (prev === 2) { localStorage.setItem("rankpill_onboarding", "3"); return 3; }
+        if (prev === 3) { localStorage.setItem("rankpill_onboarding", "4"); return 4; }
         return prev;
       });
     } catch { /* ignore */ } finally {
@@ -422,7 +428,7 @@ export default function Dashboard() {
     if (tutorialInitRef.current) return;
     tutorialInitRef.current = true;
     const saved = localStorage.getItem("rankpill_onboarding");
-    const step = saved !== null ? Math.min(parseInt(saved, 10), 3) : 0;
+    const step = saved !== null ? Math.min(parseInt(saved, 10), 4) : 0;
     setTutorialStep(step);
     setScoreBubbleStep(0);
   }, [data?.site?.seo_analysis_done]);
@@ -649,7 +655,7 @@ export default function Dashboard() {
         <div className="border-t border-white/[0.04]">
           <div className="max-w-screen-xl mx-auto px-6 flex items-center gap-1 py-0">
             {(["overview", "publications", "keywords", "calendar"] as const).map((tab) => {
-              const isLocked = tutorialStep < 3 && tab !== "overview";
+              const isLocked = tutorialStep < 4 && tab !== "overview";
               const labels: Record<string, string> = { overview: "Vue d'ensemble", publications: "Publications", keywords: "Mots-clés", calendar: "Calendrier" };
               return (
                 <button
@@ -682,7 +688,7 @@ export default function Dashboard() {
         )}
 
         {/* Bandeau GSC non connecté */}
-        {!loading && data?.site && !data.site.gsc_connected && tutorialStep >= 3 && (
+        {!loading && data?.site && !data.site.gsc_connected && tutorialStep >= 4 && (
           <div className="mb-6 flex items-center justify-between gap-4 bg-[#0d0d0d] border border-white/[0.08] rounded-2xl px-5 py-4 animate-fade-in">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center flex-shrink-0">
@@ -867,7 +873,7 @@ export default function Dashboard() {
                                 style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 6px 28px rgba(249,115,22,0.4)" }}
                               >
                                 <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)" }} />
-                                <span className="relative">Découvrir mon potentiel de croissance →</span>
+                                <span className="relative">Structurer mon SEO →</span>
                               </button>
                             </>
                           )}
@@ -877,9 +883,19 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* ── COCON SÉMANTIQUE ────────────────────────────────── */}
-                {tutorialStep >= 3 && (
-                  <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 md:p-8 animate-fade-in-up overflow-hidden">
+                {/* ── COCON SÉMANTIQUE (étape 1 du tutorial) ────────── */}
+                {tutorialStep >= 1 && (
+                  <div
+                    className="relative animate-fade-in-up"
+                    style={{ zIndex: tutorialStep === 1 ? 10 : "auto" }}
+                  >
+                  <div
+                    className="bg-white/[0.03] rounded-2xl p-6 md:p-8 overflow-hidden"
+                    style={tutorialStep === 1
+                      ? { border: "1px solid rgba(139,92,246,0.2)", animation: "borderGlowViolet 2.5s ease-in-out infinite" }
+                      : { border: "1px solid rgba(255,255,255,0.07)" }
+                    }
+                  >
                     <div className="flex items-center justify-between mb-6">
                       <div>
                         <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.15em]">Architecture SEO</p>
@@ -900,6 +916,33 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
+
+                    {/* ── Bulle tutoriel cocon (étape 1) ── */}
+                    {tutorialStep === 1 && (
+                      <div className="mb-5 p-4 rounded-xl animate-[modalPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_0.2s_both]" style={{ background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.32)" }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-violet-400 text-xs font-black uppercase tracking-wider">🕸️ Cocon Sémantique</span>
+                          <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 2 / 4</span>
+                        </div>
+                        <p className="text-white/70 text-xs leading-relaxed mb-3">
+                          Nous structurons votre SEO en <span className="text-white font-bold">cocon sémantique intelligent</span>. Les clusters, pages piliers et le maillage interne sont générés automatiquement à partir de vos données.
+                        </p>
+                        {cocoonData ? (
+                          <button
+                            onClick={() => advanceTutorial(2)}
+                            className="w-full py-2.5 rounded-lg text-xs font-black text-white transition-all hover:opacity-90"
+                            style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)", boxShadow: "0 4px 20px rgba(139,92,246,0.3)" }}
+                          >
+                            Continuer → Analyser mon potentiel SEO
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2 text-violet-400/70 text-xs">
+                            <span className="text-base animate-bounce">↓</span>
+                            <span>Cliquez sur le bouton ci-dessous pour générer votre cocon</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {cocoonError && (
                       <div className="mb-4 p-3 rounded-xl text-sm text-red-400" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
@@ -1103,199 +1146,24 @@ export default function Dashboard() {
                       </>
                     )}
                   </div>
+                  </div>
                 )}
 
-                {/* ── GRILLE : ROADMAP (gauche) + POTENTIEL (droite) ──── */}
-                {tutorialStep >= 1 && (
+                {/* ── GRILLE : POTENTIEL (gauche, étape 2) + ROADMAP (droite, étape 3) ── */}
+                {tutorialStep >= 2 && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 animate-fade-in-up">
 
-                    {/* ── ROADMAP SEO — GAUCHE ── */}
-                    {tutorialStep < 2 ? (
-                      /* Placeholder verrouillé */
-                      <div
-                        className="lg:col-span-7 rounded-2xl flex flex-col items-center justify-center gap-3 animate-fade-in-up"
-                        style={{ minHeight: 420, background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.05)" }}
-                      >
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.1)" }}>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-                            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
-                          </svg>
-                        </div>
-                        <p className="text-gray-700 text-sm font-bold">Roadmap SEO</p>
-                        <p className="text-gray-800 text-xs text-center max-w-[200px] leading-relaxed">Se débloque après le calcul du potentiel de croissance</p>
-                      </div>
-                    ) : (
-                      /* Carte roadmap réelle */
-                      <div
-                        className="lg:col-span-7 relative animate-fade-in-up"
-                        style={{ zIndex: tutorialStep === 2 ? 10 : "auto" }}
-                      >
-                        <div
-                          className="relative z-[1] rounded-2xl overflow-hidden flex flex-col"
-                          style={{
-                            background: "rgba(255,255,255,0.03)",
-                            minHeight: 420,
-                            ...(tutorialStep === 2
-                              ? { border: "1px solid rgba(167,139,250,0.2)", animation: "borderGlowViolet 2.5s ease-in-out infinite" }
-                              : { border: "1px solid rgba(167,139,250,0.15)" }),
-                          }}
-                        >
-                          <div className="absolute top-0 left-0 w-72 h-52 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.1), transparent 65%)" }} />
-                          <div className="absolute bottom-0 right-0 w-48 h-36 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(96,165,250,0.05), transparent 65%)" }} />
-
-                          <div className="relative p-6 flex flex-col flex-1">
-                            {/* Header roadmap */}
-                            <div className="flex items-start justify-between mb-5">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa" }}>
-                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-                                  </svg>
-                                </div>
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: "#a78bfa" }}>Roadmap SEO</p>
-                                  <p className="text-white font-black text-xl">Plan éditorial — 40 articles</p>
-                                </div>
-                              </div>
-                              <div className="relative group flex-shrink-0">
-                                <button className="w-7 h-7 rounded-full flex items-center justify-center text-gray-600 hover:text-violet-400 transition-colors text-xs font-black" style={{ background: "rgba(255,255,255,0.04)" }}>?</button>
-                                <div className="absolute right-0 top-9 w-64 bg-[#111] border border-violet-500/20 rounded-xl p-3 text-xs text-gray-400 leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-30 shadow-xl">
-                                  Générez votre plan éditorial SEO sur 40 articles, priorisés par potentiel de trafic. RankPill publie automatiquement chaque article selon la roadmap.
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* ── Bulle tutoriel roadmap (étape 2) ── */}
-                            {tutorialStep === 2 && (
-                              <div className="mb-5 p-4 rounded-xl animate-[modalPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_0.2s_both]" style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.32)" }}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-violet-400 text-xs font-black uppercase tracking-wider">🗺️ Roadmap SEO</span>
-                                  <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 3 / 3</span>
-                                </div>
-                                <p className="text-white/70 text-xs leading-relaxed mb-3">
-                                  Générez votre plan éditorial sur <span className="text-white font-bold">40 articles</span>, priorisés par potentiel de trafic. RankPill les publiera automatiquement selon ce plan, sans intervention de votre part.
-                                </p>
-                                {roadmapRecord ? (
-                                  <button
-                                    onClick={() => advanceTutorial(3)}
-                                    className="w-full py-2.5 rounded-lg text-xs font-black text-white transition-all hover:opacity-90"
-                                    style={{ background: "linear-gradient(135deg, #7c3aed, #a78bfa)", boxShadow: "0 4px 20px rgba(124,58,237,0.3)" }}
-                                  >
-                                    Accéder au dashboard complet →
-                                  </button>
-                                ) : (
-                                  <div className="flex items-center gap-2 text-violet-400/70 text-xs">
-                                    <span className="text-base animate-bounce">↓</span>
-                                    <span>Cliquez sur le bouton ci-dessous pour générer votre roadmap</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Contenu roadmap */}
-                            {roadmapRecord ? (
-                              (() => {
-                                const publishedKw = new Set((data?.recentPublications ?? []).map(p => p.keyword?.toLowerCase()));
-                                const allArticles = (roadmapRecord.data.articles ?? []) as { title: string; keyword: string; priority: number }[];
-                                const remaining = allArticles.filter(a => !publishedKw.has(a.keyword?.toLowerCase())).sort((a, b) => a.priority - b.priority);
-                                const total = allArticles.length;
-                                const done = kpis?.totalArticles ?? 0;
-                                const pct = Math.round((done / Math.max(total, 1)) * 100);
-                                return (
-                                  <div className="flex flex-col gap-4 flex-1">
-                                    <div>
-                                      <div className="flex items-center justify-between mb-1.5 text-xs">
-                                        <span className="text-gray-400 font-bold">{done} / {total} publiés</span>
-                                        <span className="font-black" style={{ color: "#a78bfa" }}>{pct}%</span>
-                                      </div>
-                                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(167,139,250,0.1)" }}>
-                                        <div className="h-full rounded-full relative overflow-hidden transition-all duration-1000" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #7c3aed, #a78bfa, #60a5fa)" }}>
-                                          <div className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)" }} />
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex-1 flex flex-col gap-1 overflow-y-auto max-h-72">
-                                      {remaining.slice(0, 20).map((a, i) => (
-                                        <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-all group/item" style={{ borderLeft: i === 0 ? "2px solid rgba(167,139,250,0.7)" : i < 3 ? "2px solid rgba(167,139,250,0.25)" : "2px solid rgba(167,139,250,0.06)" }}>
-                                          <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black" style={{ background: i === 0 ? "linear-gradient(135deg,#7c3aed,#a78bfa)" : "rgba(255,255,255,0.04)", color: i === 0 ? "white" : "#6b7280" }}>{i + 1}</span>
-                                          <span className="flex-1 text-xs truncate" style={{ color: i === 0 ? "rgba(255,255,255,0.92)" : i < 3 ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.22)", fontWeight: i === 0 ? 600 : 400 }}>{a.title}</span>
-                                          <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full truncate max-w-[80px] opacity-0 group-hover/item:opacity-100 transition-opacity" style={{ background: "rgba(167,139,250,0.1)", color: "#c4b5fd" }}>{a.keyword}</span>
-                                        </div>
-                                      ))}
-                                      {remaining.length === 0 && <p className="text-green-400 text-xs text-center py-4 font-bold">🎉 Tous les articles sont publiés !</p>}
-                                      {remaining.length > 20 && <p className="text-center text-gray-600 text-xs py-2">+{remaining.length - 20} articles</p>}
-                                    </div>
-                                    <div className="flex gap-2 pt-3 border-t border-white/[0.06]">
-                                      <button onClick={() => setShowRoadmapModal(true)} className="flex-1 text-xs font-bold py-2.5 rounded-xl transition-all hover:opacity-80" style={{ background: "rgba(167,139,250,0.12)", color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.2)" }}>
-                                        Voir la roadmap complète →
-                                      </button>
-                                      <button onClick={generateRoadmap} disabled={roadmapLoading} className="px-4 text-xs text-gray-600 hover:text-violet-400 transition-colors disabled:opacity-40 rounded-xl border border-white/[0.06] hover:border-violet-500/20">
-                                        {roadmapLoading ? <span className="w-3.5 h-3.5 border-2 border-violet-400/30 border-t-violet-400 rounded-full animate-spin inline-block" /> : "↺"}
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })()
-                            ) : (
-                              <div className="flex flex-col gap-5 flex-1 justify-between">
-                                <div className="flex flex-col gap-4">
-                                  <p className="text-gray-400 text-sm leading-relaxed">
-                                    Générez votre plan éditorial sur <span className="text-white font-bold">40 articles SEO</span>, classés par potentiel de trafic et facilité de classement Google.
-                                  </p>
-                                  <div className="grid grid-cols-3 gap-3">
-                                    {[
-                                      { label: "Articles planifiés", value: "40", color: "#a78bfa" },
-                                      { label: "Mots-clés ciblés", value: String(kpis?.totalKeywords ?? 0), color: "#818cf8" },
-                                      { label: "Phases SEO", value: "3", color: "#60a5fa" },
-                                    ].map(s => (
-                                      <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.1)" }}>
-                                        <p className="font-black text-2xl leading-none mb-1" style={{ color: s.color }}>{s.value}</p>
-                                        <p className="text-gray-500 text-[10px] leading-tight mt-1">{s.label}</p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div className="space-y-2 p-4 rounded-xl" style={{ background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.08)" }}>
-                                    {["Articles priorisés par potentiel de trafic", "Alignés sur vos mots-clés configurés", "Publication automatique selon la roadmap"].map((f, i) => (
-                                      <div key={i} className="flex items-center gap-2 text-xs text-gray-400">
-                                        <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#a78bfa" }} />
-                                        {f}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={generateRoadmap}
-                                  disabled={roadmapLoading}
-                                  className="relative w-full overflow-hidden py-4 rounded-xl font-black text-white text-sm uppercase tracking-wide transition-all disabled:opacity-60 group"
-                                  style={{ background: "linear-gradient(135deg, #7c3aed, #a78bfa)", boxShadow: "0 8px 32px rgba(124,58,237,0.35)" }}
-                                >
-                                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
-                                  <span className="relative flex items-center justify-center gap-2">
-                                    {roadmapLoading ? (
-                                      <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Génération en cours…</>
-                                    ) : (
-                                      <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Calculer ma roadmap SEO</>
-                                    )}
-                                  </span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ── POTENTIEL DE CROISSANCE — DROITE ── */}
+                    {/* ── POTENTIEL DE CROISSANCE — GAUCHE (5 cols) ── */}
                     <div
                       className="lg:col-span-5 relative animate-fade-in-up"
-                      style={{ zIndex: tutorialStep === 1 ? 10 : "auto" }}
+                      style={{ zIndex: tutorialStep === 2 ? 10 : "auto" }}
                     >
                       <div
                         className="relative z-[1] rounded-2xl overflow-hidden flex flex-col"
                         style={{
                           background: "rgba(255,255,255,0.03)",
                           minHeight: 420,
-                          ...(tutorialStep === 1
+                          ...(tutorialStep === 2
                             ? { border: "1px solid rgba(34,197,94,0.25)", animation: "borderGlowGreen 2.5s ease-in-out infinite" }
                             : { border: "1px solid rgba(34,197,94,0.15)" }),
                         }}
@@ -1325,23 +1193,23 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          {/* ── Bulle tutoriel potentiel (étape 1) ── */}
-                          {tutorialStep === 1 && (
+                          {/* ── Bulle tutoriel potentiel (étape 2) ── */}
+                          {tutorialStep === 2 && (
                             <div className="mb-5 p-4 rounded-xl animate-[modalPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_0.2s_both]" style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.32)" }}>
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-green-400 text-xs font-black uppercase tracking-wider">💡 Potentiel SEO</span>
-                                <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 2 / 3</span>
+                                <span className="text-green-400 text-xs font-black uppercase tracking-wider">📊 Potentiel SEO</span>
+                                <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 3 / 4</span>
                               </div>
                               <p className="text-white/70 text-xs leading-relaxed mb-3">
-                                Calculez le nombre de <span className="text-white font-bold">clics organiques supplémentaires</span> que vous pouvez générer chaque mois en optimisant votre stratégie SEO sur vos mots-clés cibles.
+                                Voici où vous pouvez <span className="text-white font-bold">gagner du trafic rapidement</span>. Calculez les opportunités détectées dans votre cocon sémantique.
                               </p>
                               {projections ? (
                                 <button
-                                  onClick={() => advanceTutorial(2)}
+                                  onClick={() => advanceTutorial(3)}
                                   className="w-full py-2.5 rounded-lg text-xs font-black text-white transition-all hover:opacity-90"
                                   style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", boxShadow: "0 4px 20px rgba(34,197,94,0.3)" }}
                                 >
-                                  Continuer → Découvrir ma Roadmap
+                                  Continuer → Générer ma Roadmap
                                 </button>
                               ) : (
                                 <div className="flex items-center gap-2 text-green-400/70 text-xs">
@@ -1420,6 +1288,182 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
+
+                    {/* ── ROADMAP SEO — DROITE (7 cols) ── */}
+                    {tutorialStep < 3 ? (
+                      /* Placeholder verrouillé */
+                      <div
+                        className="lg:col-span-7 rounded-2xl flex flex-col items-center justify-center gap-3 animate-fade-in-up"
+                        style={{ minHeight: 420, background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.05)" }}
+                      >
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.1)" }}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+                            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                          </svg>
+                        </div>
+                        <p className="text-gray-700 text-sm font-bold">Roadmap SEO</p>
+                        <p className="text-gray-800 text-xs text-center max-w-[200px] leading-relaxed">Se débloque après le calcul du potentiel de croissance</p>
+                      </div>
+                    ) : (
+                      /* Carte roadmap réelle */
+                      <div
+                        className="lg:col-span-7 relative animate-fade-in-up"
+                        style={{ zIndex: tutorialStep === 3 ? 10 : "auto" }}
+                      >
+                        <div
+                          className="relative z-[1] rounded-2xl overflow-hidden flex flex-col"
+                          style={{
+                            background: "rgba(255,255,255,0.03)",
+                            minHeight: 420,
+                            ...(tutorialStep === 3
+                              ? { border: "1px solid rgba(167,139,250,0.2)", animation: "borderGlowViolet 2.5s ease-in-out infinite" }
+                              : { border: "1px solid rgba(167,139,250,0.15)" }),
+                          }}
+                        >
+                          <div className="absolute top-0 left-0 w-72 h-52 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.1), transparent 65%)" }} />
+                          <div className="absolute bottom-0 right-0 w-48 h-36 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(96,165,250,0.05), transparent 65%)" }} />
+
+                          <div className="relative p-6 flex flex-col flex-1">
+                            {/* Header roadmap */}
+                            <div className="flex items-start justify-between mb-5">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa" }}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                                  </svg>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: "#a78bfa" }}>Roadmap SEO</p>
+                                  <p className="text-white font-black text-xl">Plan éditorial — 40 articles</p>
+                                </div>
+                              </div>
+                              <div className="relative group flex-shrink-0">
+                                <button className="w-7 h-7 rounded-full flex items-center justify-center text-gray-600 hover:text-violet-400 transition-colors text-xs font-black" style={{ background: "rgba(255,255,255,0.04)" }}>?</button>
+                                <div className="absolute right-0 top-9 w-64 bg-[#111] border border-violet-500/20 rounded-xl p-3 text-xs text-gray-400 leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-30 shadow-xl">
+                                  Générez votre plan éditorial SEO sur 40 articles, priorisés par potentiel de trafic. RankPill publie automatiquement chaque article selon la roadmap.
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* ── Bulle tutoriel roadmap (étape 3) ── */}
+                            {tutorialStep === 3 && (
+                              <div className="mb-5 p-4 rounded-xl animate-[modalPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_0.2s_both]" style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.32)" }}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-violet-400 text-xs font-black uppercase tracking-wider">🗺️ Roadmap SEO</span>
+                                  <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 4 / 4</span>
+                                </div>
+                                <p className="text-white/70 text-xs leading-relaxed mb-3">
+                                  Générez votre plan éditorial sur <span className="text-white font-bold">40 articles</span>, priorisés par votre cocon sémantique et votre potentiel de trafic. RankPill les publiera automatiquement.
+                                </p>
+                                {roadmapRecord ? (
+                                  <button
+                                    onClick={() => advanceTutorial(4)}
+                                    className="w-full py-2.5 rounded-lg text-xs font-black text-white transition-all hover:opacity-90"
+                                    style={{ background: "linear-gradient(135deg, #7c3aed, #a78bfa)", boxShadow: "0 4px 20px rgba(124,58,237,0.3)" }}
+                                  >
+                                    Accéder au dashboard complet →
+                                  </button>
+                                ) : (
+                                  <div className="flex items-center gap-2 text-violet-400/70 text-xs">
+                                    <span className="text-base animate-bounce">↓</span>
+                                    <span>Cliquez sur le bouton ci-dessous pour générer votre roadmap</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Contenu roadmap */}
+                            {roadmapRecord ? (
+                              (() => {
+                                const publishedKw = new Set((data?.recentPublications ?? []).map(p => p.keyword?.toLowerCase()));
+                                const allArticles = (roadmapRecord.data.articles ?? []) as { title: string; keyword: string; priority: number }[];
+                                const remaining = allArticles.filter(a => !publishedKw.has(a.keyword?.toLowerCase())).sort((a, b) => a.priority - b.priority);
+                                const total = allArticles.length;
+                                const done = kpis?.totalArticles ?? 0;
+                                const pct = Math.round((done / Math.max(total, 1)) * 100);
+                                return (
+                                  <div className="flex flex-col gap-4 flex-1">
+                                    <div>
+                                      <div className="flex items-center justify-between mb-1.5 text-xs">
+                                        <span className="text-gray-400 font-bold">{done} / {total} publiés</span>
+                                        <span className="font-black" style={{ color: "#a78bfa" }}>{pct}%</span>
+                                      </div>
+                                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(167,139,250,0.1)" }}>
+                                        <div className="h-full rounded-full relative overflow-hidden transition-all duration-1000" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #7c3aed, #a78bfa, #60a5fa)" }}>
+                                          <div className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)" }} />
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex-1 flex flex-col gap-1 overflow-y-auto max-h-72">
+                                      {remaining.slice(0, 20).map((a, i) => (
+                                        <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-all group/item" style={{ borderLeft: i === 0 ? "2px solid rgba(167,139,250,0.7)" : i < 3 ? "2px solid rgba(167,139,250,0.25)" : "2px solid rgba(167,139,250,0.06)" }}>
+                                          <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black" style={{ background: i === 0 ? "linear-gradient(135deg,#7c3aed,#a78bfa)" : "rgba(255,255,255,0.04)", color: i === 0 ? "white" : "#6b7280" }}>{i + 1}</span>
+                                          <span className="flex-1 text-xs truncate" style={{ color: i === 0 ? "rgba(255,255,255,0.92)" : i < 3 ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.22)", fontWeight: i === 0 ? 600 : 400 }}>{a.title}</span>
+                                          <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full truncate max-w-[80px] opacity-0 group-hover/item:opacity-100 transition-opacity" style={{ background: "rgba(167,139,250,0.1)", color: "#c4b5fd" }}>{a.keyword}</span>
+                                        </div>
+                                      ))}
+                                      {remaining.length === 0 && <p className="text-green-400 text-xs text-center py-4 font-bold">Tous les articles sont publiés !</p>}
+                                      {remaining.length > 20 && <p className="text-center text-gray-600 text-xs py-2">+{remaining.length - 20} articles</p>}
+                                    </div>
+                                    <div className="flex gap-2 pt-3 border-t border-white/[0.06]">
+                                      <button onClick={() => setShowRoadmapModal(true)} className="flex-1 text-xs font-bold py-2.5 rounded-xl transition-all hover:opacity-80" style={{ background: "rgba(167,139,250,0.12)", color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.2)" }}>
+                                        Voir la roadmap complète →
+                                      </button>
+                                      <button onClick={generateRoadmap} disabled={roadmapLoading} className="px-4 text-xs text-gray-600 hover:text-violet-400 transition-colors disabled:opacity-40 rounded-xl border border-white/[0.06] hover:border-violet-500/20">
+                                        {roadmapLoading ? <span className="w-3.5 h-3.5 border-2 border-violet-400/30 border-t-violet-400 rounded-full animate-spin inline-block" /> : "↺"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              <div className="flex flex-col gap-5 flex-1 justify-between">
+                                <div className="flex flex-col gap-4">
+                                  <p className="text-gray-400 text-sm leading-relaxed">
+                                    Générez votre plan éditorial sur <span className="text-white font-bold">40 articles SEO</span>, structurés selon votre cocon sémantique et priorisés par potentiel de trafic.
+                                  </p>
+                                  <div className="grid grid-cols-3 gap-3">
+                                    {[
+                                      { label: "Articles planifiés", value: "40", color: "#a78bfa" },
+                                      { label: "Mots-clés ciblés", value: String(kpis?.totalKeywords ?? 0), color: "#818cf8" },
+                                      { label: "Phases SEO", value: "3", color: "#60a5fa" },
+                                    ].map(s => (
+                                      <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.1)" }}>
+                                        <p className="font-black text-2xl leading-none mb-1" style={{ color: s.color }}>{s.value}</p>
+                                        <p className="text-gray-500 text-[10px] leading-tight mt-1">{s.label}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="space-y-2 p-4 rounded-xl" style={{ background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.08)" }}>
+                                    {["Articles structurés selon votre cocon sémantique", "Priorisés par potentiel de trafic", "Publication automatique selon la roadmap"].map((f, i) => (
+                                      <div key={i} className="flex items-center gap-2 text-xs text-gray-400">
+                                        <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: "#a78bfa" }} />
+                                        {f}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={generateRoadmap}
+                                  disabled={roadmapLoading}
+                                  className="relative w-full overflow-hidden py-4 rounded-xl font-black text-white text-sm uppercase tracking-wide transition-all disabled:opacity-60 group"
+                                  style={{ background: "linear-gradient(135deg, #7c3aed, #a78bfa)", boxShadow: "0 8px 32px rgba(124,58,237,0.35)" }}
+                                >
+                                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                                  <span className="relative flex items-center justify-center gap-2">
+                                    {roadmapLoading ? (
+                                      <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Génération en cours…</>
+                                    ) : (
+                                      <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Calculer ma roadmap SEO</>
+                                    )}
+                                  </span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                   </div>
                 )}
