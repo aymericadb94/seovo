@@ -1757,63 +1757,211 @@ export default function Dashboard() {
             {/* ════════════════════════════════════════════════════════════
                 TAB 3 — MOTS-CLÉS
             ════════════════════════════════════════════════════════════ */}
-            {activeTab === "keywords" && (
+            {activeTab === "keywords" && (() => {
+              // Mapper chaque mot-clé à son cluster du cocon
+              type KwCocoonInfo = { cluster: string; role: "pilier" | "support"; priority: string };
+              const kwCocoonMap = new Map<string, KwCocoonInfo>();
+              if (cocoonData) {
+                for (const cluster of cocoonData.clusters) {
+                  kwCocoonMap.set(cluster.pillar.keyword.toLowerCase(), { cluster: cluster.name, role: "pilier", priority: cluster.priority });
+                  for (const sp of cluster.support_pages) {
+                    kwCocoonMap.set(sp.keyword.toLowerCase(), { cluster: cluster.name, role: "support", priority: cluster.priority });
+                  }
+                }
+              }
+
+              // Enrichir les keywordStats avec les infos cocon (match partiel)
+              const enrichedStats = data.keywordStats.map(kw => {
+                const kwLower = kw.keyword.toLowerCase();
+                let cocoonInfo = kwCocoonMap.get(kwLower);
+                if (!cocoonInfo) {
+                  for (const [key, info] of kwCocoonMap.entries()) {
+                    if (kwLower.includes(key) || key.includes(kwLower)) { cocoonInfo = info; break; }
+                  }
+                }
+                return { ...kw, cocoonInfo: cocoonInfo ?? null };
+              });
+
+              // Stats
+              const inCocoon = enrichedStats.filter(k => k.cocoonInfo).length;
+              const pillarCount = enrichedStats.filter(k => k.cocoonInfo?.role === "pilier").length;
+
+              return (
               <div className="space-y-5">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { label: "Mots-clés configurés", value: kpis?.totalKeywords ?? 0 },
-                    { label: "Couverts au moins 1×", value: kpis?.coveredKeywords ?? 0 },
-                    { label: "Non encore couverts", value: (kpis?.totalKeywords ?? 0) - (kpis?.coveredKeywords ?? 0) },
+                    { label: "Mots-clés", value: kpis?.totalKeywords ?? 0, color: "#f97316" },
+                    { label: "Couverts", value: kpis?.coveredKeywords ?? 0, color: "#22c55e" },
+                    { label: "Dans le cocon", value: inCocoon, color: "#fb923c" },
+                    { label: "Pages piliers", value: pillarCount, color: "#ef4444" },
                   ].map(s => (
-                    <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 text-center">
-                      <p className="text-3xl font-black text-white">{s.value}</p>
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mt-1">{s.label}</p>
+                    <div key={s.label} className="group relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 text-center overflow-hidden card-hover">
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: `radial-gradient(ellipse at center, ${s.color}10, transparent 70%)` }} />
+                      <p className="text-3xl font-black relative" style={{ color: s.color }}>{s.value}</p>
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mt-1 relative">{s.label}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-                  <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-6">Performance par mot-clé</p>
-                  {data.keywordStats.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500 text-sm">Aucun mot-clé configuré. <Link href="/settings" className="text-orange-400 hover:underline">Configurer les mots-clés →</Link></p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {data.keywordStats.map((kw, i) => (
-                        <div key={kw.keyword} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 card-hover animate-fade-in-up" style={{animationDelay: `${i * 80}ms`}}>
-                          <div className="flex items-start justify-between mb-3">
-                            <p className="text-white font-bold">{kw.keyword}</p>
-                            <span className={`text-xs font-black px-2 py-1 rounded-full ${kw.count > 0 ? "bg-orange-500/10 text-orange-400" : "bg-white/[0.05] text-gray-500"}`}>
-                              {kw.count > 0 ? `${kw.count} article${kw.count > 1 ? "s" : ""}` : "Non couvert"}
-                            </span>
+                {/* Mots-clés groupés par cluster */}
+                {cocoonData ? (
+                  <div className="space-y-4">
+                    {cocoonData.clusters.map((cluster, ci) => {
+                      const orphanedKws = ci === 0 ? enrichedStats.filter(k => !k.cocoonInfo) : [];
+                      const priorityColors: Record<string, string> = {
+                        haute: "border-red-500/20 bg-red-500/[0.03]",
+                        moyenne: "border-orange-500/20 bg-orange-500/[0.03]",
+                        faible: "border-white/[0.08] bg-white/[0.02]",
+                      };
+
+                      return (
+                        <div key={cluster.name} className={`rounded-2xl overflow-hidden animate-fade-in-up ${priorityColors[cluster.priority] ?? priorityColors.faible}`} style={{ border: "1px solid", animationDelay: `${ci * 60}ms` }}>
+                          <div className="px-5 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(249,115,22,0.12)" }}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="1.5" className="w-4 h-4"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-7.07-15.07l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4"/></svg>
+                              </div>
+                              <div>
+                                <p className="text-white font-bold text-sm">{cluster.name}</p>
+                                <p className="text-gray-500 text-[10px]">{cluster.objective}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                                cluster.priority === "haute" ? "text-red-400 bg-red-500/10" :
+                                cluster.priority === "moyenne" ? "text-orange-400 bg-orange-500/10" :
+                                "text-gray-400 bg-white/[0.05]"
+                              }`}>{cluster.priority}</span>
+                              <span className="text-orange-400/60 text-xs font-bold">+{cluster.traffic_potential}</span>
+                            </div>
                           </div>
-                          <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden mb-2">
-                            <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500" style={{ width: `${maxKeywordCount > 0 ? (kw.count / maxKeywordCount) * 100 : 0}%`, transition: "width 1s ease" }} />
+
+                          <div className="px-5 pb-4 grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {/* Page pilier */}
+                            {(() => {
+                              const pillarKw = enrichedStats.find(k => k.keyword.toLowerCase() === cluster.pillar.keyword.toLowerCase() || k.keyword.toLowerCase().includes(cluster.pillar.keyword.toLowerCase()));
+                              return (
+                                <div className="relative rounded-xl p-3 overflow-hidden" style={{ background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.15)" }}>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0" />
+                                    <span className="text-[9px] font-black uppercase tracking-wide text-orange-400">Pilier</span>
+                                    <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full ${cluster.pillar.status === "existing" ? "text-green-400 bg-green-500/10" : "text-orange-400 bg-orange-500/10"}`}>
+                                      {cluster.pillar.status === "existing" ? "Existant" : "A créer"}
+                                    </span>
+                                  </div>
+                                  <p className="text-white text-sm font-semibold mb-0.5">{cluster.pillar.keyword}</p>
+                                  {pillarKw && pillarKw.count > 0 ? (
+                                    <p className="text-green-400 text-[10px] font-bold">{pillarKw.count} article{pillarKw.count > 1 ? "s" : ""} publié{pillarKw.count > 1 ? "s" : ""}</p>
+                                  ) : (
+                                    <p className="text-gray-600 text-[10px]">{cluster.pillar.title}</p>
+                                  )}
+                                </div>
+                              );
+                            })()}
+
+                            {/* Pages support */}
+                            {cluster.support_pages.slice(0, 5).map((sp, si) => {
+                              const spKw = enrichedStats.find(k => k.keyword.toLowerCase() === sp.keyword.toLowerCase() || k.keyword.toLowerCase().includes(sp.keyword.toLowerCase()));
+                              return (
+                                <div key={si} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${sp.status === "existing" ? "bg-green-400" : "bg-gray-500"}`} />
+                                    <span className="text-[9px] font-bold uppercase tracking-wide text-gray-500">Support</span>
+                                    {spKw && spKw.count > 0 && (
+                                      <span className="ml-auto text-[9px] font-bold text-green-400">{spKw.count} art.</span>
+                                    )}
+                                  </div>
+                                  <p className="text-gray-300 text-sm">{sp.keyword}</p>
+                                  <p className="text-gray-600 text-[10px] truncate">{sp.title}</p>
+                                </div>
+                              );
+                            })}
+                            {cluster.support_pages.length > 5 && (
+                              <div className="rounded-xl p-3 flex items-center justify-center" style={{ background: "rgba(255,255,255,0.01)", border: "1px dashed rgba(255,255,255,0.06)" }}>
+                                <span className="text-gray-600 text-xs">+{cluster.support_pages.length - 5} pages support</span>
+                              </div>
+                            )}
                           </div>
-                          {kw.lastPublished ? (
-                            <p className="text-gray-600 text-xs">Dernier article : {new Date(kw.lastPublished).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</p>
-                          ) : (
-                            <p className="text-gray-600 text-xs">Pas encore publié — sera priorisé prochainement</p>
+
+                          {/* Mots-clés orphelins (affichés dans le premier cluster) */}
+                          {orphanedKws.length > 0 && ci === 0 && (
+                            <div className="mx-5 mb-4 p-3 rounded-xl" style={{ background: "rgba(239,68,68,0.04)", border: "1px dashed rgba(239,68,68,0.15)" }}>
+                              <p className="text-[9px] font-black uppercase tracking-wide text-red-400/70 mb-2">Mots-clés hors cocon ({orphanedKws.length})</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {orphanedKws.map((k, ki) => (
+                                  <span key={ki} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-gray-400 border border-white/[0.06]">{k.keyword}</span>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
-                      ))}
+                      );
+                    })}
+
+                    {/* Mots-clés non mappés si pas de premier cluster */}
+                    {enrichedStats.filter(k => !k.cocoonInfo).length > 0 && cocoonData.clusters.length === 0 && (
+                      <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4">Mots-clés non structurés</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {enrichedStats.filter(k => !k.cocoonInfo).map((kw, i) => (
+                            <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                              <p className="text-white text-sm font-bold">{kw.keyword}</p>
+                              <p className="text-gray-600 text-[10px] mt-1">{kw.count > 0 ? `${kw.count} article(s)` : "Non couvert"}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Fallback sans cocon */
+                  <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
+                    <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-6">Performance par mot-clé</p>
+                    {data.keywordStats.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500 text-sm">Aucun mot-clé configuré. <Link href="/settings" className="text-orange-400 hover:underline">Configurer les mots-clés →</Link></p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {data.keywordStats.map((kw, i) => (
+                          <div key={kw.keyword} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 card-hover animate-fade-in-up" style={{animationDelay: `${i * 80}ms`}}>
+                            <div className="flex items-start justify-between mb-3">
+                              <p className="text-white font-bold">{kw.keyword}</p>
+                              <span className={`text-xs font-black px-2 py-1 rounded-full ${kw.count > 0 ? "bg-orange-500/10 text-orange-400" : "bg-white/[0.05] text-gray-500"}`}>
+                                {kw.count > 0 ? `${kw.count} article${kw.count > 1 ? "s" : ""}` : "Non couvert"}
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden mb-2">
+                              <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500" style={{ width: `${maxKeywordCount > 0 ? (kw.count / maxKeywordCount) * 100 : 0}%`, transition: "width 1s ease" }} />
+                            </div>
+                            {kw.lastPublished ? (
+                              <p className="text-gray-600 text-xs">Dernier article : {new Date(kw.lastPublished).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</p>
+                            ) : (
+                              <p className="text-gray-600 text-xs">Pas encore publié — sera priorisé prochainement</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-4 p-3 rounded-xl text-center" style={{ background: "rgba(249,115,22,0.05)", border: "1px dashed rgba(249,115,22,0.15)" }}>
+                      <p className="text-orange-400/70 text-xs font-bold">Générez votre cocon sémantique pour structurer vos mots-clés en clusters</p>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <div className="flex gap-3">
                   <Link href="/settings" className="flex-1 bg-white/[0.03] border border-white/[0.07] hover:border-orange-500/30 rounded-xl p-4 text-center transition-colors group">
-                    <p className="text-white font-bold group-hover:text-orange-400 transition-colors">⚙ Modifier les mots-clés</p>
+                    <p className="text-white font-bold group-hover:text-orange-400 transition-colors">Modifier les mots-clés</p>
                     <p className="text-gray-600 text-xs mt-1">Ajouter ou supprimer des mots-clés cibles</p>
                   </Link>
                   <button onClick={() => handleManualPublish()} disabled={cronRunning} className="flex-1 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 hover:border-orange-500/40 rounded-xl p-4 text-center transition-colors disabled:opacity-40">
-                    <p className="text-orange-400 font-bold">{cronRunning ? "⏳ En cours..." : "▶ Générer un article maintenant"}</p>
+                    <p className="text-orange-400 font-bold">{cronRunning ? "En cours..." : "Générer un article maintenant"}</p>
                     <p className="text-gray-600 text-xs mt-1">Couvre le prochain mot-clé non traité</p>
                   </button>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* ════════════════════════════════════════════════════════════
                 TAB 4 — CALENDRIER
