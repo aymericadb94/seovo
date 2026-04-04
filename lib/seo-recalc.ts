@@ -4,7 +4,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import Anthropic from "@anthropic-ai/sdk";
+import { aiCall, parseAiJson } from "@/lib/ai-router";
 import { computeProjections, type GSCQuery } from "@/lib/seo-projections";
 import {
   type SeoEventType,
@@ -22,7 +22,7 @@ import {
   AMPLITUDE_CAPS,
 } from "@/lib/seo-stability";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Model routing handled by ai-router
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -339,36 +339,31 @@ RÉPONSE : JSON uniquement.
 }`;
 
   try {
-    const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4000,
-      messages: [{ role: "user", content: prompt }],
-    });
+    // recalc_intermediate → Sonnet (execution-level recalc)
+    const aiResult = await aiCall(
+      { task: "recalc_intermediate" },
+      { messages: [{ role: "user", content: prompt }] }
+    );
 
-    const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-    const cleaned = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
+    type AdjustmentsType = {
+      cluster_updates?: {
+        cluster_name: string;
+        new_support_pages?: { title: string; keyword: string; status: string; reason: string }[];
+        status_changes?: { keyword: string; new_status: string }[];
+        new_internal_links?: { from: string; to: string; anchor: string; direction: string }[];
+      }[];
+      orphan_pages?: { title: string; keyword: string; recommendation: string }[];
+      actions_summary?: string[];
+    };
 
-    if (start !== -1 && end !== -1) {
-      let adjustments: {
-        cluster_updates?: {
-          cluster_name: string;
-          new_support_pages?: { title: string; keyword: string; status: string; reason: string }[];
-          status_changes?: { keyword: string; new_status: string }[];
-          new_internal_links?: { from: string; to: string; anchor: string; direction: string }[];
-        }[];
-        orphan_pages?: { title: string; keyword: string; recommendation: string }[];
-        actions_summary?: string[];
-      };
+    let adjustments = parseAiJson<AdjustmentsType>(aiResult.text);
+    if (!adjustments) {
+      // Try repairing trailing commas
+      const repaired = aiResult.text.replace(/,\s*([}\]])/g, "$1");
+      adjustments = parseAiJson<AdjustmentsType>(repaired);
+    }
 
-      try {
-        adjustments = JSON.parse(cleaned.slice(start, end + 1));
-      } catch {
-        const repaired = cleaned.slice(start, end + 1).replace(/,\s*([}\]])/g, "$1");
-        adjustments = JSON.parse(repaired);
-      }
-
+    if (adjustments) {
       // Apply cluster updates to cocoon data
       const updatedCocoon = { ...cocoon };
       let clustersModified = 0;

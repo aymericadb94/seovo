@@ -1,24 +1,23 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiCall, parseAiJson } from "@/lib/ai-router";
 
 async function extractStyleGuide(samples: string[]): Promise<string> {
   try {
-    const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 600,
-      messages: [{
-        role: "user",
-        content: `Analyze these blog article excerpts and extract the editorial style guide in 6-8 concise bullet points. Cover: tone (formal/casual/friendly), use of "vous" or "tu", sentence length and rhythm, introduction style, how H2/H3 titles are phrased, use of lists vs paragraphs, vocabulary register, and any recurring stylistic patterns.
+    const result = await aiCall(
+      { task: "style_extraction" },
+      {
+        messages: [{
+          role: "user",
+          content: `Analyze these blog article excerpts and extract the editorial style guide in 6-8 concise bullet points. Cover: tone (formal/casual/friendly), use of "vous" or "tu", sentence length and rhythm, introduction style, how H2/H3 titles are phrased, use of lists vs paragraphs, vocabulary register, and any recurring stylistic patterns.
 
 ${samples.join("\n\n---\n\n")}
 
 Respond ONLY with bullet points, no intro or conclusion:
 - [style observation]`,
-      }],
-    });
-    return msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
+        }],
+      }
+    );
+    return result.text.trim();
   } catch {
     return "";
   }
@@ -106,14 +105,15 @@ export async function POST(request: Request) {
       ? `\n\nDIRECTION ARTISTIQUE — REPRODUCE THIS STYLE EXACTLY (extracted from the site's existing articles):\n${styleGuide}`
       : "";
 
-    const message = await client.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 8000,
-      system: `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`,
-      messages: [
-        {
-          role: "user",
-          content: `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
+    // content_generation → Sonnet (execution task, not a strategic decision)
+    const aiResult = await aiCall(
+      { task: "content_generation" },
+      {
+        system: `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`,
+        messages: [
+          {
+            role: "user",
+            content: `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
 LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
 
@@ -197,10 +197,10 @@ FORMAT DE SORTIE : JSON valide uniquement, aucun texte avant ou après.
 HTML autorisé : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. Pas de <html>, <body>, <head>.`,
         },
       ],
-    });
+      }
+    );
 
-    const raw = message.content[0].type === "text" ? message.content[0].text : "";
-    let parsed: {
+    const parsed = parseAiJson<{
       title: string;
       content: string;
       meta_description: string;
@@ -208,15 +208,9 @@ HTML autorisé : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <th
       internal_links?: { anchor: string; target: string }[];
       pexels_query?: string;
       cover_alt_text?: string;
-    };
-    try {
-      const start = raw.indexOf("{");
-      const end = raw.lastIndexOf("}");
-      if (start === -1 || end === -1 || end <= start) {
-        return Response.json({ error: "Format de réponse invalide de Claude" }, { status: 500 });
-      }
-      parsed = JSON.parse(raw.slice(start, end + 1));
-    } catch {
+    }>(aiResult.text);
+
+    if (!parsed) {
       return Response.json({ error: "Impossible de lire la réponse de Claude" }, { status: 500 });
     }
     return Response.json({
@@ -229,7 +223,7 @@ HTML autorisé : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <th
       cover_alt_text: parsed.cover_alt_text ?? null,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
-    return Response.json({ error: message }, { status: 500 });
+    const errMsg = err instanceof Error ? err.message : "Erreur inconnue";
+    return Response.json({ error: errMsg }, { status: 500 });
   }
 }

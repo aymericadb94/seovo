@@ -1,7 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiCall, parseAiJson } from "@/lib/ai-router";
 
 function currentMonth() {
   const now = new Date();
@@ -161,23 +159,14 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
   "next_month_focus": "Le conseil le plus important à appliquer le mois prochain (1-2 phrases)"
 }`;
 
-    const msg = await client.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 2000,
-      messages: [{ role: "user", content: prompt }],
-    });
+    // seo_audit → Opus (strategic decision)
+    const aiResult = await aiCall(
+      { task: "seo_audit" },
+      { messages: [{ role: "user", content: prompt }], max_tokens: 2000 }
+    );
 
-    const raw = msg.content[0].type === "text" ? msg.content[0].text : "";
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start === -1 || end === -1) {
-      return Response.json({ error: "Réponse invalide" }, { status: 500 });
-    }
-
-    let auditData: Record<string, unknown>;
-    try {
-      auditData = JSON.parse(raw.slice(start, end + 1));
-    } catch {
+    const auditData = parseAiJson<Record<string, unknown>>(aiResult.text);
+    if (!auditData) {
       return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
     }
 

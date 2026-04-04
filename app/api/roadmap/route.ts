@@ -1,7 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiCall, parseAiJson } from "@/lib/ai-router";
 
 export const maxDuration = 300;
 
@@ -266,24 +264,15 @@ IMPORTANT :
 - Chaque champ texte = 1 phrase courte maximum (pas de paragraphes).
 - Réponds avec du JSON brut uniquement — aucun bloc markdown, aucun texte avant ou après l'accolade ouvrante.`;
 
-    const msg = await client.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 12000,
-      messages: [{ role: "user", content: prompt }],
-    });
+    // roadmap_strategy → Opus (strategic decision)
+    const aiResult = await aiCall(
+      { task: "roadmap_strategy" },
+      { messages: [{ role: "user", content: prompt }], max_tokens: 12000 }
+    );
 
-    const raw = msg.content[0].type === "text" ? msg.content[0].text : "";
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start === -1 || end === -1) {
-      return Response.json({ error: "Réponse Claude invalide" }, { status: 500 });
-    }
-
-    let data: unknown;
-    try {
-      data = JSON.parse(raw.slice(start, end + 1));
-    } catch (parseErr) {
-      console.error("[roadmap] JSON.parse failed:", String(parseErr), "raw slice:", raw.slice(start, start + 200));
+    const data = parseAiJson(aiResult.text);
+    if (!data) {
+      console.error("[roadmap] JSON parse failed. Raw start:", aiResult.text.slice(0, 200));
       return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
     }
 

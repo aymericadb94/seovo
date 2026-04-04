@@ -1,9 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { computeProjections, type GSCQuery } from "@/lib/seo-projections";
 import { getValidAccessToken } from "@/lib/google";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiCall, parseAiJson } from "@/lib/ai-router";
 
 type ScrapedPage = {
   text: string;
@@ -144,23 +142,14 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
   "content_angles": ["Angle de contenu différenciant 1", "Angle 2", "Angle 3"]
 }`;
 
-    const msg = await client.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 3000,
-      messages: [{ role: "user", content: prompt }],
-    });
+    // seo_analysis → Opus (strategic decision)
+    const aiResult = await aiCall(
+      { task: "seo_analysis" },
+      { messages: [{ role: "user", content: prompt }] }
+    );
 
-    const raw = msg.content[0].type === "text" ? msg.content[0].text : "";
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start === -1 || end === -1) {
-      return Response.json({ error: "Réponse Claude invalide" }, { status: 500 });
-    }
-
-    let analysis: { priority_keywords: { keyword: string }[]; quick_wins?: string[]; seo_score?: { overall?: number } } & Record<string, unknown>;
-    try {
-      analysis = JSON.parse(raw.slice(start, end + 1));
-    } catch {
+    const analysis = parseAiJson<{ priority_keywords: { keyword: string }[]; quick_wins?: string[]; seo_score?: { overall?: number } } & Record<string, unknown>>(aiResult.text);
+    if (!analysis) {
       return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
     }
 

@@ -5,15 +5,13 @@
  * POST — Run data-driven linking analysis (seo-linking engine + Claude enrichment)
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getValidAccessToken } from "@/lib/google";
 import { fetchGscData } from "@/lib/seo-events";
 import { listCmsPosts, type CmsCredentials } from "@/lib/cms-update";
 import { analyzeLinking, type LinkingAnalysis } from "@/lib/seo-linking";
+import { aiCall, parseAiJson } from "@/lib/ai-router";
 import type { GSCQuery } from "@/lib/seo-projections";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export const maxDuration = 120;
 
@@ -184,18 +182,13 @@ MISSION : Génère 3-5 opportunités stratégiques d'amélioration du maillage i
 
 RÉPONSE JSON : ["Opportunité 1", "Opportunité 2", ...]`;
 
-    const msg = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 500,
-      messages: [{ role: "user", content: prompt }],
-    });
+    const aiResult = await aiCall(
+      { task: "linking_enrichment" },
+      { messages: [{ role: "user", content: prompt }] }
+    );
 
-    const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-    const start = raw.indexOf("[");
-    const end = raw.lastIndexOf("]");
-    if (start !== -1 && end !== -1) {
-      return JSON.parse(raw.slice(start, end + 1)) as string[];
-    }
+    const parsed = parseAiJson<string[]>(aiResult.text);
+    if (parsed) return parsed;
   } catch {
     // Non-fatal — opportunities are optional
   }

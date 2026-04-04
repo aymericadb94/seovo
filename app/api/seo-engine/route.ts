@@ -1,8 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getValidAccessToken } from "@/lib/google";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiCall, parseAiJson } from "@/lib/ai-router";
 
 export const maxDuration = 300;
 
@@ -390,24 +388,15 @@ CONTRAINTES ABSOLUES :
 - Les scores doivent être des nombres réels calculés selon la formule fournie (0-10)
 - Uniquement des insights basés sur les données fournies, jamais des suppositions génériques`;
 
-    const msg = await client.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 8000,
-      messages: [{ role: "user", content: prompt }],
-    });
+    // seo_engine_execution → Sonnet (execution task)
+    const aiResult = await aiCall(
+      { task: "seo_engine_execution" },
+      { messages: [{ role: "user", content: prompt }] }
+    );
 
-    const raw = msg.content[0].type === "text" ? msg.content[0].text : "";
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start === -1 || end === -1) {
-      return Response.json({ error: "Réponse Claude invalide" }, { status: 500 });
-    }
-
-    let engineResult: unknown;
-    try {
-      engineResult = JSON.parse(raw.slice(start, end + 1));
-    } catch (parseErr) {
-      console.error("[seo-engine] JSON.parse failed:", String(parseErr));
+    const engineResult = parseAiJson(aiResult.text);
+    if (!engineResult) {
+      console.error("[seo-engine] JSON parse failed. Raw start:", aiResult.text.slice(0, 200));
       return Response.json({ error: "Réponse non parseable" }, { status: 500 });
     }
 

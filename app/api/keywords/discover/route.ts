@@ -1,7 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiCall, parseAiJson } from "@/lib/ai-router";
 
 export async function POST() {
   try {
@@ -61,13 +59,14 @@ export async function POST() {
     const primaryLanguage = targetLanguages[0] ?? "fr";
 
     // ── Demander à Claude les meilleurs mots-clés ────────────────────────────
-    const message = await anthropic.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 1000,
-      system: `You are an SEO expert specialized in keyword research. You analyze websites and identify the most strategic keywords to maximize organic traffic. Always respond in valid JSON only.`,
-      messages: [{
-        role: "user",
-        content: `Analyze this website and suggest the 12 best SEO keywords to target for maximum organic traffic.
+    // keyword_discovery → Opus (strategic decision)
+    const aiResult = await aiCall(
+      { task: "keyword_discovery" },
+      {
+        system: `You are an SEO expert specialized in keyword research. You analyze websites and identify the most strategic keywords to maximize organic traffic. Always respond in valid JSON only.`,
+        messages: [{
+          role: "user",
+          content: `Analyze this website and suggest the 12 best SEO keywords to target for maximum organic traffic.
 
 SITE:
 - Name: ${site.business_name}
@@ -88,19 +87,12 @@ Respond ONLY with valid JSON, no text before or after:
   "keywords": ["keyword 1", "keyword 2", ...],
   "reasoning": "Short explanation of the strategy in 1-2 sentences (write in ${primaryLanguage})"
 }`,
-      }],
-    });
-
-    const raw = message.content[0].type === "text" ? message.content[0].text : "";
-    let parsed: { keywords?: string[]; reasoning?: string };
-    try {
-      const start = raw.indexOf("{");
-      const end = raw.lastIndexOf("}");
-      if (start === -1 || end === -1 || end <= start) {
-        return Response.json({ error: "Réponse IA invalide" }, { status: 500 });
+        }],
       }
-      parsed = JSON.parse(raw.slice(start, end + 1));
-    } catch {
+    );
+
+    const parsed = parseAiJson<{ keywords?: string[]; reasoning?: string }>(aiResult.text);
+    if (!parsed) {
       return Response.json({ error: "Impossible de lire la réponse de l'IA" }, { status: 500 });
     }
     return Response.json({

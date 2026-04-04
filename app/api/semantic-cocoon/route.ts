@@ -1,8 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getValidAccessToken } from "@/lib/google";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiCall, parseAiJson, assessComplexity } from "@/lib/ai-router";
 
 export const maxDuration = 180;
 
@@ -277,34 +275,30 @@ FORMAT DE RÉPONSE : JSON valide uniquement, aucun texte avant ou après.
   }
 }`;
 
-    const msg = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 16000,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const rawText = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-    // Nettoyer : retirer les blocs markdown ```json ... ```
-    const cleaned = rawText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end === -1) {
-      console.error("[semantic-cocoon] Pas de JSON trouvé. Début de la réponse:", rawText.slice(0, 300));
-      return Response.json({ error: "Réponse Claude invalide" }, { status: 500 });
-    }
-
-    let result: unknown;
-    try {
-      result = JSON.parse(cleaned.slice(start, end + 1));
-    } catch (parseErr) {
-      console.error("[semantic-cocoon] JSON parse error:", parseErr, "Extrait:", cleaned.slice(start, start + 200));
-      // Tentative de réparation : supprimer les trailing commas
-      try {
-        const repaired = cleaned.slice(start, end + 1).replace(/,\s*([}\]])/g, "$1");
-        result = JSON.parse(repaired);
-      } catch {
-        return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
+    // semantic_cocoon → Opus (strategic decision task)
+    const aiResult = await aiCall(
+      {
+        task: "semantic_cocoon",
+        complexity: assessComplexity({
+          has_gsc_data: gscQueries.length > 0,
+          keywords_count: (site.keywords ?? []).length,
+        }),
+      },
+      {
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 16000,
       }
+    );
+
+    let result = parseAiJson(aiResult.text);
+    if (!result) {
+      // Tentative de réparation : supprimer les trailing commas
+      const repaired = aiResult.text.replace(/,\s*([}\]])/g, "$1");
+      result = parseAiJson(repaired);
+    }
+    if (!result) {
+      console.error("[semantic-cocoon] Pas de JSON trouvé. Début:", aiResult.text.slice(0, 300));
+      return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
     }
 
     // ── Sauvegarder (upsert) ──────────────────────────────────────────────────

@@ -10,7 +10,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import Anthropic from "@anthropic-ai/sdk";
+import { aiCall, parseAiJson } from "@/lib/ai-router";
 import {
   type CmsCredentials,
   type CmsPost,
@@ -25,7 +25,7 @@ import { assessRisk, getModificationHistory, type ActionContext, type RiskAssess
 import { analyzeLinking } from "@/lib/seo-linking";
 import type { GSCQuery } from "@/lib/seo-projections";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Model routing handled by ai-router
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -429,12 +429,12 @@ async function executeOptimizeMeta(
   const keyword = action.details.keyword as string;
 
   try {
-    const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 500,
-      messages: [{
-        role: "user",
-        content: `Génère un title SEO et une meta description optimisés pour ce mot-clé.
+    const aiResult = await aiCall(
+      { task: "meta_optimization" },
+      {
+        messages: [{
+          role: "user",
+          content: `Génère un title SEO et une meta description optimisés pour ce mot-clé.
 
 MOT-CLÉ : ${keyword}
 TITRE ACTUEL : ${action.target_title}
@@ -448,14 +448,12 @@ CONTRAINTES :
 - Naturel, pas de keyword stuffing
 
 RÉPONSE JSON : {"title": "...", "meta_description": "..."}`
-      }],
-    });
+        }],
+      }
+    );
 
-    const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start !== -1 && end !== -1) {
-      const suggestion = JSON.parse(raw.slice(start, end + 1)) as { title: string; meta_description: string };
+    const suggestion = parseAiJson<{ title: string; meta_description: string }>(aiResult.text);
+    if (suggestion) {
       return {
         action: { ...action, details: { ...action.details, suggestion } },
         executed: false, // Not auto-executed — stored for validation
