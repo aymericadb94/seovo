@@ -404,11 +404,6 @@ export default function Dashboard() {
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
   const [roadmapLoading, setRoadmapLoading] = useState(false);
 
-  // Guided onboarding (3 sequential popups)
-  const [tutorialPopup, setTutorialPopup] = useState<1 | 2 | 3 | null>(null);
-  const [popup1Loading, setPopup1Loading] = useState(false);
-  const [popup2Loading, setPopup2Loading] = useState(false);
-  const tutorialChecked = useRef(false);
 
   // Maillage interne
   type LinkingSuggestion = {
@@ -535,31 +530,6 @@ export default function Dashboard() {
 
   // Popup audit désactivé
 
-  // Reprendre le tutorial au bon popup si l'utilisateur a rechargé la page en cours de flow
-  useEffect(() => {
-    if (loading || !data || tutorialChecked.current) return;
-    if (!data.site?.seo_analysis_done) return;
-    tutorialChecked.current = true;
-
-    // Migration depuis l'ancien système (rankpill_guided_step >= 3 = tutoriel déjà complété)
-    const oldStep = parseInt(localStorage.getItem("rankpill_guided_step") ?? "0");
-    if (oldStep >= 3) {
-      localStorage.setItem("rankpill_onboarding_popup", "done");
-      return;
-    }
-
-    const popupState = localStorage.getItem("rankpill_onboarding_popup");
-    if (popupState === "done") return;
-
-    if (popupState === "1") {
-      setTutorialPopup(2);
-    } else if (popupState === "2") {
-      setTutorialPopup(3);
-    } else if (!popupState && oldStep === 0) {
-      // Nouveau utilisateur : popup 1 (projections déjà calculées par l'analyse, on recharge)
-      setTutorialPopup(1);
-    }
-  }, [loading, data]);
 
   async function handleLogout() {
     const supabase = createClient();
@@ -626,7 +596,6 @@ export default function Dashboard() {
   const kpis = data?.kpis;
   const showRoadmapCTA = !!data?.site?.seo_analysis_done && !roadmapRecord;
   const animScore = useCounter(kpis?.seoScore ?? 0);
-  const animTotal = useCounter(kpis?.totalArticles ?? 0);
   const animMonth = useCounter(kpis?.articlesThisMonth ?? 0);
   const animKw = useCounter(kpis?.coveredKeywords ?? 0);
 
@@ -640,12 +609,6 @@ export default function Dashboard() {
           onComplete={() => {
             setShowSeoModal(false);
             loadData();
-            const popupState = localStorage.getItem("rankpill_onboarding_popup");
-            if (!popupState) {
-              // Première analyse : démarrer le tutoriel depuis le début
-              tutorialChecked.current = true; // éviter double-trigger par le useEffect
-              setTutorialPopup(1);
-            }
           }}
           prefilledStrengths={data?.site?.seo_context?.strengths ?? ""}
           prefilledDifferentiators={data?.site?.seo_context?.differentiators ?? ""}
@@ -669,212 +632,6 @@ export default function Dashboard() {
           onClose={() => setShowRoadmapModal(false)}
           onGenerate={generateRoadmap}
         />
-      )}
-
-      {/* ── Tutorial popup 1 : Potentiel de croissance SEO ──────────── */}
-      {tutorialPopup === 1 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)" }}>
-          <div className="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-[modalPop_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]" style={{ background: "linear-gradient(135deg, #111 0%, #0d0d0d 100%)", border: "1px solid rgba(249,115,22,0.25)" }}>
-            <div className="absolute top-0 left-0 w-72 h-48 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(249,115,22,0.12), transparent 65%)" }} />
-            <div className="absolute bottom-0 right-0 w-56 h-40 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(239,68,68,0.06), transparent 65%)" }} />
-            <div className="relative p-8">
-              {/* Step indicator */}
-              <div className="flex items-center gap-2 mb-6">
-                {[1, 2, 3].map(p => (
-                  <div key={p} className="h-1 rounded-full transition-all duration-500" style={{
-                    width: p === 1 ? "2rem" : "0.75rem",
-                    background: p === 1 ? "linear-gradient(90deg,#f97316,#ef4444)" : "rgba(255,255,255,0.1)"
-                  }} />
-                ))}
-                <span className="text-xs text-gray-600 font-bold ml-1">Étape 1 / 3</span>
-              </div>
-              {/* Icon */}
-              <div className="flex justify-center mb-6">
-                <div className="relative w-16 h-16">
-                  <div className="absolute inset-0 rounded-full blur-xl" style={{ background: "rgba(249,115,22,0.25)" }} />
-                  <div className="relative w-full h-full rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.2), rgba(239,68,68,0.1))", border: "1px solid rgba(249,115,22,0.4)" }}>
-                    <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 text-orange-400" stroke="currentColor" strokeWidth="1.6">
-                      <path d="M3 17l4-8 4 4 4-6 4 4" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M21 21H3" strokeLinecap="round"/>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-              <div className="text-center mb-6">
-                <p className="text-xl font-black text-white mb-2">Calculer le potentiel de croissance SEO</p>
-                <p className="text-gray-400 text-sm leading-relaxed">On analyse vos mots-clés et vos données pour estimer précisément le trafic supplémentaire que vous pouvez générer.</p>
-              </div>
-              <button
-                onClick={async () => {
-                  setPopup1Loading(true);
-                  await generateProjections();
-                  setPopup1Loading(false);
-                  localStorage.setItem("rankpill_onboarding_popup", "1");
-                  setTutorialPopup(2);
-                }}
-                disabled={popup1Loading}
-                className="relative w-full overflow-hidden text-white font-black px-6 py-4 rounded-xl text-sm uppercase tracking-wide group disabled:opacity-60"
-                style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 8px 24px rgba(249,115,22,0.3)" }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
-                <span className="relative flex items-center justify-center gap-2">
-                  {popup1Loading ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
-                      </svg>
-                      Calcul en cours…
-                    </>
-                  ) : (
-                    <>
-                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="2">
-                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Calculer mon potentiel SEO
-                    </>
-                  )}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Tutorial popup 2 : Roadmap SEO ───────────────────────────── */}
-      {tutorialPopup === 2 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)" }}>
-          <div className="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-[modalPop_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]" style={{ background: "linear-gradient(135deg, #111 0%, #0d0d0d 100%)", border: "1px solid rgba(167,139,250,0.25)" }}>
-            <div className="absolute top-0 left-0 w-72 h-48 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(167,139,250,0.12), transparent 65%)" }} />
-            <div className="absolute bottom-0 right-0 w-56 h-40 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(139,92,246,0.06), transparent 65%)" }} />
-            <div className="relative p-8">
-              {/* Step indicator */}
-              <div className="flex items-center gap-2 mb-6">
-                {[1, 2, 3].map(p => (
-                  <div key={p} className="h-1 rounded-full transition-all duration-500" style={{
-                    width: p === 2 ? "2rem" : "0.75rem",
-                    background: p <= 2 ? (p === 2 ? "linear-gradient(90deg,#a78bfa,#7c3aed)" : "rgba(167,139,250,0.4)") : "rgba(255,255,255,0.1)"
-                  }} />
-                ))}
-                <span className="text-xs text-gray-600 font-bold ml-1">Étape 2 / 3</span>
-              </div>
-              {/* Icon */}
-              <div className="flex justify-center mb-6">
-                <div className="relative w-16 h-16">
-                  <div className="absolute inset-0 rounded-full blur-xl" style={{ background: "rgba(167,139,250,0.25)" }} />
-                  <div className="relative w-full h-full rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.2), rgba(139,92,246,0.1))", border: "1px solid rgba(167,139,250,0.4)" }}>
-                    <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 text-violet-400" stroke="currentColor" strokeWidth="1.6">
-                      <path d="M12 2L2 7l10 5 10-5-10-5z" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-              <div className="text-center mb-6">
-                <p className="text-xl font-black text-white mb-2">Calcul de la roadmap SEO</p>
-                <p className="text-gray-400 text-sm leading-relaxed">On génère votre plan éditorial sur 40 articles, priorisés par potentiel de trafic et facilité à ranker.</p>
-              </div>
-              <button
-                onClick={async () => {
-                  setPopup2Loading(true);
-                  await generateRoadmap();
-                  setPopup2Loading(false);
-                  localStorage.setItem("rankpill_onboarding_popup", "2");
-                  setTutorialPopup(3);
-                }}
-                disabled={popup2Loading}
-                className="relative w-full overflow-hidden text-white font-black px-6 py-4 rounded-xl text-sm uppercase tracking-wide group disabled:opacity-60"
-                style={{ background: "linear-gradient(135deg, #a78bfa, #7c3aed)", boxShadow: "0 8px 24px rgba(167,139,250,0.25)" }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
-                <span className="relative flex items-center justify-center gap-2">
-                  {popup2Loading ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
-                      </svg>
-                      Génération en cours…
-                    </>
-                  ) : (
-                    <>
-                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="2">
-                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Générer ma roadmap SEO
-                    </>
-                  )}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Tutorial popup 3 : Pages automatisées ────────────────────── */}
-      {tutorialPopup === 3 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)" }}>
-          <div className="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-[modalPop_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]" style={{ background: "linear-gradient(135deg, #111 0%, #0d0d0d 100%)", border: "1px solid rgba(34,197,94,0.2)" }}>
-            <div className="absolute top-0 left-0 w-72 h-48 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(34,197,94,0.1), transparent 65%)" }} />
-            <div className="absolute bottom-0 right-0 w-56 h-40 pointer-events-none" style={{ background: "radial-gradient(ellipse at bottom right, rgba(249,115,22,0.06), transparent 65%)" }} />
-            <div className="relative p-8">
-              {/* Step indicator */}
-              <div className="flex items-center gap-2 mb-6">
-                {[1, 2, 3].map(p => (
-                  <div key={p} className="h-1 rounded-full" style={{
-                    width: p === 3 ? "2rem" : "0.75rem",
-                    background: p < 3 ? "rgba(255,255,255,0.25)" : "linear-gradient(90deg,#22c55e,#16a34a)"
-                  }} />
-                ))}
-                <span className="text-xs text-gray-600 font-bold ml-1">Étape 3 / 3</span>
-              </div>
-              {/* Icon */}
-              <div className="flex justify-center mb-6">
-                <div className="relative w-16 h-16">
-                  <div className="absolute inset-0 rounded-full blur-xl" style={{ background: "rgba(34,197,94,0.2)" }} />
-                  <div className="relative w-full h-full rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,163,74,0.1))", border: "1px solid rgba(34,197,94,0.4)" }}>
-                    <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 text-green-400" stroke="currentColor" strokeWidth="1.6">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-              <div className="text-center mb-2">
-                <p className="text-xl font-black text-white mb-2">Votre stratégie SEO est prête !</p>
-              </div>
-              {/* Explication du système */}
-              <div className="mb-6 p-4 rounded-xl" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)" }}>
-                <p className="text-green-400 text-xs font-bold uppercase tracking-wider mb-2">Système de pages automatisées</p>
-                <p className="text-gray-300 text-sm leading-relaxed">Chaque jour à 12h00, RankPill publie automatiquement un article SEO sur votre site — optimisé pour vos mots-clés prioritaires. Zéro action requise de votre part.</p>
-              </div>
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => { localStorage.setItem("rankpill_onboarding_popup", "done"); setTutorialPopup(null); }}
-                  className="relative w-full overflow-hidden text-white font-black px-6 py-4 rounded-xl text-sm uppercase tracking-wide group"
-                  style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 8px 24px rgba(249,115,22,0.3)" }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
-                  <span className="relative flex items-center justify-center gap-2">
-                    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="2">
-                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    Pages générées automatiquement
-                  </span>
-                </button>
-                <button
-                  onClick={() => { localStorage.setItem("rankpill_onboarding_popup", "done"); setTutorialPopup(null); handleManualPublish(); }}
-                  className="w-full bg-white/[0.04] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.07] text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-all"
-                >
-                  Créer un article maintenant →
-                </button>
-                <button
-                  onClick={() => { localStorage.setItem("rankpill_onboarding_popup", "done"); setTutorialPopup(null); }}
-                  className="w-full text-gray-600 hover:text-gray-400 font-medium text-xs py-2 transition-colors"
-                >
-                  Explorer le dashboard
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Modale limite journalière */}
