@@ -14,6 +14,10 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import ScoreRing from "@/components/dashboard/ScoreRing";
+import CountdownTimer from "@/components/dashboard/CountdownTimer";
+import ChartTooltip from "@/components/dashboard/ChartTooltip";
+import useCounter from "@/components/dashboard/useCounter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,174 +57,6 @@ type DashboardData = {
     published_at: string;
   }[];
 };
-
-// ─── Animated counter ─────────────────────────────────────────────────────────
-
-function useCounter(target: number, duration = 1400) {
-  const [value, setValue] = useState(0);
-  const rafRef = useRef<number>(0);
-  useEffect(() => {
-    if (target === 0) { setValue(0); return; }
-    const start = Date.now();
-    const from = value;
-    const tick = () => {
-      const elapsed = Date.now() - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(from + ease * (target - from)));
-      if (progress < 1) { rafRef.current = requestAnimationFrame(tick); }
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, duration]);
-  return value;
-}
-
-// ─── Score ring ───────────────────────────────────────────────────────────────
-
-function ScoreRing({ score }: { score: number }) {
-  const r = 44;
-  const circ = 2 * Math.PI * r;
-  const [dash, setDash] = useState(0);
-  const [numVisible, setNumVisible] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => { setDash((score / 100) * circ); setNumVisible(true); }, 300);
-    return () => clearTimeout(t);
-  }, [score, circ]);
-  const color = score >= 75 ? "#22c55e" : score >= 50 ? "#f97316" : "#ef4444";
-  const label = score >= 75 ? "Excellent" : score >= 50 ? "En progrès" : "À améliorer";
-  return (
-    <div className="flex items-center gap-4">
-      <div className="relative w-28 h-28 flex items-center justify-center flex-shrink-0">
-        <div
-          className="absolute inset-0 rounded-full animate-pulse"
-          style={{ background: `radial-gradient(circle, ${color}18 0%, transparent 68%)`, animationDuration: "2.5s" }}
-        />
-        <svg className="absolute inset-0 rotate-[-90deg]" viewBox="0 0 100 100">
-          <defs>
-            <filter id="scoreGlow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-          </defs>
-          <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
-          <circle
-            cx="50" cy="50" r={r} fill="none"
-            stroke={color} strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={circ}
-            strokeDashoffset={circ - dash}
-            filter="url(#scoreGlow)"
-            style={{ transition: "stroke-dashoffset 1.4s cubic-bezier(0.34,1.56,0.64,1)" }}
-          />
-        </svg>
-        <div
-          className="text-center z-10"
-          style={{ opacity: numVisible ? 1 : 0, transform: numVisible ? "scale(1)" : "scale(0.8)", transition: "opacity 0.5s ease 0.9s, transform 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.9s" }}
-        >
-          <p className="text-2xl font-black text-white leading-none">{score}</p>
-          <p className="text-gray-600 text-xs">/100</p>
-        </div>
-      </div>
-      <div>
-        <p className="text-white font-bold text-lg">Score SEO</p>
-        <span
-          className="relative inline-flex items-center overflow-hidden text-xs font-bold px-2.5 py-1 rounded-full mt-1"
-          style={{ background: `${color}20`, color }}
-        >
-          <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: `linear-gradient(90deg, transparent, ${color}40, transparent)` }} />
-          {label}
-        </span>
-        <p className="text-gray-500 text-xs mt-2">Basé sur vos publications et mots-clés couverts</p>
-      </div>
-    </div>
-  );
-}
-
-// ─── Tooltip chart ────────────────────────────────────────────────────────────
-
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-[#111] border border-white/10 rounded-xl px-4 py-3 shadow-xl">
-      <p className="text-gray-400 text-xs mb-1">{label}</p>
-      <p className="text-orange-400 font-black text-lg">{payload[0].value}</p>
-      <p className="text-gray-500 text-xs">article{payload[0].value > 1 ? "s" : ""} publié{payload[0].value > 1 ? "s" : ""}</p>
-    </div>
-  );
-}
-
-// ─── Countdown timer ──────────────────────────────────────────────────────────
-
-function CountdownTimer({ targetIso }: { targetIso: string | null }) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const [time, setTime] = useState({ h: 0, m: 0, s: 0, ms: 0 });
-  const [glow, setGlow] = useState(false);
-  const prevSec = useRef(-1);
-  const totalDurationRef = useRef(0);
-
-  useEffect(() => {
-    if (targetIso) {
-      const initial = new Date(targetIso).getTime() - Date.now();
-      if (initial > 0) totalDurationRef.current = initial;
-    }
-    function calc() {
-      if (!targetIso) { setTime({ h: 0, m: 0, s: 0, ms: 0 }); return; }
-      const diff = new Date(targetIso).getTime() - Date.now();
-      if (diff <= 0) { setTime({ h: 0, m: 0, s: 0, ms: 0 }); return; }
-      const s = Math.floor((diff % 60000) / 1000);
-      if (s !== prevSec.current) {
-        prevSec.current = s;
-        setGlow(true);
-        setTimeout(() => setGlow(false), 180);
-      }
-      setTime({ h: Math.floor(diff / 3600000), m: Math.floor((diff % 3600000) / 60000), s, ms: diff });
-    }
-    calc();
-    const id = setInterval(calc, 250);
-    return () => clearInterval(id);
-  }, [targetIso]);
-
-  const hasTime = time.ms > 0 && targetIso;
-  // Total duration = 24h (daily cron cycle). Progress = how much of the 24h has elapsed.
-  const CYCLE_MS = 24 * 60 * 60 * 1000;
-  const remaining = time.ms;
-  const elapsed = CYCLE_MS - remaining;
-  const progress = hasTime ? Math.max(2, Math.min(98, (elapsed / CYCLE_MS) * 100)) : 0;
-
-  return (
-    <div className="flex flex-col gap-4 w-full">
-      {hasTime ? (
-        <div className="flex items-start">
-          {([
-            { val: pad(time.h), label: "heure" },
-            { val: pad(time.m), label: "min" },
-            { val: pad(time.s), label: "sec" },
-          ] as const).map(({ val, label }, i) => (
-            <div key={label} className="flex items-start">
-              {i > 0 && (
-                <span className="font-black select-none" style={{ fontSize: "2.4rem", lineHeight: 1, margin: "0 3px", color: "rgba(249,115,22,0.3)", animation: "colonPulse 1s ease-in-out infinite" }}>:</span>
-              )}
-              <div className="flex flex-col items-center" style={{ minWidth: 50 }}>
-                <span className="font-black tabular-nums leading-none" style={{ fontSize: "2.6rem", color: "white", textShadow: label === "sec" && glow ? "0 0 24px rgba(249,115,22,0.9), 0 0 8px rgba(249,115,22,0.6)" : "0 0 12px rgba(255,255,255,0.06)", transition: "text-shadow 0.18s ease" }}>{val}</span>
-                <span className="uppercase tracking-widest font-bold" style={{ fontSize: "0.6rem", color: "rgba(249,115,22,0.45)", marginTop: 5 }}>{label}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-2xl font-black text-white">Très prochainement</p>
-      )}
-      <div className="relative" style={{ height: 6 }}>
-        <div className="absolute inset-0 rounded-full" style={{ background: "rgba(255,255,255,0.04)" }} />
-        <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${progress}%`, background: "linear-gradient(90deg, rgba(249,115,22,0.25) 0%, #f97316 100%)", transition: "width 1s linear" }} />
-        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: `clamp(3px, calc(${progress}% - 3px), calc(100% - 3px))`, width: 12, height: 12, borderRadius: "50%", background: "radial-gradient(circle, #fff 10%, #f97316 70%)", boxShadow: "0 0 12px 4px rgba(249,115,22,0.65), 0 0 4px 1px rgba(255,200,100,0.4)", transition: "left 1s linear" }} />
-      </div>
-      <style>{`@keyframes colonPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.15; } }`}</style>
-    </div>
-  );
-}
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -2035,7 +1871,7 @@ export default function Dashboard() {
                       <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
                       <XAxis dataKey="date" tick={{ fill: "#4b5563", fontSize: 10 }} axisLine={false} tickLine={false} interval={4} />
                       <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(249,115,22,0.2)", strokeWidth: 1 }} />
+                      <Tooltip content={<ChartTooltip />} cursor={{ stroke: "rgba(249,115,22,0.2)", strokeWidth: 1 }} />
                       <Area type="monotone" dataKey="articles" stroke="#f97316" strokeWidth={2.5} fill="url(#areaGrad2)" filter="url(#areaGlow)" isAnimationActive={true} animationDuration={1400} animationEasing="ease-out" />
                     </AreaChart>
                   </ResponsiveContainer>
