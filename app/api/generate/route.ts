@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
+import { rateLimit } from "@/lib/rate-limit";
 
 async function extractStyleGuide(samples: string[]): Promise<string> {
   try {
@@ -75,6 +76,9 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
+
+    const limited = rateLimit(user.id, { name: "generate", maxRequests: 10, windowSeconds: 600 });
+    if (limited) return limited;
 
     const { keyword, businessName, industry, allKeywords, language = "fr" } = await request.json();
 

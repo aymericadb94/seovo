@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeProjections, type GSCQuery } from "@/lib/seo-projections";
 import { getValidAccessToken } from "@/lib/google";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
+import { rateLimit } from "@/lib/rate-limit";
 
 type ScrapedPage = {
   text: string;
@@ -53,6 +54,9 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
+
+    const limited = rateLimit(user.id, { name: "seo-analysis", maxRequests: 3, windowSeconds: 3600 });
+    if (limited) return limited;
 
     const { answers } = await request.json() as {
       answers: {

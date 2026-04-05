@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
+import { rateLimit } from "@/lib/rate-limit";
 
 function currentMonth() {
   const now = new Date();
@@ -42,6 +43,9 @@ export async function POST() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
+
+    const limited = rateLimit(user.id, { name: "audit", maxRequests: 3, windowSeconds: 3600 });
+    if (limited) return limited;
 
     const month = currentMonth();
 

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getValidAccessToken } from "@/lib/google";
 import { aiCall, parseAiJson, assessComplexity } from "@/lib/ai-router";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const maxDuration = 180;
 
@@ -35,6 +36,9 @@ export async function POST() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
+
+    const limited = rateLimit(user.id, { name: "semantic-cocoon", maxRequests: 5, windowSeconds: 3600 });
+    if (limited) return limited;
 
     // ── Récupérer le site ─────────────────────────────────────────────────────
     const { data: site } = await supabase

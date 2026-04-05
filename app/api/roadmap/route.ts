@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const maxDuration = 300;
 
@@ -28,6 +29,9 @@ export async function POST() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
+
+    const limited = rateLimit(user.id, { name: "roadmap", maxRequests: 5, windowSeconds: 3600 });
+    if (limited) return limited;
 
     const { data: site, error: siteError } = await supabase
       .from("sites")
