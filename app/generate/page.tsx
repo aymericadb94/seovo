@@ -139,6 +139,8 @@ export default function GeneratePage() {
     ? smartKeywords
     : smartKeywords.filter(k => k.source === kwFilter);
 
+  const [streamText, setStreamText] = useState("");
+
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!activeKeyword) return;
@@ -148,6 +150,7 @@ export default function GeneratePage() {
     setError("");
     setResult(null);
     setGenerated(null);
+    setStreamText("");
 
     const stepTimer = setInterval(() => {
       setCurrentStep((s) => {
@@ -158,7 +161,7 @@ export default function GeneratePage() {
     }, 4000);
 
     try {
-      const genRes = await fetch("/api/generate", {
+      const genRes = await fetch("/api/generate?stream=1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -170,21 +173,81 @@ export default function GeneratePage() {
         }),
       });
 
-      clearInterval(stepTimer);
-
       if (!genRes.ok) {
+        clearInterval(stepTimer);
         const data = await genRes.json();
         throw new Error(data.error || "Erreur lors de la génération");
       }
 
-      const { title, content, meta_description, cover_image_query = null, cover_alt_text = null } = await genRes.json();
-      setGenerated({ title, content, meta_description, cover_image_query, cover_alt_text });
+      // Read SSE stream
+      const reader = genRes.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+
+      if (reader) {
+        setCurrentStep(1); // "Rédaction de l'article"
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          // Parse SSE events from chunk
+          const lines = chunk.split("\n");
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const event = JSON.parse(line.slice(6)) as { type: string; text?: string; error?: string };
+              if (event.type === "delta" && event.text) {
+                fullText += event.text;
+                setStreamText(fullText);
+              } else if (event.type === "done" && event.text) {
+                fullText = event.text;
+              } else if (event.type === "error") {
+                throw new Error(event.error || "Erreur de génération");
+              }
+            } catch (parseErr) {
+              if (parseErr instanceof Error && parseErr.message !== "Erreur de génération") continue;
+              throw parseErr;
+            }
+          }
+        }
+      }
+
+      clearInterval(stepTimer);
+      setCurrentStep(2); // "Optimisation SEO"
+
+      // Parse the full JSON from streamed text
+      const parseJson = (text: string) => {
+        try { return JSON.parse(text); } catch { /* continue */ }
+        const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlock) try { return JSON.parse(codeBlock[1]); } catch { /* continue */ }
+        const s = text.indexOf("{"), e = text.lastIndexOf("}");
+        if (s !== -1 && e > s) try { return JSON.parse(text.slice(s, e + 1)); } catch { /* continue */ }
+        return null;
+      };
+
+      const parsed = parseJson(fullText) as {
+        title?: string; content?: string; meta_description?: string;
+        featured_snippet?: string; pexels_query?: string; cover_alt_text?: string;
+      } | null;
+
+      if (!parsed?.title || !parsed?.content) {
+        throw new Error("Impossible de lire la réponse générée");
+      }
+
+      const article: GeneratedArticle = {
+        title: parsed.title,
+        content: parsed.featured_snippet ? parsed.featured_snippet + "\n" + parsed.content : parsed.content,
+        meta_description: parsed.meta_description ?? "",
+        cover_image_query: parsed.pexels_query ?? null,
+        cover_alt_text: parsed.cover_alt_text ?? null,
+      };
+
+      setGenerated(article);
 
       if (previewMode) {
-        setCurrentStep(2);
         setStatus("preview");
       } else {
-        await publishArticle({ title, content, meta_description, cover_image_query, cover_alt_text });
+        await publishArticle(article);
       }
     } catch (err: unknown) {
       clearInterval(stepTimer);
@@ -574,6 +637,23 @@ export default function GeneratePage() {
                   );
                 })}
               </div>
+
+              {/* Live preview of streaming text */}
+              {streamText && status === "generating" && (
+                <div className="mt-4 relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-green-400/60">Live</span>
+                  </div>
+                  <div
+                    className="max-h-40 overflow-y-auto rounded-xl p-4 text-xs text-gray-400 font-mono leading-relaxed"
+                    style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
+                  >
+                    {streamText.length > 600 ? "…" + streamText.slice(-600) : streamText}
+                    <span className="inline-block w-1.5 h-3.5 bg-orange-400 ml-0.5 animate-pulse" style={{ verticalAlign: "text-bottom" }} />
+                  </div>
+                </div>
+              )}
 
               {/* Footer */}
               <div className="flex items-center justify-between mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>

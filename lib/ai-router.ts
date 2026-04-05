@@ -265,6 +265,64 @@ export function parseAiJson<T = unknown>(text: string): T | null {
   return null;
 }
 
+/**
+ * Make a streaming AI call with automatic model routing.
+ * Returns a ReadableStream that emits SSE-formatted chunks.
+ *
+ * Each chunk is: `data: {"type":"delta","text":"..."}\n\n`
+ * Final chunk:   `data: {"type":"done","text":"...full text..."}\n\n`
+ */
+export function aiCallStream(
+  ctx: TaskContext,
+  params: {
+    system?: string;
+    messages: Anthropic.MessageParam[];
+    max_tokens?: number;
+    temperature?: number;
+  }
+): { stream: ReadableStream; model: ModelId; tier: ModelTier; reason: string } {
+  const selection = selectModel(ctx);
+  const maxTokens = params.max_tokens ?? selection.max_tokens;
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      let fullText = "";
+
+      try {
+        const response = _client.messages.stream({
+          model: selection.model,
+          max_tokens: maxTokens,
+          ...(params.system ? { system: params.system } : {}),
+          messages: params.messages,
+          ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
+        });
+
+        for await (const event of response) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            fullText += event.delta.text;
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "delta", text: event.delta.text })}\n\n`)
+            );
+          }
+        }
+
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "done", text: fullText })}\n\n`)
+        );
+      } catch (err) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "error", error: err instanceof Error ? err.message : "Erreur inconnue" })}\n\n`)
+        );
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return { stream, model: selection.model, tier: selection.tier, reason: selection.reason };
+}
+
 // ── Pipeline helpers ────────────────────────────────────────────────────────
 
 /**

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { aiCall, parseAiJson } from "@/lib/ai-router";
+import { aiCall, aiCallStream, parseAiJson } from "@/lib/ai-router";
 import { rateLimit } from "@/lib/rate-limit";
 
 async function extractStyleGuide(samples: string[]): Promise<string> {
@@ -109,15 +109,9 @@ export async function POST(request: Request) {
       ? `\n\nDIRECTION ARTISTIQUE — REPRODUCE THIS STYLE EXACTLY (extracted from the site's existing articles):\n${styleGuide}`
       : "";
 
-    // content_generation → Sonnet (execution task, not a strategic decision)
-    const aiResult = await aiCall(
-      { task: "content_generation" },
-      {
-        system: `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`,
-        messages: [
-          {
-            role: "user",
-            content: `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
+    const systemPrompt = `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
+
+    const userPrompt = `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
 LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
 
@@ -198,11 +192,28 @@ FORMAT DE SORTIE : JSON valide uniquement, aucun texte avant ou après.
   "cover_alt_text": "Texte alt SEO de l'image, 8-12 mots, inclut le mot-clé, dans la langue de l'article"
 }
 
-HTML autorisé : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. Pas de <html>, <body>, <head>.`,
+HTML autorisé : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. Pas de <html>, <body>, <head>.`;
+
+    const aiParams = {
+      system: systemPrompt,
+      messages: [{ role: "user" as const, content: userPrompt }],
+    };
+
+    // ── Streaming mode (SSE) ──────────────────────────────────────────────
+    const url = new URL(request.url);
+    if (url.searchParams.get("stream") === "1") {
+      const { stream } = aiCallStream({ task: "content_generation" }, aiParams);
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
         },
-      ],
-      }
-    );
+      });
+    }
+
+    // ── Non-streaming mode (JSON) ─────────────────────────────────────────
+    const aiResult = await aiCall({ task: "content_generation" }, aiParams);
 
     const parsed = parseAiJson<{
       title: string;
