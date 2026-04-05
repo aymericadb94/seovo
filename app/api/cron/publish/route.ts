@@ -6,6 +6,7 @@ import { fetchPexelsImage } from "@/lib/pexels";
 import { emitEvent, createPublicationEvent, createMilestoneEvent } from "@/lib/seo-events";
 import { recordAction } from "@/lib/seo-feedback";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
+import { logger } from "@/lib/logger";
 
 function createAdminClient() {
   return createClient(
@@ -554,7 +555,7 @@ export async function GET(request: Request) {
             published_at: new Date().toISOString(),
           });
           if (insertError) {
-            console.error("[cron/publish] failed to record publication:", insertError.message);
+            logger.error("Failed to record publication in DB", { context: "cron/publish", userId: site.user_id, error: new Error(insertError.message) });
           }
 
           // ── SEO Event hook — enregistrer la publication pour le recalcul ──
@@ -572,8 +573,8 @@ export async function GET(request: Request) {
               .eq("user_id", site.user_id);
             const milestoneEvent = createMilestoneEvent(count ?? 0);
             if (milestoneEvent) await emitEvent(supabase, site.user_id, milestoneEvent);
-          } catch {
-            // Non-blocking — events will be detected at next recalc anyway
+          } catch (err) {
+            logger.warn("SEO event recording failed", { context: "cron/publish", userId: site.user_id, error: err });
           }
 
           // Notification email à l'utilisateur
@@ -589,8 +590,8 @@ export async function GET(request: Request) {
                 businessName: site.business_name,
               });
             }
-          } catch {
-            // Email optionnel, on ne bloque pas la publication
+          } catch (err) {
+            logger.warn("Email notification failed", { context: "cron/publish", userId: site.user_id, error: err });
           }
 
           results.push({ site: site.site_url, cms: site.cms, status: "ok", title });

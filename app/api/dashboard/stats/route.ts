@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getValidAccessToken } from "@/lib/google";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
@@ -121,8 +122,8 @@ export async function GET() {
             }
           }
         }
-      } catch {
-        // GSC optionnel — on continue sans
+      } catch (err) {
+        logger.warn("GSC data fetch failed for dashboard", { context: "dashboard/stats", userId: user.id, error: err });
       }
     }
 

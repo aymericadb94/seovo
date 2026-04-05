@@ -3,6 +3,7 @@ import { computeProjections, type GSCQuery } from "@/lib/seo-projections";
 import { getValidAccessToken } from "@/lib/google";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
 import { rateLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 type ScrapedPage = {
   text: string;
@@ -216,7 +217,7 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
               }));
             }
           }
-        } catch { /* GSC fetch non-fatal */ }
+        } catch (err) { logger.warn("GSC fetch failed during SEO analysis", { context: "seo-analysis", userId: user.id, error: err }); }
       }
       const projections = computeProjections(
         uniqueKeywords,
@@ -231,8 +232,8 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
           { user_id: user.id, data: projections, updated_at: new Date().toISOString() },
           { onConflict: "user_id" }
         );
-    } catch {
-      // Non-fatal : l'analyse est déjà sauvegardée, les projections seront calculées au prochain chargement
+    } catch (err) {
+      logger.warn("Projections calculation failed after SEO analysis", { context: "seo-analysis", userId: user.id, error: err });
     }
 
     return Response.json({ analysis });
