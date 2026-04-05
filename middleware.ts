@@ -37,8 +37,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Si connecté et accède au dashboard → vérifie si onboarding fait
-  if (user && path.startsWith("/dashboard")) {
+  // Si connecté et accède à une page qui nécessite un site → vérifie si onboarding fait
+  const requiresSite = ["/dashboard", "/generate", "/settings", "/admin"];
+  if (user && requiresSite.some(r => path.startsWith(r))) {
     const { data: sites } = await supabase
       .from("sites")
       .select("id")

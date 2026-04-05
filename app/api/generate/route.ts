@@ -72,27 +72,27 @@ async function fetchStyleGuideShopify(storeUrl: string, apiKey: string): Promise
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
+
     const { keyword, businessName, industry, allKeywords, language = "fr" } = await request.json();
 
     // Récupérer les credentials WP pour analyser la DA du site
     let styleGuide = "";
     try {
-      const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: site } = await supabase
-          .from("sites")
-          .select("cms, site_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id")
-          .eq("user_id", user.id)
-          .limit(1)
-          .single();
-        if (site?.cms === "wordpress" && site.wp_username && site.wp_app_password) {
-          styleGuide = await fetchStyleGuideWordPress(site.site_url, site.wp_username, site.wp_app_password);
-        } else if (site?.cms === "shopify" && site.shopify_api_key) {
-          styleGuide = await fetchStyleGuideShopify(site.site_url, site.shopify_api_key);
-        }
-        // Wix : DA non disponible via API publique, on génère sans style guide
+      const { data: site } = await supabase
+        .from("sites")
+        .select("cms, site_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id")
+        .eq("user_id", user.id)
+        .limit(1)
+        .single();
+      if (site?.cms === "wordpress" && site.wp_username && site.wp_app_password) {
+        styleGuide = await fetchStyleGuideWordPress(site.site_url, site.wp_username, site.wp_app_password);
+      } else if (site?.cms === "shopify" && site.shopify_api_key) {
+        styleGuide = await fetchStyleGuideShopify(site.site_url, site.shopify_api_key);
       }
+      // Wix : DA non disponible via API publique, on génère sans style guide
     } catch {
       // DA optionnelle, on continue sans
     }

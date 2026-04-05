@@ -45,16 +45,30 @@ export async function GET() {
 
     // ── 1. Roadmap keywords (highest priority) ────────────────────────────
     type RoadmapArticle = {
+      id: number;
       title: string;
       keyword: string;
       role: string;
       cluster?: string;
-      phase?: number;
-      priority?: string;
+      priority: number; // 1 (urgent) to 40
+    };
+    type RoadmapPhase = {
+      phase: number;
+      label: string;
+      ids: number[];
     };
 
-    const roadmapData = roadmapRes.data?.data as { articles?: RoadmapArticle[] } | null;
+    const roadmapData = roadmapRes.data?.data as { articles?: RoadmapArticle[]; phases?: RoadmapPhase[] } | null;
     const roadmapArticles = roadmapData?.articles ?? [];
+    const roadmapPhases = roadmapData?.phases ?? [];
+
+    // Build a map: article id → phase number
+    const articlePhaseMap = new Map<number, number>();
+    for (const phase of roadmapPhases) {
+      for (const id of phase.ids) {
+        articlePhaseMap.set(id, phase.phase);
+      }
+    }
 
     for (const article of roadmapArticles) {
       const kw = article.keyword?.trim();
@@ -62,18 +76,20 @@ export async function GET() {
       const kwLower = kw.toLowerCase();
       if (publishedKeywords.has(kwLower) || seenKeywords.has(kwLower)) continue;
 
+      const phase = articlePhaseMap.get(article.id) ?? null;
+
       seenKeywords.add(kwLower);
       suggestions.push({
         keyword: kw,
         source: "roadmap",
-        role: article.role === "pilier" || article.role === "pillar" ? "pillar" : "support",
+        role: article.role === "pilier" || article.role === "pillar" || article.role === "cluster" ? "pillar" : "support",
         cluster: article.cluster ?? null,
-        phase: article.phase ?? null,
-        priority: article.phase === 1 || article.priority === "haute" ? "haute"
-          : article.phase === 2 || article.priority === "moyenne" ? "moyenne"
+        phase,
+        priority: phase === 1 || article.priority <= 10 ? "haute"
+          : phase === 2 || article.priority <= 20 ? "moyenne"
           : "faible",
-        reason: article.phase
-          ? `Roadmap phase ${article.phase} — ${article.role}`
+        reason: phase
+          ? `Roadmap phase ${phase} — ${article.role}`
           : `Roadmap — ${article.role}`,
       });
     }
