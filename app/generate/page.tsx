@@ -176,9 +176,9 @@ const STEPS = [
     ),
   },
   {
-    id: "optimize",
-    label: "Optimisation SEO & méta-description",
-    sub: "Balises, densité de mots-clés et structure optimale",
+    id: "enrich",
+    label: "Enrichissement sémantique",
+    sub: "Synonymes, cooccurrences, micro-contenu et fluidité",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -328,8 +328,6 @@ export default function GeneratePage() {
         }
       }
 
-      setCurrentStep(7); // "Optimisation SEO"
-
       // Parse the full JSON from streamed text
       const parseJson = (text: string) => {
         try { return JSON.parse(text); } catch { /* continue */ }
@@ -349,9 +347,47 @@ export default function GeneratePage() {
         throw new Error("Impossible de lire la réponse générée");
       }
 
+      let articleContent = parsed.featured_snippet ? parsed.featured_snippet + "\n" + parsed.content : parsed.content;
+
+      // ── Step 7: Semantic enrichment ──────────────────────────
+      setCurrentStep(7);
+
+      try {
+        const enrichRes = await fetch("/api/content/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: articleContent,
+            title: parsed.title,
+            keyword: keywordStrategy?.primary_keyword || activeKeyword,
+            language,
+            keyword_strategy: keywordStrategy ? {
+              primary_keyword: keywordStrategy.primary_keyword,
+              secondary_keywords: keywordStrategy.secondary_keywords,
+              semantic_field: keywordStrategy.semantic_field,
+            } : undefined,
+            intent_analysis: intentResult ? {
+              intent_type: intentResult.intent_type,
+              user_intent: intentResult.user_intent,
+            } : undefined,
+          }),
+        });
+
+        if (enrichRes.ok) {
+          const enrichData = await enrichRes.json() as {
+            enrichment: { improved_content: string; improvements: string[] };
+          };
+          if (enrichData.enrichment?.improved_content) {
+            articleContent = enrichData.enrichment.improved_content;
+          }
+        }
+      } catch {
+        // Non-blocking: if enrichment fails, use original content
+      }
+
       const article: GeneratedArticle = {
         title: parsed.title,
-        content: parsed.featured_snippet ? parsed.featured_snippet + "\n" + parsed.content : parsed.content,
+        content: articleContent,
         meta_description: parsed.meta_description ?? "",
         cover_image_query: parsed.pexels_query ?? null,
         cover_alt_text: parsed.cover_alt_text ?? null,

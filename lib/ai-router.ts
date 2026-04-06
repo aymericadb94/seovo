@@ -48,6 +48,7 @@ export type TaskType =
   | "content_structure"       // SEO content structure: H1, H2, H3, featured snippet
   | "featured_snippet"        // Featured snippet (position 0) generation
   | "editorial_plan"          // Detailed editorial plan per section
+  | "semantic_enrichment"     // Post-generation semantic enrichment
 
   // ── EXECUTION tasks (default: Sonnet) ──
   | "content_generation"      // Article writing
@@ -80,6 +81,7 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
   content_structure: "sonnet",
   featured_snippet: "sonnet",
   editorial_plan: "sonnet",
+  semantic_enrichment: "sonnet",
 
   // Execution (Sonnet)
   content_generation: "sonnet",
@@ -112,6 +114,7 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   content_structure: 3000,
   featured_snippet: 1500,
   editorial_plan: 6000,
+  semantic_enrichment: 10000,
 
   content_generation: 8000,
   content_enrichment: 4000,
