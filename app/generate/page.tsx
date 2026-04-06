@@ -331,7 +331,23 @@ export default function GeneratePage() {
   const [featuredSnippet, setFeaturedSnippet] = useState<FeaturedSnippetResult | null>(null);
   const [editorialPlan, setEditorialPlan] = useState<EditorialPlanResult | null>(null);
 
-  async function runGeneration() {
+  type PreGenData = {
+    intent?: IntentResult | null;
+    position?: PositionResult | null;
+    keywords?: KeywordStrategyResult | null;
+    structure?: ContentStructureResult | null;
+    snippet?: FeaturedSnippetResult | null;
+    editorial?: EditorialPlanResult | null;
+  };
+
+  async function runGeneration(preGen: PreGenData = {}) {
+    const localIntent = preGen.intent ?? null;
+    const localPosition = preGen.position ?? null;
+    const localKeywords = preGen.keywords ?? null;
+    const localStructure = preGen.structure ?? null;
+    const localSnippet = preGen.snippet ?? null;
+    const localEditorial = preGen.editorial ?? null;
+
     setCurrentStep(6);
     setStreamText("");
 
@@ -339,16 +355,16 @@ export default function GeneratePage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        keyword: keywordStrategy?.primary_keyword || activeKeyword,
+        keyword: localKeywords?.primary_keyword || activeKeyword,
         businessName: site?.business_name ?? "",
         industry: site?.industry ?? "",
         allKeywords: site?.keywords ?? [],
         language,
-        cocoon_position: positionResult ?? undefined,
-        keyword_strategy: keywordStrategy ?? undefined,
-        content_structure: contentStructure ?? undefined,
-        featured_snippet: featuredSnippet ?? undefined,
-        editorial_plan: editorialPlan ?? undefined,
+        cocoon_position: localPosition ?? undefined,
+        keyword_strategy: localKeywords ?? undefined,
+        content_structure: localStructure ?? undefined,
+        featured_snippet: localSnippet ?? undefined,
+        editorial_plan: localEditorial ?? undefined,
       }),
     });
 
@@ -419,16 +435,16 @@ export default function GeneratePage() {
           body: JSON.stringify({
             content: articleContent,
             title: parsed.title,
-            keyword: keywordStrategy?.primary_keyword || activeKeyword,
+            keyword: localKeywords?.primary_keyword || activeKeyword,
             language,
-            keyword_strategy: keywordStrategy ? {
-              primary_keyword: keywordStrategy.primary_keyword,
-              secondary_keywords: keywordStrategy.secondary_keywords,
-              semantic_field: keywordStrategy.semantic_field,
+            keyword_strategy: localKeywords ? {
+              primary_keyword: localKeywords.primary_keyword,
+              secondary_keywords: localKeywords.secondary_keywords,
+              semantic_field: localKeywords.semantic_field,
             } : undefined,
-            intent_analysis: intentResult ? {
-              intent_type: intentResult.intent_type,
-              user_intent: intentResult.user_intent,
+            intent_analysis: localIntent ? {
+              intent_type: localIntent.intent_type,
+              user_intent: localIntent.user_intent,
             } : undefined,
           }),
         });
@@ -455,17 +471,17 @@ export default function GeneratePage() {
           body: JSON.stringify({
             content: articleContent,
             title: parsed.title,
-            keyword: keywordStrategy?.primary_keyword || activeKeyword,
+            keyword: localKeywords?.primary_keyword || activeKeyword,
             language,
-            intent_analysis: intentResult ? {
-              intent_type: intentResult.intent_type,
-              user_intent: intentResult.user_intent,
-              recommended_content_type: intentResult.recommended_content_type,
-              angle: intentResult.angle,
+            intent_analysis: localIntent ? {
+              intent_type: localIntent.intent_type,
+              user_intent: localIntent.user_intent,
+              recommended_content_type: localIntent.recommended_content_type,
+              angle: localIntent.angle,
             } : undefined,
-            keyword_strategy: keywordStrategy ? {
-              primary_keyword: keywordStrategy.primary_keyword,
-              seo_angle: keywordStrategy.seo_angle,
+            keyword_strategy: localKeywords ? {
+              primary_keyword: localKeywords.primary_keyword,
+              seo_angle: localKeywords.seo_angle,
             } : undefined,
           }),
         });
@@ -492,14 +508,14 @@ export default function GeneratePage() {
           body: JSON.stringify({
             content: articleContent,
             title: parsed.title,
-            keyword: keywordStrategy?.primary_keyword || activeKeyword,
+            keyword: localKeywords?.primary_keyword || activeKeyword,
             language,
-            cocoon_positioning: positionResult ? {
-              page_type: positionResult.page_type,
-              seo_role: positionResult.seo_role,
-              pillar_relation: positionResult.pillar_relation,
-              linking_strategy: positionResult.linking_strategy,
-              risk_level: positionResult.risk_level,
+            cocoon_positioning: localPosition ? {
+              page_type: localPosition.page_type,
+              seo_role: localPosition.seo_role,
+              pillar_relation: localPosition.pillar_relation,
+              linking_strategy: localPosition.linking_strategy,
+              risk_level: localPosition.risk_level,
             } : undefined,
           }),
         });
@@ -525,9 +541,9 @@ export default function GeneratePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             content: articleContent,
-            primary_keyword: keywordStrategy?.primary_keyword || activeKeyword,
-            secondary_keywords: keywordStrategy?.secondary_keywords,
-            semantic_field: keywordStrategy?.semantic_field,
+            primary_keyword: localKeywords?.primary_keyword || activeKeyword,
+            secondary_keywords: localKeywords?.secondary_keywords,
+            semantic_field: localKeywords?.semantic_field,
             language,
           }),
         });
@@ -555,16 +571,16 @@ export default function GeneratePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            primary_keyword: keywordStrategy?.primary_keyword || activeKeyword,
-            secondary_keywords: keywordStrategy?.secondary_keywords,
+            primary_keyword: localKeywords?.primary_keyword || activeKeyword,
+            secondary_keywords: localKeywords?.secondary_keywords,
             content_summary: articleContent.slice(0, 500).replace(/<[^>]+>/g, ""),
-            intent_analysis: intentResult ? {
-              intent_type: intentResult.intent_type,
-              user_intent: intentResult.user_intent,
-              recommended_content_type: intentResult.recommended_content_type,
-              angle: intentResult.angle,
+            intent_analysis: localIntent ? {
+              intent_type: localIntent.intent_type,
+              user_intent: localIntent.user_intent,
+              recommended_content_type: localIntent.recommended_content_type,
+              angle: localIntent.angle,
             } : undefined,
-            seo_angle: keywordStrategy?.seo_angle,
+            seo_angle: localKeywords?.seo_angle,
             language,
           }),
         });
@@ -595,19 +611,19 @@ export default function GeneratePage() {
             content: articleContent,
             title: optimizedTitle,
             meta_description: optimizedMeta,
-            primary_keyword: keywordStrategy?.primary_keyword || activeKeyword,
-            seo_structure: contentStructure ? {
-              h1: contentStructure.h1,
-              sections: contentStructure.h2_structure?.map(s => ({
+            primary_keyword: localKeywords?.primary_keyword || activeKeyword,
+            seo_structure: localStructure ? {
+              h1: localStructure.h1,
+              sections: localStructure.h2_structure?.map(s => ({
                 h2: s.title,
                 subsections: s.h3?.map(h3 => ({ h3 })),
               })),
             } : undefined,
-            cocoon_positioning: positionResult ? {
-              page_type: positionResult.page_type,
-              seo_role: positionResult.seo_role,
-              pillar_relation: positionResult.pillar_relation,
-              risk_level: positionResult.risk_level,
+            cocoon_positioning: localPosition ? {
+              page_type: localPosition.page_type,
+              seo_role: localPosition.seo_role,
+              pillar_relation: localPosition.pillar_relation,
+              risk_level: localPosition.risk_level,
             } : undefined,
             language,
           }),
@@ -699,15 +715,18 @@ export default function GeneratePage() {
         }),
       });
 
+      let localPosition: PositionResult | null = null;
       if (posRes.ok) {
         const posData = await posRes.json() as { position: PositionResult };
-        setPositionResult(posData.position);
+        localPosition = posData.position;
+        setPositionResult(localPosition);
       }
       // Non-blocking: if positioning fails, continue without it
 
       // ── Step 2: Keyword strategy ─────────────────────────────
       setCurrentStep(2);
 
+      let localKeywords: KeywordStrategyResult | null = null;
       const kwRes = await fetch("/api/keywords/strategy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -719,24 +738,26 @@ export default function GeneratePage() {
             recommended_content_type: analysis.recommended_content_type,
             angle: analysis.angle,
           },
-          cocoon_positioning: positionResult ? {
-            page_type: positionResult.page_type,
-            seo_role: positionResult.seo_role,
-            pillar_relation: positionResult.pillar_relation,
-            linking_strategy: positionResult.linking_strategy,
+          cocoon_positioning: localPosition ? {
+            page_type: localPosition.page_type,
+            seo_role: localPosition.seo_role,
+            pillar_relation: localPosition.pillar_relation,
+            linking_strategy: localPosition.linking_strategy,
           } : undefined,
         }),
       });
 
       if (kwRes.ok) {
         const kwData = await kwRes.json() as { strategy: KeywordStrategyResult };
-        setKeywordStrategy(kwData.strategy);
+        localKeywords = kwData.strategy;
+        setKeywordStrategy(localKeywords);
       }
       // Non-blocking: if strategy fails, continue with original keyword
 
       // ── Step 3: Content structure ────────────────────────────
       setCurrentStep(3);
 
+      let localStructure: ContentStructureResult | null = null;
       const structRes = await fetch("/api/content/structure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -749,29 +770,31 @@ export default function GeneratePage() {
             angle: analysis.angle,
             serp_analysis: analysis.serp_analysis,
           },
-          cocoon_positioning: positionResult ? {
-            page_type: positionResult.page_type,
-            seo_role: positionResult.seo_role,
-            pillar_relation: positionResult.pillar_relation,
+          cocoon_positioning: localPosition ? {
+            page_type: localPosition.page_type,
+            seo_role: localPosition.seo_role,
+            pillar_relation: localPosition.pillar_relation,
           } : undefined,
-          keyword_strategy: keywordStrategy ? {
-            primary_keyword: keywordStrategy.primary_keyword,
-            secondary_keywords: keywordStrategy.secondary_keywords,
-            semantic_field: keywordStrategy.semantic_field,
-            seo_angle: keywordStrategy.seo_angle,
+          keyword_strategy: localKeywords ? {
+            primary_keyword: localKeywords.primary_keyword,
+            secondary_keywords: localKeywords.secondary_keywords,
+            semantic_field: localKeywords.semantic_field,
+            seo_angle: localKeywords.seo_angle,
           } : undefined,
         }),
       });
 
       if (structRes.ok) {
         const structData = await structRes.json() as { structure: ContentStructureResult };
-        setContentStructure(structData.structure);
+        localStructure = structData.structure;
+        setContentStructure(localStructure);
       }
       // Non-blocking: if structure fails, continue without it
 
       // ── Step 4: Featured snippet ─────────────────────────────
       setCurrentStep(4);
 
+      let localSnippet: FeaturedSnippetResult | null = null;
       const snippetRes = await fetch("/api/content/snippet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -783,26 +806,28 @@ export default function GeneratePage() {
             recommended_content_type: analysis.recommended_content_type,
             angle: analysis.angle,
           },
-          content_structure: contentStructure ? {
-            h1: contentStructure.h1,
-            featured_snippet_section: contentStructure.featured_snippet_section,
+          content_structure: localStructure ? {
+            h1: localStructure.h1,
+            featured_snippet_section: localStructure.featured_snippet_section,
           } : undefined,
-          keyword_strategy: keywordStrategy ? {
-            primary_keyword: keywordStrategy.primary_keyword,
-            seo_angle: keywordStrategy.seo_angle,
+          keyword_strategy: localKeywords ? {
+            primary_keyword: localKeywords.primary_keyword,
+            seo_angle: localKeywords.seo_angle,
           } : undefined,
         }),
       });
 
       if (snippetRes.ok) {
         const snippetData = await snippetRes.json() as { snippet: FeaturedSnippetResult };
-        setFeaturedSnippet(snippetData.snippet);
+        localSnippet = snippetData.snippet;
+        setFeaturedSnippet(localSnippet);
       }
       // Non-blocking: if snippet fails, generate will create its own
 
       // ── Step 5: Editorial plan ───────────────────────────────
       setCurrentStep(5);
 
+      let localEditorial: EditorialPlanResult | null = null;
       const editRes = await fetch("/api/content/editorial-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -814,33 +839,41 @@ export default function GeneratePage() {
             recommended_content_type: analysis.recommended_content_type,
             angle: analysis.angle,
           },
-          content_structure: contentStructure ? {
-            h1: contentStructure.h1,
-            h2_structure: contentStructure.h2_structure,
-            featured_snippet_section: contentStructure.featured_snippet_section,
+          content_structure: localStructure ? {
+            h1: localStructure.h1,
+            h2_structure: localStructure.h2_structure,
+            featured_snippet_section: localStructure.featured_snippet_section,
           } : undefined,
-          keyword_strategy: keywordStrategy ? {
-            primary_keyword: keywordStrategy.primary_keyword,
-            secondary_keywords: keywordStrategy.secondary_keywords,
-            semantic_field: keywordStrategy.semantic_field,
-            seo_angle: keywordStrategy.seo_angle,
+          keyword_strategy: localKeywords ? {
+            primary_keyword: localKeywords.primary_keyword,
+            secondary_keywords: localKeywords.secondary_keywords,
+            semantic_field: localKeywords.semantic_field,
+            seo_angle: localKeywords.seo_angle,
           } : undefined,
-          featured_snippet: featuredSnippet ? {
-            snippet_type: featuredSnippet.snippet_type,
-            snippet_text: featuredSnippet.snippet_text,
-            placement: featuredSnippet.placement,
+          featured_snippet: localSnippet ? {
+            snippet_type: localSnippet.snippet_type,
+            snippet_text: localSnippet.snippet_text,
+            placement: localSnippet.placement,
           } : undefined,
         }),
       });
 
       if (editRes.ok) {
         const editData = await editRes.json() as { plan: EditorialPlanResult };
-        setEditorialPlan(editData.plan);
+        localEditorial = editData.plan;
+        setEditorialPlan(localEditorial);
       }
       // Non-blocking: if editorial plan fails, continue without it
 
-      // ── Steps 6-8: Generate + publish ────────────────────────
-      await runGeneration();
+      // ── Steps 6-14: Generate + post-process + publish ────────
+      await runGeneration({
+        intent: analysis,
+        position: localPosition,
+        keywords: localKeywords,
+        structure: localStructure,
+        snippet: localSnippet,
+        editorial: localEditorial,
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
       setStatus("error");
@@ -1188,7 +1221,7 @@ export default function GeneratePage() {
                 <div
                   className="absolute inset-y-0 left-0 rounded-full"
                   style={{
-                    width: `${Math.min((currentStep / (STEPS.length - 1)) * 100, 100)}%`,
+                    width: `${Math.min((currentStep / (STEPS.length - 2)) * 100, 100)}%`,
                     background: "linear-gradient(90deg, #f97316, #ef4444)",
                     transition: "width 0.8s cubic-bezier(0.34,1.56,0.64,1)",
                     boxShadow: "0 0 8px rgba(249,115,22,0.5)",
@@ -1290,7 +1323,7 @@ export default function GeneratePage() {
                   Étape {Math.min(currentStep + 1, STEPS.length)} sur {STEPS.length}
                 </p>
                 <p className="text-gray-600 text-xs">
-                  {elapsed < 15 ? "Estimation : 30 – 60s" : elapsed < 40 ? "Presque terminé..." : "Finalisation en cours..."}
+                  {elapsed < 30 ? "Estimation : 2 – 4 min" : elapsed < 90 ? "Analyse et rédaction..." : elapsed < 180 ? "Optimisation en cours..." : "Finalisation..."}
                 </p>
               </div>
             </div>
