@@ -186,6 +186,16 @@ const STEPS = [
     ),
   },
   {
+    id: "enhance",
+    label: "Valeur ajoutée & crédibilité",
+    sub: "Exemples concrets, conseils pratiques, insights experts",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+      </svg>
+    ),
+  },
+  {
     id: "publish",
     label: "Publication sur votre site",
     sub: "Envoi automatique vers votre CMS",
@@ -383,6 +393,43 @@ export default function GeneratePage() {
         }
       } catch {
         // Non-blocking: if enrichment fails, use original content
+      }
+
+      // ── Step 8: Value enhancement ───────────────────────────
+      setCurrentStep(8);
+
+      try {
+        const enhanceRes = await fetch("/api/content/enhance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: articleContent,
+            title: parsed.title,
+            keyword: keywordStrategy?.primary_keyword || activeKeyword,
+            language,
+            intent_analysis: intentResult ? {
+              intent_type: intentResult.intent_type,
+              user_intent: intentResult.user_intent,
+              recommended_content_type: intentResult.recommended_content_type,
+              angle: intentResult.angle,
+            } : undefined,
+            keyword_strategy: keywordStrategy ? {
+              primary_keyword: keywordStrategy.primary_keyword,
+              seo_angle: keywordStrategy.seo_angle,
+            } : undefined,
+          }),
+        });
+
+        if (enhanceRes.ok) {
+          const enhanceData = await enhanceRes.json() as {
+            enhancement: { enhanced_content: string };
+          };
+          if (enhanceData.enhancement?.enhanced_content) {
+            articleContent = enhanceData.enhancement.enhanced_content;
+          }
+        }
+      } catch {
+        // Non-blocking: if enhancement fails, use current content
       }
 
       const article: GeneratedArticle = {
@@ -621,7 +668,7 @@ export default function GeneratePage() {
   }
 
   async function publishArticle(article: GeneratedArticle) {
-    setCurrentStep(8);
+    setCurrentStep(9);
     setStatus("publishing");
 
     try {
