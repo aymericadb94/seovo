@@ -51,6 +51,8 @@ export type TaskType =
   | "semantic_enrichment"     // Post-generation semantic enrichment
   | "value_enhancement"       // Add examples, tips, insights, credibility
   | "internal_linking"        // Intelligent internal link insertion
+  | "roadmap_integration"     // Post-publish roadmap strategy update
+  | "content_audit"           // SEO over-optimization & AI detection audit
 
   // ── EXECUTION tasks (default: Sonnet) ──
   | "content_generation"      // Article writing
@@ -86,6 +88,8 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
   semantic_enrichment: "sonnet",
   value_enhancement: "sonnet",
   internal_linking: "sonnet",
+  roadmap_integration: "sonnet",
+  content_audit: "sonnet",
 
   // Execution (Sonnet)
   content_generation: "sonnet",
@@ -121,6 +125,8 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   semantic_enrichment: 10000,
   value_enhancement: 10000,
   internal_linking: 10000,
+  roadmap_integration: 4000,
+  content_audit: 10000,
 
   content_generation: 8000,
   content_enrichment: 4000,

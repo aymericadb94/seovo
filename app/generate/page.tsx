@@ -206,6 +206,16 @@ const STEPS = [
     ),
   },
   {
+    id: "audit",
+    label: "Audit qualité SEO",
+    sub: "Détection sur-optimisation, patterns IA, naturalité",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+      </svg>
+    ),
+  },
+  {
     id: "publish",
     label: "Publication sur votre site",
     sub: "Envoi automatique vers votre CMS",
@@ -486,6 +496,34 @@ export default function GeneratePage() {
         // Non-blocking: if linking fails, publish without internal links
       }
 
+      // ── Step 10: Content quality audit ─────────────────────────
+      setCurrentStep(10);
+
+      try {
+        const auditRes = await fetch("/api/content/audit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: articleContent,
+            primary_keyword: keywordStrategy?.primary_keyword || activeKeyword,
+            secondary_keywords: keywordStrategy?.secondary_keywords,
+            semantic_field: keywordStrategy?.semantic_field,
+            language,
+          }),
+        });
+
+        if (auditRes.ok) {
+          const auditData = await auditRes.json() as {
+            audit: { corrected_content: string; naturalness_score: number };
+          };
+          if (auditData.audit?.corrected_content) {
+            articleContent = auditData.audit.corrected_content;
+          }
+        }
+      } catch {
+        // Non-blocking: if audit fails, use current content
+      }
+
       const article: GeneratedArticle = {
         title: parsed.title,
         content: articleContent,
@@ -722,7 +760,7 @@ export default function GeneratePage() {
   }
 
   async function publishArticle(article: GeneratedArticle) {
-    setCurrentStep(10);
+    setCurrentStep(11);
     setStatus("publishing");
 
     try {
@@ -752,8 +790,8 @@ export default function GeneratePage() {
 
       setResult({ title: article.title, url: data.url, meta: article.meta_description });
 
-      // ── Step 11: Roadmap integration (non-blocking) ─────────────────
-      setCurrentStep(11);
+      // ── Step 12: Roadmap integration (non-blocking) ─────────────────
+      setCurrentStep(12);
       try {
         await fetch("/api/roadmap/integrate", {
           method: "POST",
