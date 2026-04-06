@@ -57,6 +57,17 @@ type PositionResult = {
   justification: string;
 };
 
+type KeywordStrategyResult = {
+  primary_keyword: string;
+  secondary_keywords: string[];
+  semantic_field: string[];
+  cannibalization_risk: "low" | "medium" | "high";
+  conflicting_pages: string[];
+  seo_angle: string;
+  priority: "high" | "medium" | "low";
+  justification: string;
+};
+
 const STEPS = [
   {
     id: "intent",
@@ -75,6 +86,16 @@ const STEPS = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
         <circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="14"/><circle cx="6" cy="19" r="3"/><circle cx="18" cy="19" r="3"/><line x1="12" y1="14" x2="6" y2="16"/><line x1="12" y1="14" x2="18" y2="16"/>
+      </svg>
+    ),
+  },
+  {
+    id: "keywords",
+    label: "Stratégie de mots-clés",
+    sub: "Mot-clé principal, secondaires, champ sémantique",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
       </svg>
     ),
   },
@@ -179,21 +200,23 @@ export default function GeneratePage() {
   const [streamText, setStreamText] = useState("");
   const [intentResult, setIntentResult] = useState<IntentResult | null>(null);
   const [positionResult, setPositionResult] = useState<PositionResult | null>(null);
+  const [keywordStrategy, setKeywordStrategy] = useState<KeywordStrategyResult | null>(null);
 
   async function runGeneration() {
-    setCurrentStep(2);
+    setCurrentStep(3);
     setStreamText("");
 
     const genRes = await fetch("/api/generate?stream=1", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        keyword: activeKeyword,
+        keyword: keywordStrategy?.primary_keyword || activeKeyword,
         businessName: site?.business_name ?? "",
         industry: site?.industry ?? "",
         allKeywords: site?.keywords ?? [],
         language,
         cocoon_position: positionResult ?? undefined,
+        keyword_strategy: keywordStrategy ?? undefined,
       }),
     });
 
@@ -233,7 +256,7 @@ export default function GeneratePage() {
         }
       }
 
-      setCurrentStep(3); // "Optimisation SEO"
+      setCurrentStep(4); // "Optimisation SEO"
 
       // Parse the full JSON from streamed text
       const parseJson = (text: string) => {
@@ -283,6 +306,7 @@ export default function GeneratePage() {
     setStreamText("");
     setIntentResult(null);
     setPositionResult(null);
+    setKeywordStrategy(null);
 
     try {
       // ── Step 0: Intent analysis ──────────────────────────────
@@ -330,7 +354,36 @@ export default function GeneratePage() {
       }
       // Non-blocking: if positioning fails, continue without it
 
-      // ── Steps 2-4: Generate + publish ────────────────────────
+      // ── Step 2: Keyword strategy ─────────────────────────────
+      setCurrentStep(2);
+
+      const kwRes = await fetch("/api/keywords/strategy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: activeKeyword,
+          intent_analysis: {
+            intent_type: analysis.intent_type,
+            user_intent: analysis.user_intent,
+            recommended_content_type: analysis.recommended_content_type,
+            angle: analysis.angle,
+          },
+          cocoon_positioning: positionResult ? {
+            page_type: positionResult.page_type,
+            seo_role: positionResult.seo_role,
+            pillar_relation: positionResult.pillar_relation,
+            linking_strategy: positionResult.linking_strategy,
+          } : undefined,
+        }),
+      });
+
+      if (kwRes.ok) {
+        const kwData = await kwRes.json() as { strategy: KeywordStrategyResult };
+        setKeywordStrategy(kwData.strategy);
+      }
+      // Non-blocking: if strategy fails, continue with original keyword
+
+      // ── Steps 3-5: Generate + publish ────────────────────────
       await runGeneration();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
@@ -352,7 +405,7 @@ export default function GeneratePage() {
   }
 
   async function publishArticle(article: GeneratedArticle) {
-    setCurrentStep(4);
+    setCurrentStep(5);
     setStatus("publishing");
 
     try {

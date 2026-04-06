@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const limited = rateLimit(user.id, { name: "generate", maxRequests: 10, windowSeconds: 600 });
     if (limited) return limited;
 
-    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position } = await request.json();
+    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position, keyword_strategy } = await request.json();
 
     // Récupérer les credentials WP pour analyser la DA du site
     let styleGuide = "";
@@ -126,13 +126,26 @@ ${cocoonPos.linking_strategy.incoming.map((l: LinkEntry) => `- Depuis "${l.sourc
 IMPORTANT : Intègre les liens sortants ci-dessus naturellement dans le contenu. Utilise les ancres recommandées de manière fluide dans le texte.`
       : "";
 
+    // Build keyword strategy context
+    type KwStrategy = { primary_keyword: string; secondary_keywords: string[]; semantic_field: string[]; seo_angle: string };
+    const kwStrat = keyword_strategy as KwStrategy | undefined;
+    const keywordContext = kwStrat
+      ? `\n\nSTRATÉGIE DE MOTS-CLÉS (définie par l'analyse pré-rédaction) :
+Mot-clé principal : "${kwStrat.primary_keyword}"
+Mots-clés secondaires à intégrer naturellement : ${kwStrat.secondary_keywords.join(", ")}
+Champ sémantique (termes à utiliser dans le texte) : ${kwStrat.semantic_field.join(", ")}
+Angle SEO : ${kwStrat.seo_angle}
+
+IMPORTANT : Intègre les mots-clés secondaires et le champ sémantique de manière naturelle et fluide. Densité mot-clé principal < 2%. Ne force jamais un terme.`
+      : "";
+
     const systemPrompt = `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
 
     const userPrompt = `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
 LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
 
-MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}
+MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}${keywordContext}
 
 ---
 
