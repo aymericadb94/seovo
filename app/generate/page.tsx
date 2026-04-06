@@ -196,6 +196,16 @@ const STEPS = [
     ),
   },
   {
+    id: "linking",
+    label: "Maillage interne intelligent",
+    sub: "Liens stratégiques, ancres naturelles, cocon sémantique",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+      </svg>
+    ),
+  },
+  {
     id: "publish",
     label: "Publication sur votre site",
     sub: "Envoi automatique vers votre CMS",
@@ -430,6 +440,40 @@ export default function GeneratePage() {
         }
       } catch {
         // Non-blocking: if enhancement fails, use current content
+      }
+
+      // ── Step 9: Internal linking ────────────────────────────
+      setCurrentStep(9);
+
+      try {
+        const linkRes = await fetch("/api/content/linking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: articleContent,
+            title: parsed.title,
+            keyword: keywordStrategy?.primary_keyword || activeKeyword,
+            language,
+            cocoon_positioning: positionResult ? {
+              page_type: positionResult.page_type,
+              seo_role: positionResult.seo_role,
+              pillar_relation: positionResult.pillar_relation,
+              linking_strategy: positionResult.linking_strategy,
+              risk_level: positionResult.risk_level,
+            } : undefined,
+          }),
+        });
+
+        if (linkRes.ok) {
+          const linkData = await linkRes.json() as {
+            linking: { updated_content: string; links_added: unknown[] };
+          };
+          if (linkData.linking?.updated_content) {
+            articleContent = linkData.linking.updated_content;
+          }
+        }
+      } catch {
+        // Non-blocking: if linking fails, publish without internal links
       }
 
       const article: GeneratedArticle = {
@@ -668,7 +712,7 @@ export default function GeneratePage() {
   }
 
   async function publishArticle(article: GeneratedArticle) {
-    setCurrentStep(9);
+    setCurrentStep(10);
     setStatus("publishing");
 
     try {

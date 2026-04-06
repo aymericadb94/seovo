@@ -50,6 +50,7 @@ export type TaskType =
   | "editorial_plan"          // Detailed editorial plan per section
   | "semantic_enrichment"     // Post-generation semantic enrichment
   | "value_enhancement"       // Add examples, tips, insights, credibility
+  | "internal_linking"        // Intelligent internal link insertion
 
   // ── EXECUTION tasks (default: Sonnet) ──
   | "content_generation"      // Article writing
@@ -84,6 +85,7 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
   editorial_plan: "sonnet",
   semantic_enrichment: "sonnet",
   value_enhancement: "sonnet",
+  internal_linking: "sonnet",
 
   // Execution (Sonnet)
   content_generation: "sonnet",
@@ -118,6 +120,7 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   editorial_plan: 6000,
   semantic_enrichment: 10000,
   value_enhancement: 10000,
+  internal_linking: 10000,
 
   content_generation: 8000,
   content_enrichment: 4000,
