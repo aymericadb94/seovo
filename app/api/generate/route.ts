@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const limited = rateLimit(user.id, { name: "generate", maxRequests: 10, windowSeconds: 600 });
     if (limited) return limited;
 
-    const { keyword, businessName, industry, allKeywords, language = "fr" } = await request.json();
+    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position } = await request.json();
 
     // Récupérer les credentials WP pour analyser la DA du site
     let styleGuide = "";
@@ -109,13 +109,30 @@ export async function POST(request: Request) {
       ? `\n\nDIRECTION ARTISTIQUE — REPRODUCE THIS STYLE EXACTLY (extracted from the site's existing articles):\n${styleGuide}`
       : "";
 
+    // Build cocoon positioning context for intelligent linking
+    type LinkEntry = { target: string; source?: string; anchor: string; reason: string };
+    type CocoonPos = { page_type: string; seo_role: string; linking_strategy: { outgoing: LinkEntry[]; incoming: LinkEntry[] }; pillar_relation: string };
+    const cocoonPos = cocoon_position as CocoonPos | undefined;
+    const cocoonContext = cocoonPos
+      ? `\n\nPOSITIONNEMENT COCON SÉMANTIQUE :
+Type de page : ${cocoonPos.page_type}
+Rôle SEO : ${cocoonPos.seo_role}
+Relation pilier : ${cocoonPos.pillar_relation}
+Liens sortants obligatoires :
+${cocoonPos.linking_strategy.outgoing.map((l: LinkEntry) => `- Vers "${l.target}" avec ancre "${l.anchor}" (${l.reason})`).join("\n")}
+Liens entrants recommandés :
+${cocoonPos.linking_strategy.incoming.map((l: LinkEntry) => `- Depuis "${l.source}" avec ancre "${l.anchor}" (${l.reason})`).join("\n")}
+
+IMPORTANT : Intègre les liens sortants ci-dessus naturellement dans le contenu. Utilise les ancres recommandées de manière fluide dans le texte.`
+      : "";
+
     const systemPrompt = `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
 
     const userPrompt = `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
 LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
 
-MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}
+MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}
 
 ---
 

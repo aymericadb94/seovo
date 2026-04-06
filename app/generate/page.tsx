@@ -41,6 +41,22 @@ type IntentResult = {
   cannibalization_target?: string;
 };
 
+type PositionResult = {
+  page_type: "pillar" | "support" | "complementary";
+  seo_role: string;
+  priority: "high" | "medium" | "low";
+  pillar_relation: string;
+  supporting_pages: string[];
+  internal_conflicts: string[];
+  linking_strategy: {
+    outgoing: { target: string; anchor: string; reason: string }[];
+    incoming: { source: string; anchor: string; reason: string }[];
+  };
+  roadmap_position: string;
+  risk_level: "low" | "medium" | "high";
+  justification: string;
+};
+
 const STEPS = [
   {
     id: "intent",
@@ -49,6 +65,16 @@ const STEPS = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
         <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+      </svg>
+    ),
+  },
+  {
+    id: "position",
+    label: "Positionnement dans le cocon",
+    sub: "Rôle stratégique, maillage interne et liens",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="14"/><circle cx="6" cy="19" r="3"/><circle cx="18" cy="19" r="3"/><line x1="12" y1="14" x2="6" y2="16"/><line x1="12" y1="14" x2="18" y2="16"/>
       </svg>
     ),
   },
@@ -152,9 +178,10 @@ export default function GeneratePage() {
 
   const [streamText, setStreamText] = useState("");
   const [intentResult, setIntentResult] = useState<IntentResult | null>(null);
+  const [positionResult, setPositionResult] = useState<PositionResult | null>(null);
 
   async function runGeneration() {
-    setCurrentStep(1);
+    setCurrentStep(2);
     setStreamText("");
 
     const genRes = await fetch("/api/generate?stream=1", {
@@ -166,6 +193,7 @@ export default function GeneratePage() {
         industry: site?.industry ?? "",
         allKeywords: site?.keywords ?? [],
         language,
+        cocoon_position: positionResult ?? undefined,
       }),
     });
 
@@ -205,7 +233,7 @@ export default function GeneratePage() {
         }
       }
 
-      setCurrentStep(2); // "Optimisation SEO"
+      setCurrentStep(3); // "Optimisation SEO"
 
       // Parse the full JSON from streamed text
       const parseJson = (text: string) => {
@@ -254,6 +282,7 @@ export default function GeneratePage() {
     setGenerated(null);
     setStreamText("");
     setIntentResult(null);
+    setPositionResult(null);
 
     try {
       // ── Step 0: Intent analysis ──────────────────────────────
@@ -278,7 +307,30 @@ export default function GeneratePage() {
         return;
       }
 
-      // ── Steps 1-3: Generate + publish ────────────────────────
+      // ── Step 1: Cocoon positioning ───────────────────────────
+      setCurrentStep(1);
+
+      const posRes = await fetch("/api/keywords/position", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: activeKeyword,
+          intent_analysis: {
+            intent_type: analysis.intent_type,
+            user_intent: analysis.user_intent,
+            recommended_content_type: analysis.recommended_content_type,
+            angle: analysis.angle,
+          },
+        }),
+      });
+
+      if (posRes.ok) {
+        const posData = await posRes.json() as { position: PositionResult };
+        setPositionResult(posData.position);
+      }
+      // Non-blocking: if positioning fails, continue without it
+
+      // ── Steps 2-4: Generate + publish ────────────────────────
       await runGeneration();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
@@ -300,7 +352,7 @@ export default function GeneratePage() {
   }
 
   async function publishArticle(article: GeneratedArticle) {
-    setCurrentStep(3);
+    setCurrentStep(4);
     setStatus("publishing");
 
     try {

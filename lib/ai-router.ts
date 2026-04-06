@@ -43,6 +43,7 @@ export type TaskType =
   | "risk_arbitrage"          // High-risk page modification decisions
   | "recalc_full"             // Full recalculation (cocoon restructure)
   | "intent_analysis"         // Search intent analysis before content creation
+  | "cocoon_positioning"      // Strategic page positioning within cocoon
 
   // ── EXECUTION tasks (default: Sonnet) ──
   | "content_generation"      // Article writing
@@ -70,6 +71,7 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
   risk_arbitrage: "opus",
   recalc_full: "opus",
   intent_analysis: "opus",
+  cocoon_positioning: "opus",
 
   // Execution (Sonnet)
   content_generation: "sonnet",
@@ -97,6 +99,7 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   risk_arbitrage: 2000,
   recalc_full: 6000,
   intent_analysis: 2000,
+  cocoon_positioning: 4000,
 
   content_generation: 8000,
   content_enrichment: 4000,
