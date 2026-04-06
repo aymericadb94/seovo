@@ -42,6 +42,7 @@ export type TaskType =
   | "gsc_advanced_analysis"   // GSC data interpretation, anomaly detection
   | "risk_arbitrage"          // High-risk page modification decisions
   | "recalc_full"             // Full recalculation (cocoon restructure)
+  | "intent_analysis"         // Search intent analysis before content creation
 
   // ── EXECUTION tasks (default: Sonnet) ──
   | "content_generation"      // Article writing
@@ -68,6 +69,7 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
   gsc_advanced_analysis: "opus",
   risk_arbitrage: "opus",
   recalc_full: "opus",
+  intent_analysis: "opus",
 
   // Execution (Sonnet)
   content_generation: "sonnet",
@@ -94,6 +96,7 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   gsc_advanced_analysis: 4000,
   risk_arbitrage: 2000,
   recalc_full: 6000,
+  intent_analysis: 2000,
 
   content_generation: 8000,
   content_enrichment: 4000,

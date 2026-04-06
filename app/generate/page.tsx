@@ -29,15 +29,26 @@ type GeneratedArticle = {
   cover_alt_text?: string | null;
 };
 
+type IntentResult = {
+  intent_type: string;
+  user_intent: string;
+  serp_analysis: string;
+  recommended_content_type: string;
+  angle: string;
+  risk_level: "low" | "medium" | "high";
+  decision: "create" | "optimize" | "ignore";
+  justification: string;
+  cannibalization_target?: string;
+};
+
 const STEPS = [
   {
-    id: "analyze",
-    label: "Analyse du secteur et des mots-clés",
-    sub: "Recherche sémantique et positionnement concurrentiel",
+    id: "intent",
+    label: "Analyse d'intention de recherche",
+    sub: "Validation stratégique du mot-clé avant rédaction",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+        <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
       </svg>
     ),
   },
@@ -86,7 +97,7 @@ export default function GeneratePage() {
   const [customKeyword, setCustomKeyword] = useState("");
   const [language, setLanguage] = useState<Locale>("fr");
   const [previewMode, setPreviewMode] = useState(false);
-  const [status, setStatus] = useState<"idle" | "generating" | "preview" | "publishing" | "done" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "generating" | "preview" | "publishing" | "done" | "error" | "intent-blocked">("idle");
   const [currentStep, setCurrentStep] = useState(0);
   const [generated, setGenerated] = useState<GeneratedArticle | null>(null);
   const [result, setResult] = useState<{ title: string; url: string; meta?: string } | null>(null);
@@ -140,52 +151,34 @@ export default function GeneratePage() {
     : smartKeywords.filter(k => k.source === kwFilter);
 
   const [streamText, setStreamText] = useState("");
+  const [intentResult, setIntentResult] = useState<IntentResult | null>(null);
 
-  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!activeKeyword) return;
-
-    setStatus("generating");
-    setCurrentStep(0);
-    setError("");
-    setResult(null);
-    setGenerated(null);
+  async function runGeneration() {
+    setCurrentStep(1);
     setStreamText("");
 
-    const stepTimer = setInterval(() => {
-      setCurrentStep((s) => {
-        if (s < 2) return s + 1;
-        clearInterval(stepTimer);
-        return s;
-      });
-    }, 4000);
+    const genRes = await fetch("/api/generate?stream=1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        keyword: activeKeyword,
+        businessName: site?.business_name ?? "",
+        industry: site?.industry ?? "",
+        allKeywords: site?.keywords ?? [],
+        language,
+      }),
+    });
 
-    try {
-      const genRes = await fetch("/api/generate?stream=1", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          keyword: activeKeyword,
-          businessName: site?.business_name ?? "",
-          industry: site?.industry ?? "",
-          allKeywords: site?.keywords ?? [],
-          language,
-        }),
-      });
+    if (!genRes.ok) {
+      const data = await genRes.json();
+      throw new Error(data.error || "Erreur lors de la génération");
+    }
 
-      if (!genRes.ok) {
-        clearInterval(stepTimer);
-        const data = await genRes.json();
-        throw new Error(data.error || "Erreur lors de la génération");
-      }
+    const reader = genRes.body?.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
 
-      // Read SSE stream
-      const reader = genRes.body?.getReader();
-      const decoder = new TextDecoder();
-      let fullText = "";
-
-      if (reader) {
-        setCurrentStep(1); // "Rédaction de l'article"
+    if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -212,7 +205,6 @@ export default function GeneratePage() {
         }
       }
 
-      clearInterval(stepTimer);
       setCurrentStep(2); // "Optimisation SEO"
 
       // Parse the full JSON from streamed text
@@ -249,8 +241,59 @@ export default function GeneratePage() {
       } else {
         await publishArticle(article);
       }
+  }
+
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!activeKeyword) return;
+
+    setStatus("generating");
+    setCurrentStep(0);
+    setError("");
+    setResult(null);
+    setGenerated(null);
+    setStreamText("");
+    setIntentResult(null);
+
+    try {
+      // ── Step 0: Intent analysis ──────────────────────────────
+      const intentRes = await fetch("/api/keywords/intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyword: activeKeyword }),
+      });
+
+      if (!intentRes.ok) {
+        const data = await intentRes.json();
+        throw new Error(data.error || "Erreur lors de l'analyse d'intention");
+      }
+
+      const intentData = await intentRes.json() as { analysis: IntentResult };
+      const analysis = intentData.analysis;
+      setIntentResult(analysis);
+
+      // Block if decision is "ignore" or "optimize"
+      if (analysis.decision === "ignore" || analysis.decision === "optimize") {
+        setStatus("intent-blocked");
+        return;
+      }
+
+      // ── Steps 1-3: Generate + publish ────────────────────────
+      await runGeneration();
     } catch (err: unknown) {
-      clearInterval(stepTimer);
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
+      setStatus("error");
+    }
+  }
+
+  async function forceGenerate() {
+    setStatus("generating");
+    setError("");
+    setResult(null);
+    setGenerated(null);
+    try {
+      await runGeneration();
+    } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
       setStatus("error");
     }
@@ -328,7 +371,7 @@ export default function GeneratePage() {
         </div>
 
         {/* ── Formulaire ── */}
-        {status === "idle" || status === "error" ? (
+        {(status === "idle" || status === "error") ? (
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
             {/* Keyword picker — Smart suggestions */}
@@ -729,6 +772,141 @@ export default function GeneratePage() {
               >
                 Publier l&apos;article →
               </button>
+            </div>
+          </div>
+
+        ) : status === "intent-blocked" && intentResult ? (
+          /* ── Intent blocked ── */
+          <div className="flex flex-col gap-5">
+            <div
+              className="rounded-2xl overflow-hidden"
+              style={{
+                background: "#090909",
+                border: intentResult.decision === "ignore"
+                  ? "1px solid rgba(239,68,68,0.25)"
+                  : "1px solid rgba(59,130,246,0.25)",
+              }}
+            >
+              <div
+                className="h-0.5 w-full"
+                style={{
+                  background: intentResult.decision === "ignore"
+                    ? "linear-gradient(90deg, #ef4444, #f97316)"
+                    : "linear-gradient(90deg, #3b82f6, #8b5cf6)",
+                }}
+              />
+
+              <div className="p-7">
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-5">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-lg"
+                    style={{
+                      background: intentResult.decision === "ignore"
+                        ? "rgba(239,68,68,0.15)"
+                        : "rgba(59,130,246,0.15)",
+                    }}
+                  >
+                    {intentResult.decision === "ignore" ? "⛔" : "🔄"}
+                  </div>
+                  <div>
+                    <p
+                      className="font-black text-sm uppercase tracking-wide"
+                      style={{
+                        color: intentResult.decision === "ignore" ? "#f87171" : "#60a5fa",
+                      }}
+                    >
+                      {intentResult.decision === "ignore"
+                        ? "Mot-clé non recommandé"
+                        : "Page existante détectée"}
+                    </p>
+                    <p className="text-gray-500 text-xs">
+                      Analyse d&apos;intention pour &quot;{activeKeyword}&quot;
+                    </p>
+                  </div>
+                </div>
+
+                {/* Analysis details */}
+                <div className="flex flex-col gap-3 mb-6">
+                  {/* Intent type + risk */}
+                  <div className="flex gap-2">
+                    <span
+                      className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase"
+                      style={{ background: "rgba(249,115,22,0.12)", color: "#f97316" }}
+                    >
+                      {intentResult.intent_type}
+                    </span>
+                    <span
+                      className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase"
+                      style={{
+                        background: intentResult.risk_level === "high"
+                          ? "rgba(239,68,68,0.12)"
+                          : intentResult.risk_level === "medium"
+                          ? "rgba(234,179,8,0.12)"
+                          : "rgba(34,197,94,0.12)",
+                        color: intentResult.risk_level === "high"
+                          ? "#f87171"
+                          : intentResult.risk_level === "medium"
+                          ? "#facc15"
+                          : "#4ade80",
+                      }}
+                    >
+                      Risque {intentResult.risk_level}
+                    </span>
+                  </div>
+
+                  {/* User intent */}
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Intention réelle</p>
+                    <p className="text-gray-300 text-sm leading-relaxed">{intentResult.user_intent}</p>
+                  </div>
+
+                  {/* SERP analysis */}
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Analyse SERP</p>
+                    <p className="text-gray-300 text-sm leading-relaxed">{intentResult.serp_analysis}</p>
+                  </div>
+
+                  {/* Justification */}
+                  <div
+                    className="rounded-xl p-4"
+                    style={{
+                      background: intentResult.decision === "ignore"
+                        ? "rgba(239,68,68,0.06)"
+                        : "rgba(59,130,246,0.06)",
+                      border: intentResult.decision === "ignore"
+                        ? "1px solid rgba(239,68,68,0.15)"
+                        : "1px solid rgba(59,130,246,0.15)",
+                    }}
+                  >
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      {intentResult.decision === "ignore" ? "Pourquoi ne pas créer cette page" : "Recommandation"}
+                    </p>
+                    <p className="text-gray-300 text-sm leading-relaxed">{intentResult.justification}</p>
+                    {intentResult.cannibalization_target && (
+                      <p className="text-blue-400 text-sm font-bold mt-2">
+                        Page existante : {intentResult.cannibalization_target}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setStatus("idle"); setIntentResult(null); }}
+                    className="flex-1 px-5 py-3 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-gray-300 font-bold text-sm transition-all"
+                  >
+                    Choisir un autre mot-clé
+                  </button>
+                  <button
+                    onClick={forceGenerate}
+                    className="flex-1 px-5 py-3 rounded-xl border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 font-bold text-sm transition-all"
+                  >
+                    Générer quand même
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
