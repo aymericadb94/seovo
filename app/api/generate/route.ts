@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const limited = rateLimit(user.id, { name: "generate", maxRequests: 10, windowSeconds: 600 });
     if (limited) return limited;
 
-    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position, keyword_strategy, content_structure } = await request.json();
+    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position, keyword_strategy, content_structure, featured_snippet } = await request.json();
 
     // Récupérer les credentials WP pour analyser la DA du site
     let styleGuide = "";
@@ -152,13 +152,28 @@ Featured snippet : section "${struct.featured_snippet_section.title}" (type: ${s
 IMPORTANT : Suis EXACTEMENT cette structure. Utilise ces titres H1/H2/H3 tels quels (tu peux ajuster légèrement la formulation si nécessaire pour la fluidité). La section featured snippet doit être optimisée pour la position 0.`
       : "";
 
+    // Build featured snippet context
+    type SnippetData = { snippet_type: string; snippet_text: string; structured_version: string[]; placement: string; integration_text: string };
+    const snip = featured_snippet as SnippetData | undefined;
+    const snippetContext = snip
+      ? `\n\nFEATURED SNIPPET PRÉ-GÉNÉRÉ (à intégrer tel quel dans l'article) :
+Type : ${snip.snippet_type}
+Placement : ${snip.placement}
+Titre d'introduction : ${snip.integration_text}
+Texte du snippet : ${snip.snippet_text}
+Version structurée :
+${snip.structured_version.map((item: string, i: number) => `${snip.snippet_type === "steps" ? `${i + 1}.` : "-"} ${item}`).join("\n")}
+
+IMPORTANT : Intègre ce featured snippet EXACTEMENT comme fourni. Place-le ${snip.placement === "top" ? "juste après le H1, avant l'introduction" : "après les 2 premiers paragraphes de l'introduction"}. Utilise le titre "${snip.integration_text}" comme H2 d'introduction du snippet. Ne régénère PAS le featured_snippet dans ta sortie JSON — utilise celui-ci.`
+      : "";
+
     const systemPrompt = `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
 
     const userPrompt = `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
 LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
 
-MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}${keywordContext}${structureContext}
+MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}${keywordContext}${structureContext}${snippetContext}
 
 ---
 

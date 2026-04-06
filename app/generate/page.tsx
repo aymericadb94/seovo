@@ -57,6 +57,15 @@ type PositionResult = {
   justification: string;
 };
 
+type FeaturedSnippetResult = {
+  snippet_type: "definition" | "list" | "steps";
+  snippet_text: string;
+  structured_version: string[];
+  placement: "top" | "after_intro";
+  integration_text: string;
+  justification: string;
+};
+
 type ContentStructureResult = {
   h1: string;
   h2_structure: {
@@ -119,6 +128,16 @@ const STEPS = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
         <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+      </svg>
+    ),
+  },
+  {
+    id: "snippet",
+    label: "Featured snippet (position 0)",
+    sub: "Bloc optimisé pour capturer la position 0 Google",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
       </svg>
     ),
   },
@@ -225,9 +244,10 @@ export default function GeneratePage() {
   const [positionResult, setPositionResult] = useState<PositionResult | null>(null);
   const [keywordStrategy, setKeywordStrategy] = useState<KeywordStrategyResult | null>(null);
   const [contentStructure, setContentStructure] = useState<ContentStructureResult | null>(null);
+  const [featuredSnippet, setFeaturedSnippet] = useState<FeaturedSnippetResult | null>(null);
 
   async function runGeneration() {
-    setCurrentStep(4);
+    setCurrentStep(5);
     setStreamText("");
 
     const genRes = await fetch("/api/generate?stream=1", {
@@ -242,6 +262,7 @@ export default function GeneratePage() {
         cocoon_position: positionResult ?? undefined,
         keyword_strategy: keywordStrategy ?? undefined,
         content_structure: contentStructure ?? undefined,
+        featured_snippet: featuredSnippet ?? undefined,
       }),
     });
 
@@ -281,7 +302,7 @@ export default function GeneratePage() {
         }
       }
 
-      setCurrentStep(5); // "Optimisation SEO"
+      setCurrentStep(6); // "Optimisation SEO"
 
       // Parse the full JSON from streamed text
       const parseJson = (text: string) => {
@@ -333,6 +354,7 @@ export default function GeneratePage() {
     setPositionResult(null);
     setKeywordStrategy(null);
     setContentStructure(null);
+    setFeaturedSnippet(null);
 
     try {
       // ── Step 0: Intent analysis ──────────────────────────────
@@ -444,7 +466,38 @@ export default function GeneratePage() {
       }
       // Non-blocking: if structure fails, continue without it
 
-      // ── Steps 4-6: Generate + publish ────────────────────────
+      // ── Step 4: Featured snippet ─────────────────────────────
+      setCurrentStep(4);
+
+      const snippetRes = await fetch("/api/content/snippet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: activeKeyword,
+          intent_analysis: {
+            intent_type: analysis.intent_type,
+            user_intent: analysis.user_intent,
+            recommended_content_type: analysis.recommended_content_type,
+            angle: analysis.angle,
+          },
+          content_structure: contentStructure ? {
+            h1: contentStructure.h1,
+            featured_snippet_section: contentStructure.featured_snippet_section,
+          } : undefined,
+          keyword_strategy: keywordStrategy ? {
+            primary_keyword: keywordStrategy.primary_keyword,
+            seo_angle: keywordStrategy.seo_angle,
+          } : undefined,
+        }),
+      });
+
+      if (snippetRes.ok) {
+        const snippetData = await snippetRes.json() as { snippet: FeaturedSnippetResult };
+        setFeaturedSnippet(snippetData.snippet);
+      }
+      // Non-blocking: if snippet fails, generate will create its own
+
+      // ── Steps 5-7: Generate + publish ────────────────────────
       await runGeneration();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
@@ -466,7 +519,7 @@ export default function GeneratePage() {
   }
 
   async function publishArticle(article: GeneratedArticle) {
-    setCurrentStep(6);
+    setCurrentStep(7);
     setStatus("publishing");
 
     try {
