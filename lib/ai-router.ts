@@ -130,7 +130,7 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
 
   content_generation: 8000,
   content_enrichment: 4000,
-  meta_optimization: 500,
+  meta_optimization: 3000,
   linking_enrichment: 500,
   recalc_intermediate: 4000,
   seo_engine_execution: 8000,

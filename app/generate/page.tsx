@@ -216,6 +216,16 @@ const STEPS = [
     ),
   },
   {
+    id: "meta",
+    label: "Optimisation title & meta",
+    sub: "Title SEO et meta description optimisés pour le CTR",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M4 7h16"/><path d="M4 12h10"/><path d="M4 17h6"/>
+      </svg>
+    ),
+  },
+  {
     id: "publish",
     label: "Publication sur votre site",
     sub: "Envoi automatique vers votre CMS",
@@ -524,10 +534,50 @@ export default function GeneratePage() {
         // Non-blocking: if audit fails, use current content
       }
 
+      // ── Step 11: Meta optimization (title & meta description) ──
+      setCurrentStep(11);
+
+      let optimizedTitle = parsed.title;
+      let optimizedMeta = parsed.meta_description ?? "";
+
+      try {
+        const metaRes = await fetch("/api/content/meta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            primary_keyword: keywordStrategy?.primary_keyword || activeKeyword,
+            secondary_keywords: keywordStrategy?.secondary_keywords,
+            content_summary: articleContent.slice(0, 500).replace(/<[^>]+>/g, ""),
+            intent_analysis: intentResult ? {
+              intent_type: intentResult.intent_type,
+              user_intent: intentResult.user_intent,
+              recommended_content_type: intentResult.recommended_content_type,
+              angle: intentResult.angle,
+            } : undefined,
+            seo_angle: keywordStrategy?.seo_angle,
+            language,
+          }),
+        });
+
+        if (metaRes.ok) {
+          const metaData = await metaRes.json() as {
+            meta: { titles: string[]; meta_descriptions: string[] };
+          };
+          if (metaData.meta?.titles?.[0]) {
+            optimizedTitle = metaData.meta.titles[0];
+          }
+          if (metaData.meta?.meta_descriptions?.[0]) {
+            optimizedMeta = metaData.meta.meta_descriptions[0];
+          }
+        }
+      } catch {
+        // Non-blocking: if meta optimization fails, use original title/meta
+      }
+
       const article: GeneratedArticle = {
-        title: parsed.title,
+        title: optimizedTitle,
         content: articleContent,
-        meta_description: parsed.meta_description ?? "",
+        meta_description: optimizedMeta,
         cover_image_query: parsed.pexels_query ?? null,
         cover_alt_text: parsed.cover_alt_text ?? null,
       };
@@ -760,7 +810,7 @@ export default function GeneratePage() {
   }
 
   async function publishArticle(article: GeneratedArticle) {
-    setCurrentStep(11);
+    setCurrentStep(12);
     setStatus("publishing");
 
     try {
@@ -790,8 +840,8 @@ export default function GeneratePage() {
 
       setResult({ title: article.title, url: data.url, meta: article.meta_description });
 
-      // ── Step 12: Roadmap integration (non-blocking) ─────────────────
-      setCurrentStep(12);
+      // ── Step 13: Roadmap integration (non-blocking) ─────────────────
+      setCurrentStep(13);
       try {
         await fetch("/api/roadmap/integrate", {
           method: "POST",
