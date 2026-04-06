@@ -57,6 +57,20 @@ type PositionResult = {
   justification: string;
 };
 
+type EditorialPlanResult = {
+  sections: {
+    title: string;
+    objective: string;
+    content_points: string[];
+    examples: string[];
+    seo_notes: string;
+    importance: "high" | "medium" | "low";
+  }[];
+  content_flow: string;
+  differentiation_points: string[];
+  global_strategy: string;
+};
+
 type FeaturedSnippetResult = {
   snippet_type: "definition" | "list" | "steps";
   snippet_text: string;
@@ -138,6 +152,16 @@ const STEPS = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+      </svg>
+    ),
+  },
+  {
+    id: "editorial",
+    label: "Plan éditorial détaillé",
+    sub: "Contenu, exemples et différenciation par section",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
       </svg>
     ),
   },
@@ -245,9 +269,10 @@ export default function GeneratePage() {
   const [keywordStrategy, setKeywordStrategy] = useState<KeywordStrategyResult | null>(null);
   const [contentStructure, setContentStructure] = useState<ContentStructureResult | null>(null);
   const [featuredSnippet, setFeaturedSnippet] = useState<FeaturedSnippetResult | null>(null);
+  const [editorialPlan, setEditorialPlan] = useState<EditorialPlanResult | null>(null);
 
   async function runGeneration() {
-    setCurrentStep(5);
+    setCurrentStep(6);
     setStreamText("");
 
     const genRes = await fetch("/api/generate?stream=1", {
@@ -263,6 +288,7 @@ export default function GeneratePage() {
         keyword_strategy: keywordStrategy ?? undefined,
         content_structure: contentStructure ?? undefined,
         featured_snippet: featuredSnippet ?? undefined,
+        editorial_plan: editorialPlan ?? undefined,
       }),
     });
 
@@ -302,7 +328,7 @@ export default function GeneratePage() {
         }
       }
 
-      setCurrentStep(6); // "Optimisation SEO"
+      setCurrentStep(7); // "Optimisation SEO"
 
       // Parse the full JSON from streamed text
       const parseJson = (text: string) => {
@@ -355,6 +381,7 @@ export default function GeneratePage() {
     setKeywordStrategy(null);
     setContentStructure(null);
     setFeaturedSnippet(null);
+    setEditorialPlan(null);
 
     try {
       // ── Step 0: Intent analysis ──────────────────────────────
@@ -497,7 +524,46 @@ export default function GeneratePage() {
       }
       // Non-blocking: if snippet fails, generate will create its own
 
-      // ── Steps 5-7: Generate + publish ────────────────────────
+      // ── Step 5: Editorial plan ───────────────────────────────
+      setCurrentStep(5);
+
+      const editRes = await fetch("/api/content/editorial-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: activeKeyword,
+          intent_analysis: {
+            intent_type: analysis.intent_type,
+            user_intent: analysis.user_intent,
+            recommended_content_type: analysis.recommended_content_type,
+            angle: analysis.angle,
+          },
+          content_structure: contentStructure ? {
+            h1: contentStructure.h1,
+            h2_structure: contentStructure.h2_structure,
+            featured_snippet_section: contentStructure.featured_snippet_section,
+          } : undefined,
+          keyword_strategy: keywordStrategy ? {
+            primary_keyword: keywordStrategy.primary_keyword,
+            secondary_keywords: keywordStrategy.secondary_keywords,
+            semantic_field: keywordStrategy.semantic_field,
+            seo_angle: keywordStrategy.seo_angle,
+          } : undefined,
+          featured_snippet: featuredSnippet ? {
+            snippet_type: featuredSnippet.snippet_type,
+            snippet_text: featuredSnippet.snippet_text,
+            placement: featuredSnippet.placement,
+          } : undefined,
+        }),
+      });
+
+      if (editRes.ok) {
+        const editData = await editRes.json() as { plan: EditorialPlanResult };
+        setEditorialPlan(editData.plan);
+      }
+      // Non-blocking: if editorial plan fails, continue without it
+
+      // ── Steps 6-8: Generate + publish ────────────────────────
       await runGeneration();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
@@ -519,7 +585,7 @@ export default function GeneratePage() {
   }
 
   async function publishArticle(article: GeneratedArticle) {
-    setCurrentStep(7);
+    setCurrentStep(8);
     setStatus("publishing");
 
     try {

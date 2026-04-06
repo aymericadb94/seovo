@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const limited = rateLimit(user.id, { name: "generate", maxRequests: 10, windowSeconds: 600 });
     if (limited) return limited;
 
-    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position, keyword_strategy, content_structure, featured_snippet } = await request.json();
+    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position, keyword_strategy, content_structure, featured_snippet, editorial_plan } = await request.json();
 
     // Récupérer les credentials WP pour analyser la DA du site
     let styleGuide = "";
@@ -167,13 +167,32 @@ ${snip.structured_version.map((item: string, i: number) => `${snip.snippet_type 
 IMPORTANT : Intègre ce featured snippet EXACTEMENT comme fourni. Place-le ${snip.placement === "top" ? "juste après le H1, avant l'introduction" : "après les 2 premiers paragraphes de l'introduction"}. Utilise le titre "${snip.integration_text}" comme H2 d'introduction du snippet. Ne régénère PAS le featured_snippet dans ta sortie JSON — utilise celui-ci.`
       : "";
 
+    // Build editorial plan context
+    type EditSection = { title: string; objective: string; content_points: string[]; examples: string[]; seo_notes: string; importance: string };
+    type EditPlan = { sections: EditSection[]; content_flow: string; differentiation_points: string[]; global_strategy: string };
+    const editPlan = editorial_plan as EditPlan | undefined;
+    const editorialContext = editPlan
+      ? `\n\nPLAN ÉDITORIAL DÉTAILLÉ (suis ce plan pour chaque section) :
+Stratégie globale : ${editPlan.global_strategy}
+Progression : ${editPlan.content_flow}
+Points différenciants à intégrer : ${editPlan.differentiation_points.join(" | ")}
+
+${editPlan.sections.map((s: EditSection) => `--- ${s.title} [${s.importance}] ---
+Objectif : ${s.objective}
+Points à couvrir : ${s.content_points.join(" ; ")}
+Exemples à inclure : ${s.examples.join(" ; ")}
+SEO : ${s.seo_notes}`).join("\n\n")}
+
+IMPORTANT : Suis ce plan section par section. Chaque section doit couvrir les points listés, inclure les exemples suggérés, et intégrer les termes SEO indiqués. Les sections marquées "high" doivent être les plus développées.`
+      : "";
+
     const systemPrompt = `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
 
     const userPrompt = `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
 LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
 
-MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}${keywordContext}${structureContext}${snippetContext}
+MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}${keywordContext}${structureContext}${snippetContext}${editorialContext}
 
 ---
 
