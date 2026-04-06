@@ -226,6 +226,16 @@ const STEPS = [
     ),
   },
   {
+    id: "final-check",
+    label: "Contrôle final qualité",
+    sub: "Validation globale avant publication",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    ),
+  },
+  {
     id: "publish",
     label: "Publication sur votre site",
     sub: "Envoi automatique vers votre CMS",
@@ -574,6 +584,47 @@ export default function GeneratePage() {
         // Non-blocking: if meta optimization fails, use original title/meta
       }
 
+      // ── Step 12: Final quality check ──────────────────────────
+      setCurrentStep(12);
+
+      try {
+        const checkRes = await fetch("/api/content/final-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: articleContent,
+            title: optimizedTitle,
+            meta_description: optimizedMeta,
+            primary_keyword: keywordStrategy?.primary_keyword || activeKeyword,
+            seo_structure: contentStructure ? {
+              h1: contentStructure.h1,
+              sections: contentStructure.h2_structure?.map(s => ({
+                h2: s.title,
+                subsections: s.h3?.map(h3 => ({ h3 })),
+              })),
+            } : undefined,
+            cocoon_positioning: positionResult ? {
+              page_type: positionResult.page_type,
+              seo_role: positionResult.seo_role,
+              pillar_relation: positionResult.pillar_relation,
+              risk_level: positionResult.risk_level,
+            } : undefined,
+            language,
+          }),
+        });
+
+        if (checkRes.ok) {
+          const checkData = await checkRes.json() as {
+            check: { final_content: string; final_verdict: string };
+          };
+          if (checkData.check?.final_content && checkData.check.final_verdict !== "rewrite") {
+            articleContent = checkData.check.final_content;
+          }
+        }
+      } catch {
+        // Non-blocking: if final check fails, use current content
+      }
+
       const article: GeneratedArticle = {
         title: optimizedTitle,
         content: articleContent,
@@ -810,7 +861,7 @@ export default function GeneratePage() {
   }
 
   async function publishArticle(article: GeneratedArticle) {
-    setCurrentStep(12);
+    setCurrentStep(13);
     setStatus("publishing");
 
     try {
@@ -840,8 +891,8 @@ export default function GeneratePage() {
 
       setResult({ title: article.title, url: data.url, meta: article.meta_description });
 
-      // ── Step 13: Roadmap integration (non-blocking) ─────────────────
-      setCurrentStep(13);
+      // ── Step 14: Roadmap integration (non-blocking) ─────────────────
+      setCurrentStep(14);
       try {
         await fetch("/api/roadmap/integrate", {
           method: "POST",

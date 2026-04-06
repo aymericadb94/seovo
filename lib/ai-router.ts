@@ -53,6 +53,7 @@ export type TaskType =
   | "internal_linking"        // Intelligent internal link insertion
   | "roadmap_integration"     // Post-publish roadmap strategy update
   | "content_audit"           // SEO over-optimization & AI detection audit
+  | "final_check"             // Final quality gate before publication
 
   // ── EXECUTION tasks (default: Sonnet) ──
   | "content_generation"      // Article writing
@@ -90,6 +91,7 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
   internal_linking: "sonnet",
   roadmap_integration: "sonnet",
   content_audit: "sonnet",
+  final_check: "sonnet",
 
   // Execution (Sonnet)
   content_generation: "sonnet",
@@ -127,6 +129,7 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   internal_linking: 10000,
   roadmap_integration: 4000,
   content_audit: 10000,
+  final_check: 10000,
 
   content_generation: 8000,
   content_enrichment: 4000,
