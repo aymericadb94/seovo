@@ -104,6 +104,15 @@ type KeywordStrategyResult = {
   justification: string;
 };
 
+type PreGenData = {
+  intent?: IntentResult | null;
+  position?: PositionResult | null;
+  keywords?: KeywordStrategyResult | null;
+  structure?: ContentStructureResult | null;
+  snippet?: FeaturedSnippetResult | null;
+  editorial?: EditorialPlanResult | null;
+};
+
 const STEPS = [
   {
     id: "intent",
@@ -330,15 +339,6 @@ export default function GeneratePage() {
   const [contentStructure, setContentStructure] = useState<ContentStructureResult | null>(null);
   const [featuredSnippet, setFeaturedSnippet] = useState<FeaturedSnippetResult | null>(null);
   const [editorialPlan, setEditorialPlan] = useState<EditorialPlanResult | null>(null);
-
-  type PreGenData = {
-    intent?: IntentResult | null;
-    position?: PositionResult | null;
-    keywords?: KeywordStrategyResult | null;
-    structure?: ContentStructureResult | null;
-    snippet?: FeaturedSnippetResult | null;
-    editorial?: EditorialPlanResult | null;
-  };
 
   async function runGeneration(preGen: PreGenData = {}) {
     const localIntent = preGen.intent ?? null;
@@ -654,7 +654,7 @@ export default function GeneratePage() {
       if (previewMode) {
         setStatus("preview");
       } else {
-        await publishArticle(article);
+        await publishArticle(article, localPosition);
       }
   }
 
@@ -882,9 +882,11 @@ export default function GeneratePage() {
 
   async function forceGenerate() {
     setStatus("generating");
+    setCurrentStep(6);
     setError("");
     setResult(null);
     setGenerated(null);
+    setStreamText("");
     try {
       await runGeneration();
     } catch (err: unknown) {
@@ -893,9 +895,12 @@ export default function GeneratePage() {
     }
   }
 
-  async function publishArticle(article: GeneratedArticle) {
+  async function publishArticle(article: GeneratedArticle, position?: PositionResult | null) {
     setCurrentStep(13);
     setStatus("publishing");
+
+    // Use passed position (from runGeneration) or fall back to state (from preview button)
+    const pos = position ?? positionResult;
 
     try {
       const pubRes = await fetch("/api/publish", {
@@ -934,12 +939,12 @@ export default function GeneratePage() {
             keyword: activeKeyword,
             title: article.title,
             url: data.url,
-            cocoon_positioning: positionResult ? {
-              page_type: positionResult.page_type,
-              seo_role: positionResult.seo_role,
-              priority: positionResult.priority,
-              pillar_relation: positionResult.pillar_relation,
-              risk_level: positionResult.risk_level,
+            cocoon_positioning: pos ? {
+              page_type: pos.page_type,
+              seo_role: pos.seo_role,
+              priority: pos.priority,
+              pillar_relation: pos.pillar_relation,
+              risk_level: pos.risk_level,
             } : undefined,
           }),
         });
