@@ -186,9 +186,12 @@ SEO : ${s.seo_notes}`).join("\n\n")}
 IMPORTANT : Suis ce plan section par section. Chaque section doit couvrir les points listés, inclure les exemples suggérés, et intégrer les termes SEO indiqués. Les sections marquées "high" doivent être les plus développées.`
       : "";
 
-    const systemPrompt = `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
+    // Determine if we have pre-generated data (enriched mode) or not (legacy mode)
+    const hasPreGenData = !!(struct || editPlan || snip || kwStrat);
 
-    const userPrompt = `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
+    const systemPrompt = `Tu es un rédacteur SEO senior (10+ ans d'expérience), spécialisé dans la rédaction web naturelle, le SEO avancé, la création de contenu qui rank sur Google, et l'UX/lisibilité. Chaque article que tu produis est unique, profond, utile et génère du trafic organique réel. Tu n'écris JAMAIS de contenu générique, répétitif ou robotique. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
+
+    const userPrompt = `Tu es un rédacteur SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
 LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
 
@@ -196,62 +199,62 @@ MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${co
 
 ---
 
-MISSION : Générer un article de blog parfaitement optimisé pour le SEO.
+MISSION : Rédiger un article SEO complet, naturel et de haute qualité.
+
+${hasPreGenData ? `Tu disposes de données pré-analysées (structure SEO, plan éditorial, featured snippet, stratégie de mots-clés, positionnement cocon). SUIS ces données — elles sont le fruit d'une analyse stratégique en amont. Ne les ignore pas, ne les réinvente pas.` : ""}
 
 ---
 
-PARTIE 1 — STRUCTURE SEO
-- 1 H1 avec le mot-clé intégré naturellement
-- Plusieurs H2 / H3 logiques et hiérarchisés
-- Paragraphes aérés, structure fluide
-- Aucune répétition abusive de mots-clés
+RÈGLES DE RÉDACTION :
 
-PARTIE 2 — INTRODUCTION (150-200 mots)
-- Accroche naturelle et percutante
-- Reformulation du besoin utilisateur
-- Annonce claire du contenu
+1. INTRODUCTION (150-200 mots)
+- Accroche qui capte immédiatement l'attention (question, stat, problème).
+- Reformule le besoin réel de l'utilisateur (pas le mot-clé littéral).
+- Annonce clairement ce que l'article va apporter.
+- Ton : expert mais accessible, comme un collègue senior qui explique.
 
-PARTIE 3 — FEATURED SNIPPET (OBLIGATOIRE — généré dans le champ "featured_snippet" ET intégré au début du contenu)
-- Répond directement à la requête en 2 à 4 lignes OU sous forme de liste
-- Format : H2 avec le mot-clé sous forme de question, suivi d'un <p> de 40-60 mots
-- Si guide/tutoriel : ajouter un <ol> avec 4-8 étapes concises
-- Si comparatif : ajouter un <table> avec 2-4 colonnes et 3-6 lignes
-- Si définition : commencer par "[Mot-clé] est..."
+2. FEATURED SNIPPET
+${snip ? "- Le featured snippet a été pré-généré. Intègre-le TEL QUEL dans le contenu à l'emplacement indiqué. Ne le régénère pas." : "- Crée un bloc featured snippet : H2 sous forme de question + réponse directe en 40-60 mots. Si guide → <ol> avec 4-8 étapes. Si comparatif → <table>. Si définition → commencer par \"[Sujet] est...\"."}
 
-PARTIE 4 — CONTENU PRINCIPAL (1200-1800 mots)
-- 4 à 6 sections H2 bien structurées avec H3 si nécessaire
-- Paragraphes courts (3-4 lignes max)
-- Exemples concrets liés au secteur "${industry ?? "e-commerce"}"
-- Chiffres et statistiques pour la crédibilité
-- Listes à puces pour la lisibilité
-- Ton : expert mais accessible, jamais robotique
-- Densité mot-clé : naturelle, 1-2% maximum
+3. CONTENU PRINCIPAL (1200-1800 mots)
+${editPlan ? "- Suis le plan éditorial section par section. Chaque section doit couvrir les points listés et inclure les exemples suggérés." : `- 4 à 6 sections H2 bien structurées avec H3 si nécessaire.
+- Exemples concrets liés au secteur "${industry ?? "e-commerce"}".`}
+- Paragraphes courts (3-4 lignes max). Aucun mur de texte.
+- Listes à puces pour la lisibilité quand pertinent.
+- Chiffres, données, statistiques pour la crédibilité.
+- Chaque section apporte une valeur UNIQUE — aucune répétition entre sections.
+- Transitions naturelles entre sections.
 
-PARTIE 5 — FAQ (3-4 questions)
-- Questions réellement posées par l'audience cible
-- Chaque réponse : 40-60 mots max (pouvant aussi être capturée comme featured snippet)
+4. FAQ (3-4 questions)
+- Questions réellement posées par l'audience cible.
+- Réponses directes : 40-60 mots chacune (optimisées featured snippet).
+- Ne PAS répéter le contenu des sections précédentes.
 
-PARTIE 6 — CONCLUSION (100-150 mots)
-- Résumé synthétique
-- Call-to-action fort
+5. CONCLUSION (100-150 mots)
+- Résumé synthétique des points clés.
+- Call-to-action fort et naturel.
+- Aucune répétition mot-à-mot du contenu.
 
-PARTIE 7 — MAILLAGE INTERNE
-Propose 2 à 4 liens internes avec ancrage naturel en lien avec la thématique.
+6. MAILLAGE INTERNE
+${cocoonPos ? "- Les liens sortants obligatoires sont définis ci-dessus. Intègre-les naturellement dans le texte avec les ancres recommandées." : "- Propose 2 à 4 liens internes avec ancrage naturel."}
 
-PARTIE 8 — IMAGE
-Génère une requête Pexels précise et cohérente avec le sujet (3-5 mots-clés en anglais).
+7. IMAGE
+- Génère une requête Pexels précise (3-5 mots-clés en anglais).
 
-PARTIE 9 — MÉTA DONNÉES
-- title SEO : optimisé CTR, 50-60 caractères, contient le mot-clé
-- meta_description : 150-160 caractères, incitative et naturelle
+8. MÉTA DONNÉES
+- title SEO : optimisé CTR, 50-60 caractères, contient le mot-clé.
+- meta_description : 150-160 caractères, incitative, naturelle.
 
 ---
 
-ANTI-SPAM / QUALITÉ (IMPÉRATIF) :
-- Aucune sur-optimisation
-- Aucun contenu générique
-- Aucune répétition excessive
-- Le contenu doit sembler écrit par un humain expert
+QUALITÉ — RÈGLES ABSOLUES :
+
+- Écrit par un humain expert, PAS par une IA. Aucune formule générique ("il est important de noter", "dans le monde actuel", "en conclusion").
+- Aucune sur-optimisation. Densité mot-clé principal < 2%.
+- Aucun contenu de remplissage. Chaque phrase apporte de la valeur.
+- Varier la longueur des phrases. Alterner phrases courtes et développées.
+- Utiliser la voix active. Être direct et concret.
+- Les exemples doivent être spécifiques et crédibles, pas génériques.
 
 ---
 
@@ -259,14 +262,14 @@ FORMAT DE SORTIE : JSON valide uniquement, aucun texte avant ou après.
 
 {
   "title": "Le H1 optimisé",
-  "meta_description": "La meta description de 150-160 caractères",
-  "featured_snippet": "Le bloc featured snippet en HTML pur (h2 + p, ou h2 + p + ol/table)",
-  "content": "Le contenu HTML complet de l'article (sans le featured_snippet qui est déjà inclus au début)",
+  "meta_description": "Meta description de 150-160 caractères",
+  "featured_snippet": "${snip ? "Reprends le featured snippet pré-généré en HTML (h2 + p + liste/table)" : "Le bloc featured snippet en HTML pur"}",
+  "content": "Le contenu HTML complet de l'article (SANS le featured_snippet, qui est séparé)",
   "internal_links": [
     { "anchor": "texte d'ancrage naturel", "target": "slug-ou-url-cible" }
   ],
   "pexels_query": "3-5 english keywords for stock photo",
-  "cover_alt_text": "Texte alt SEO de l'image, 8-12 mots, inclut le mot-clé, dans la langue de l'article"
+  "cover_alt_text": "Texte alt SEO, 8-12 mots, inclut le mot-clé, dans la langue de l'article"
 }
 
 HTML autorisé : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. Pas de <html>, <body>, <head>.`;
