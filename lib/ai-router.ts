@@ -131,7 +131,7 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   content_audit: 10000,
   final_check: 10000,
 
-  content_generation: 8000,
+  content_generation: 16000,
   content_enrichment: 4000,
   meta_optimization: 3000,
   linking_enrichment: 500,
@@ -334,17 +334,21 @@ export function aiCallStream(
           ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
         });
 
+        let stopReason = "";
         for await (const event of response) {
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             fullText += event.delta.text;
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ type: "delta", text: event.delta.text })}\n\n`)
             );
+          } else if (event.type === "message_delta") {
+            const delta = event.delta as { stop_reason?: string };
+            if (delta.stop_reason) stopReason = delta.stop_reason;
           }
         }
 
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ type: "done", text: fullText })}\n\n`)
+          encoder.encode(`data: ${JSON.stringify({ type: "done", text: fullText, stop_reason: stopReason })}\n\n`)
         );
       } catch (err) {
         controller.enqueue(

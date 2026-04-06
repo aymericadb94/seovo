@@ -387,12 +387,15 @@ export default function GeneratePage() {
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
             try {
-              const event = JSON.parse(line.slice(6)) as { type: string; text?: string; error?: string };
+              const event = JSON.parse(line.slice(6)) as { type: string; text?: string; error?: string; stop_reason?: string };
               if (event.type === "delta" && event.text) {
                 fullText += event.text;
                 setStreamText(fullText);
               } else if (event.type === "done" && event.text) {
                 fullText = event.text;
+                if (event.stop_reason === "max_tokens") {
+                  console.warn("[generate] Response truncated (max_tokens hit)");
+                }
               } else if (event.type === "error") {
                 throw new Error(event.error || "Erreur de génération");
               }
@@ -404,13 +407,25 @@ export default function GeneratePage() {
         }
       }
 
-      // Parse the full JSON from streamed text
+      // Parse the full JSON from streamed text (with truncation repair)
       const parseJson = (text: string) => {
         try { return JSON.parse(text); } catch { /* continue */ }
         const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
         if (codeBlock) try { return JSON.parse(codeBlock[1]); } catch { /* continue */ }
         const s = text.indexOf("{"), e = text.lastIndexOf("}");
         if (s !== -1 && e > s) try { return JSON.parse(text.slice(s, e + 1)); } catch { /* continue */ }
+        // Attempt to repair truncated JSON (missing closing braces/quotes)
+        if (s !== -1) {
+          let truncated = text.slice(s);
+          // Close any open string
+          const quoteCount = (truncated.match(/(?<!\\)"/g) || []).length;
+          if (quoteCount % 2 !== 0) truncated += '"';
+          // Close open braces/brackets
+          const opens = (truncated.match(/[{[]/g) || []).length;
+          const closes = (truncated.match(/[}\]]/g) || []).length;
+          for (let i = 0; i < opens - closes; i++) truncated += "}";
+          try { return JSON.parse(truncated); } catch { /* continue */ }
+        }
         return null;
       };
 
@@ -420,7 +435,8 @@ export default function GeneratePage() {
       } | null;
 
       if (!parsed?.title || !parsed?.content) {
-        throw new Error("Impossible de lire la réponse générée");
+        console.error("[generate] Parse failed. fullText length:", fullText.length, "parsed:", parsed, "first 500 chars:", fullText.slice(0, 500));
+        throw new Error("Impossible de lire la réponse générée — le contenu a peut-être été tronqué. Réessayez.");
       }
 
       let articleContent = parsed.featured_snippet ? parsed.featured_snippet + "\n" + parsed.content : parsed.content;
