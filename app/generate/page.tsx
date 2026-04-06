@@ -57,6 +57,19 @@ type PositionResult = {
   justification: string;
 };
 
+type ContentStructureResult = {
+  h1: string;
+  h2_structure: {
+    title: string;
+    h3: string[];
+  }[];
+  featured_snippet_section: {
+    type: "definition" | "list" | "answer";
+    title: string;
+    reason: string;
+  };
+};
+
 type KeywordStrategyResult = {
   primary_keyword: string;
   secondary_keywords: string[];
@@ -96,6 +109,16 @@ const STEPS = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
         <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+      </svg>
+    ),
+  },
+  {
+    id: "structure",
+    label: "Structure SEO de la page",
+    sub: "H1, H2, H3, featured snippet optimisés",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
       </svg>
     ),
   },
@@ -201,9 +224,10 @@ export default function GeneratePage() {
   const [intentResult, setIntentResult] = useState<IntentResult | null>(null);
   const [positionResult, setPositionResult] = useState<PositionResult | null>(null);
   const [keywordStrategy, setKeywordStrategy] = useState<KeywordStrategyResult | null>(null);
+  const [contentStructure, setContentStructure] = useState<ContentStructureResult | null>(null);
 
   async function runGeneration() {
-    setCurrentStep(3);
+    setCurrentStep(4);
     setStreamText("");
 
     const genRes = await fetch("/api/generate?stream=1", {
@@ -217,6 +241,7 @@ export default function GeneratePage() {
         language,
         cocoon_position: positionResult ?? undefined,
         keyword_strategy: keywordStrategy ?? undefined,
+        content_structure: contentStructure ?? undefined,
       }),
     });
 
@@ -256,7 +281,7 @@ export default function GeneratePage() {
         }
       }
 
-      setCurrentStep(4); // "Optimisation SEO"
+      setCurrentStep(5); // "Optimisation SEO"
 
       // Parse the full JSON from streamed text
       const parseJson = (text: string) => {
@@ -307,6 +332,7 @@ export default function GeneratePage() {
     setIntentResult(null);
     setPositionResult(null);
     setKeywordStrategy(null);
+    setContentStructure(null);
 
     try {
       // ── Step 0: Intent analysis ──────────────────────────────
@@ -383,7 +409,42 @@ export default function GeneratePage() {
       }
       // Non-blocking: if strategy fails, continue with original keyword
 
-      // ── Steps 3-5: Generate + publish ────────────────────────
+      // ── Step 3: Content structure ────────────────────────────
+      setCurrentStep(3);
+
+      const structRes = await fetch("/api/content/structure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: activeKeyword,
+          intent_analysis: {
+            intent_type: analysis.intent_type,
+            user_intent: analysis.user_intent,
+            recommended_content_type: analysis.recommended_content_type,
+            angle: analysis.angle,
+            serp_analysis: analysis.serp_analysis,
+          },
+          cocoon_positioning: positionResult ? {
+            page_type: positionResult.page_type,
+            seo_role: positionResult.seo_role,
+            pillar_relation: positionResult.pillar_relation,
+          } : undefined,
+          keyword_strategy: keywordStrategy ? {
+            primary_keyword: keywordStrategy.primary_keyword,
+            secondary_keywords: keywordStrategy.secondary_keywords,
+            semantic_field: keywordStrategy.semantic_field,
+            seo_angle: keywordStrategy.seo_angle,
+          } : undefined,
+        }),
+      });
+
+      if (structRes.ok) {
+        const structData = await structRes.json() as { structure: ContentStructureResult };
+        setContentStructure(structData.structure);
+      }
+      // Non-blocking: if structure fails, continue without it
+
+      // ── Steps 4-6: Generate + publish ────────────────────────
       await runGeneration();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
@@ -405,7 +466,7 @@ export default function GeneratePage() {
   }
 
   async function publishArticle(article: GeneratedArticle) {
-    setCurrentStep(5);
+    setCurrentStep(6);
     setStatus("publishing");
 
     try {

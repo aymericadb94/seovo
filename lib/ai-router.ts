@@ -45,6 +45,7 @@ export type TaskType =
   | "intent_analysis"         // Search intent analysis before content creation
   | "cocoon_positioning"      // Strategic page positioning within cocoon
   | "keyword_strategy"        // Keyword strategy: primary, secondary, semantic field
+  | "content_structure"       // SEO content structure: H1, H2, H3, featured snippet
 
   // ── EXECUTION tasks (default: Sonnet) ──
   | "content_generation"      // Article writing
@@ -74,6 +75,7 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
   intent_analysis: "opus",
   cocoon_positioning: "opus",
   keyword_strategy: "sonnet",
+  content_structure: "sonnet",
 
   // Execution (Sonnet)
   content_generation: "sonnet",
@@ -103,6 +105,7 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   intent_analysis: 2000,
   cocoon_positioning: 4000,
   keyword_strategy: 3000,
+  content_structure: 3000,
 
   content_generation: 8000,
   content_enrichment: 4000,

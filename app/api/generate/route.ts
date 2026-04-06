@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const limited = rateLimit(user.id, { name: "generate", maxRequests: 10, windowSeconds: 600 });
     if (limited) return limited;
 
-    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position, keyword_strategy } = await request.json();
+    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position, keyword_strategy, content_structure } = await request.json();
 
     // Récupérer les credentials WP pour analyser la DA du site
     let styleGuide = "";
@@ -139,13 +139,26 @@ Angle SEO : ${kwStrat.seo_angle}
 IMPORTANT : Intègre les mots-clés secondaires et le champ sémantique de manière naturelle et fluide. Densité mot-clé principal < 2%. Ne force jamais un terme.`
       : "";
 
+    // Build content structure context
+    type H2Entry = { title: string; h3: string[] };
+    type StructureData = { h1: string; h2_structure: H2Entry[]; featured_snippet_section: { type: string; title: string } };
+    const struct = content_structure as StructureData | undefined;
+    const structureContext = struct
+      ? `\n\nSTRUCTURE SEO IMPOSÉE (définie par l'analyse pré-rédaction) :
+H1 : ${struct.h1}
+${struct.h2_structure.map((h2: H2Entry) => `H2 : ${h2.title}\n${h2.h3.map((h3: string) => `  H3 : ${h3}`).join("\n")}`).join("\n")}
+Featured snippet : section "${struct.featured_snippet_section.title}" (type: ${struct.featured_snippet_section.type})
+
+IMPORTANT : Suis EXACTEMENT cette structure. Utilise ces titres H1/H2/H3 tels quels (tu peux ajuster légèrement la formulation si nécessaire pour la fluidité). La section featured snippet doit être optimisée pour la position 0.`
+      : "";
+
     const systemPrompt = `Tu es un expert senior en référencement SEO (10+ ans d'expérience), spécialisé dans la création de contenus SEO à forte valeur, le maillage interne intelligent, l'optimisation sémantique naturelle et la rédaction web orientée performance Google. Chaque article que tu produis est unique, créatif et génère du trafic organique réel. Tu n'écris jamais de contenu générique ou répétitif. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
 
     const userPrompt = `Tu es un expert SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
 LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
 
-MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}${keywordContext}
+MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}${keywordContext}${structureContext}
 
 ---
 
