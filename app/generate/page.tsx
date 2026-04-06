@@ -215,6 +215,16 @@ const STEPS = [
       </svg>
     ),
   },
+  {
+    id: "roadmap",
+    label: "Intégration roadmap",
+    sub: "Mise à jour de la stratégie SEO globale",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-10"/>
+      </svg>
+    ),
+  },
 ];
 
 const SOURCE_BADGES: Record<string, { label: string; color: string; bg: string }> = {
@@ -741,6 +751,31 @@ export default function GeneratePage() {
       }
 
       setResult({ title: article.title, url: data.url, meta: article.meta_description });
+
+      // ── Step 11: Roadmap integration (non-blocking) ─────────────────
+      setCurrentStep(11);
+      try {
+        await fetch("/api/roadmap/integrate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            keyword: activeKeyword,
+            title: article.title,
+            url: data.url,
+            cocoon_positioning: positionResult ? {
+              page_type: positionResult.page_type,
+              seo_role: positionResult.seo_role,
+              priority: positionResult.priority,
+              pillar_relation: positionResult.pillar_relation,
+              risk_level: positionResult.risk_level,
+            } : undefined,
+          }),
+        });
+      } catch {
+        // Non-blocking — failure doesn't affect published page
+        console.warn("[roadmap-integrate] Non-blocking error, skipping");
+      }
+
       setStatus("done");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
