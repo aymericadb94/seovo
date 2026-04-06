@@ -269,7 +269,7 @@ export async function executeSeoActions(
 
       switch (action.type) {
         case "add_internal_links": {
-          const result = await executeAddLinks(creds, action);
+          const result = await executeAddLinks(creds, action, supabase, userId);
           results.push(result);
 
           if (result.executed) {
@@ -337,7 +337,9 @@ export async function executeSeoActions(
 
 async function executeAddLinks(
   creds: CmsCredentials,
-  action: SeoAction
+  action: SeoAction,
+  supabase?: SupabaseClient,
+  userId?: string
 ): Promise<ExecutionResult> {
   const links = (action.details.links ?? []) as LinkInjection[];
   if (links.length === 0) {
@@ -396,10 +398,16 @@ async function executeAddLinks(
     };
   }
 
-  // Apply update
-  const extra = creds.cms === "shopify" && "blog_id" in post
-    ? { blog_id: (post as CmsPost & { blog_id: number }).blog_id }
-    : undefined;
+  // Apply update (with snapshot for rollback)
+  const extra: { blog_id?: number; supabase?: SupabaseClient; userId?: string; actionType?: string } = {};
+  if (creds.cms === "shopify" && "blog_id" in post) {
+    extra.blog_id = (post as CmsPost & { blog_id: number }).blog_id;
+  }
+  if (supabase && userId) {
+    extra.supabase = supabase;
+    extra.userId = userId;
+    extra.actionType = "add_internal_links";
+  }
 
   const updateResult = await updateCmsPost(creds, action.target_post_id, { content: html }, extra);
 

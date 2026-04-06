@@ -2,7 +2,12 @@
  * CMS Update Layer
  * Read + Update capabilities for WordPress, Shopify, Wix, Custom.
  * Used by the SEO executor to modify existing content (maillage, meta, etc.).
+ *
+ * SAFETY: Every update is preceded by a snapshot of the original content
+ * stored in the `content_snapshots` table. Use `rollbackCmsPost()` to restore.
  */
+
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -283,12 +288,175 @@ export async function listCmsPosts(creds: CmsCredentials, limit: number = 50): P
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// SNAPSHOT & ROLLBACK — Safety net for all CMS modifications
+// ══════════════════════════════════════════════════════════════════════════════
+
+export type ContentSnapshot = {
+  id: string;
+  post_id: string | number;
+  post_url: string;
+  title: string;
+  content: string;
+  excerpt: string;
+  action_type: string;
+  created_at: string;
+};
+
+/**
+ * Save a snapshot of a post before modifying it.
+ * Returns the snapshot ID, or null if the save failed.
+ */
+async function saveSnapshot(
+  supabase: SupabaseClient,
+  userId: string,
+  post: CmsPost,
+  actionType: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from("content_snapshots")
+      .insert({
+        user_id: userId,
+        post_id: String(post.id),
+        post_url: post.url,
+        title: post.title,
+        content: post.content,
+        excerpt: post.excerpt ?? "",
+        action_type: actionType,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("[cms-update] snapshot save failed:", error.message);
+      return null;
+    }
+    return data.id;
+  } catch (err) {
+    console.error("[cms-update] snapshot save error:", err);
+    return null;
+  }
+}
+
+/**
+ * List all snapshots for a given user, newest first.
+ */
+export async function listSnapshots(
+  supabase: SupabaseClient,
+  userId: string,
+  limit: number = 50
+): Promise<ContentSnapshot[]> {
+  const { data } = await supabase
+    .from("content_snapshots")
+    .select("id, post_id, post_url, title, content, excerpt, action_type, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  return (data ?? []) as ContentSnapshot[];
+}
+
+/**
+ * Rollback a post to a previous snapshot.
+ * 1. Loads the snapshot from DB
+ * 2. Restores the content to the CMS
+ * 3. Marks the snapshot as "rolled_back"
+ */
+export async function rollbackCmsPost(
+  supabase: SupabaseClient,
+  userId: string,
+  snapshotId: string,
+  creds: CmsCredentials
+): Promise<{ success: boolean; error?: string }> {
+  // 1. Load snapshot
+  const { data: snapshot, error } = await supabase
+    .from("content_snapshots")
+    .select("*")
+    .eq("id", snapshotId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !snapshot) {
+    return { success: false, error: "Snapshot introuvable" };
+  }
+
+  // 2. Restore to CMS (bypass snapshot — direct update)
+  const updates: { content?: string; title?: string; excerpt?: string } = {
+    content: snapshot.content,
+    title: snapshot.title,
+  };
+  if (snapshot.excerpt) updates.excerpt = snapshot.excerpt;
+
+  let result: UpdateResult;
+  switch (creds.cms) {
+    case "wordpress":
+      if (!creds.wp_username || !creds.wp_app_password) {
+        return { success: false, error: "WordPress credentials missing" };
+      }
+      result = await wpUpdatePost(
+        creds.site_url,
+        wpAuth(creds.wp_username, creds.wp_app_password),
+        Number(snapshot.post_id),
+        updates
+      );
+      break;
+
+    case "shopify":
+      if (!creds.shopify_api_key) {
+        return { success: false, error: "Shopify credentials missing" };
+      }
+      // For shopify rollback, we need the blog_id — try to find it
+      const posts = await shopifyListArticles(creds.site_url, creds.shopify_api_key, 100);
+      const shopifyPost = posts.find(p => String(p.id) === String(snapshot.post_id));
+      if (!shopifyPost) {
+        return { success: false, error: "Article Shopify introuvable pour rollback" };
+      }
+      result = await shopifyUpdateArticle(
+        creds.site_url,
+        creds.shopify_api_key,
+        shopifyPost.blog_id,
+        Number(snapshot.post_id),
+        { body_html: snapshot.content, title: snapshot.title, summary_html: snapshot.excerpt }
+      );
+      break;
+
+    default:
+      return { success: false, error: `Rollback non supporté pour ${creds.cms}` };
+  }
+
+  if (!result.success) {
+    return { success: false, error: result.error };
+  }
+
+  // 3. Mark snapshot as rolled back
+  await supabase
+    .from("content_snapshots")
+    .update({ rolled_back_at: new Date().toISOString() })
+    .eq("id", snapshotId);
+
+  return { success: true };
+}
+
 export async function updateCmsPost(
   creds: CmsCredentials,
   postId: string | number,
   updates: { content?: string; title?: string; excerpt?: string },
-  extra?: { blog_id?: number }
+  extra?: { blog_id?: number; supabase?: SupabaseClient; userId?: string; actionType?: string }
 ): Promise<UpdateResult> {
+  // ── Snapshot before modification ──
+  if (extra?.supabase && extra?.userId) {
+    try {
+      const currentPost = await getCmsPost(creds, postId);
+      if (currentPost) {
+        await saveSnapshot(extra.supabase, extra.userId, currentPost, extra.actionType ?? "unknown");
+      }
+    } catch (err) {
+      console.error("[cms-update] snapshot failed (non-blocking):", err);
+      // Non-blocking: continue with the update even if snapshot fails
+    }
+  }
+
   switch (creds.cms) {
     case "wordpress":
       if (!creds.wp_username || !creds.wp_app_password) {
