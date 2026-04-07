@@ -99,16 +99,15 @@ const SHOPIFY_TUTORIAL = {
   title: "Comment connecter Shopify",
   permissions: ["write_content — Publier des articles de blog", "read_content — Lire les blogs existants"],
   steps: [
-    { num: "01", title: "Ouvrez votre admin Shopify", detail: "Connectez-vous à votre boutique et allez dans :", path: ["Paramètres", "Applications et canaux de vente"] },
-    { num: "02", title: "Activez le développement d'apps", detail: "En haut, cliquez sur \"Développer des applications\". Si c'est la première fois, cliquez sur \"Autoriser le développement d'applications personnalisées\" et confirmez." },
-    { num: "03", title: "Créez une application personnalisée", detail: "Cliquez sur \"Créer une application\". Donnez-lui le nom :", code: "RankPill" },
-    { num: "04", title: "Configurez les scopes API Admin", detail: "Cliquez sur \"Configurer les champs d'application de l'API Admin\". Cherchez et activez :", permissions: true },
-    { num: "05", title: "Sauvegardez", detail: "Cliquez sur \"Enregistrer\" en haut à droite pour valider les permissions." },
-    { num: "06", title: "Installez l'application", detail: "Allez dans l'onglet \"Clés d'API\" et cliquez sur \"Installer l'application\". Confirmez l'installation." },
-    { num: "07", title: "Copiez le token Admin API", detail: "Après l'installation, le token s'affiche. Copiez-le immédiatement :", code: "Jeton d'accès à l'API Admin (shpat_...)" },
-    { num: "08", title: "Collez le token dans le champ", detail: "Revenez ici et collez le token dans le champ \"Clé API Admin Shopify\" à gauche." },
+    { num: "01", title: "Ouvrez le Dev Dashboard", detail: "Dans votre admin Shopify, allez dans :", path: ["Paramètres", "Applications", "Développer des applications dans le Dev Dashboard"] },
+    { num: "02", title: "Créez une nouvelle app", detail: "Sur le Dev Dashboard (dev.shopify.com), cliquez sur \"Create an app\". Donnez-lui le nom :", code: "RankPill" },
+    { num: "03", title: "Configurez l'API Admin", detail: "Dans votre app, allez dans \"Configuration\" puis \"Admin API integration\". Activez les permissions :", permissions: true },
+    { num: "04", title: "Créez une version", detail: "Allez dans \"Versions\" → \"Créer une version\". Validez la création." },
+    { num: "05", title: "Installez l'app sur votre boutique", detail: "Dans la section \"Installations\", cliquez sur \"Installer l'application\" et confirmez sur votre boutique." },
+    { num: "06", title: "Récupérez le token Admin API", detail: "Après l'installation, allez dans \"Configuration\" → \"Admin API integration\". Le jeton d'accès apparait. Copiez-le :", code: "Jeton d'accès à l'API Admin (shpat_...)" },
+    { num: "07", title: "Collez le token dans le champ", detail: "Revenez ici et collez le token dans le champ \"Clé API Admin Shopify\" à gauche." },
   ],
-  warning: "Le token ne s'affiche qu'une seule fois après l'installation. Si vous l'avez manqué, désinstallez et réinstallez l'app. Ne passez PAS par dev.shopify.com (Partners) — restez dans l'admin de votre boutique.",
+  warning: "Attention : le token commence par shpat_. Ne confondez pas avec le Client ID ou le Secret (dans \"Paramètres\" de l'app) — ce ne sont PAS les bons identifiants. Le token Admin API se trouve dans \"Configuration\" → \"Admin API integration\" après installation.",
 };
 
 const WIX_TUTORIAL = {
