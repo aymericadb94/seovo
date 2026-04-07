@@ -63,6 +63,7 @@ export async function PATCH(request: Request) {
         wp_username: body.wp_username || null,
         wp_app_password: body.wp_app_password || null,
         shopify_api_key: body.shopify_api_key || null,
+        shopify_store_url: body.shopify_store_url || null,
         wix_api_key: body.wix_api_key || null,
         wix_site_id: body.wix_site_id || null,
         custom_api_url: body.custom_api_url || null,

@@ -45,18 +45,18 @@ export async function POST(request: Request) {
 
     if (body.cms === "shopify") {
       try {
-        const baseUrl = (body.site_url as string).replace(/\/$/, "");
-        if (!baseUrl.includes(".myshopify.com")) {
-          return Response.json({ error: "L'URL Shopify doit être au format https://nom-boutique.myshopify.com" }, { status: 400 });
+        const shopifyStoreUrl = ((body.shopify_store_url || body.site_url) as string).replace(/\/$/, "");
+        if (!shopifyStoreUrl.includes(".myshopify.com")) {
+          return Response.json({ error: "L'URL Shopify (.myshopify.com) est requise pour la connexion API." }, { status: 400 });
         }
-        const testRes = await fetch(`${baseUrl}/admin/api/2024-01/shop.json`, {
+        const testRes = await fetch(`${shopifyStoreUrl}/admin/api/2025-10/shop.json`, {
           headers: {
             "X-Shopify-Access-Token": body.shopify_api_key,
             "Content-Type": "application/json",
           },
         });
         if (!testRes.ok) {
-          return Response.json({ error: "Connexion Shopify échouée. Vérifiez l'URL et la clé API." }, { status: 400 });
+          return Response.json({ error: "Connexion Shopify échouée. Vérifiez l'URL .myshopify.com et la clé API." }, { status: 400 });
         }
       } catch {
         return Response.json({ error: "Impossible de joindre la boutique Shopify. Vérifiez l'URL." }, { status: 400 });
@@ -94,6 +94,7 @@ export async function POST(request: Request) {
       wp_username: body.wp_username || null,
       wp_app_password: body.wp_app_password || null,
       shopify_api_key: body.shopify_api_key || null,
+      shopify_store_url: body.shopify_store_url || null,
       wix_api_key: body.wix_api_key || null,
       wix_site_id: body.wix_site_id || null,
       wix_member_id: wixMemberId,

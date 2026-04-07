@@ -2,7 +2,7 @@ import { testWixConnection } from "@/lib/wix";
 
 export async function POST(request: Request) {
   try {
-    const { cms, siteUrl, wpUsername, wpAppPassword, shopifyApiKey, wixApiKey, wixSiteId, customApiUrl, customApiKey } = await request.json();
+    const { cms, siteUrl, shopifyStoreUrl, wpUsername, wpAppPassword, shopifyApiKey, wixApiKey, wixSiteId, customApiUrl, customApiKey } = await request.json();
 
     if (!cms) {
       return Response.json({ ok: false, reason: "CMS manquant" }, { status: 400 });
@@ -35,15 +35,15 @@ export async function POST(request: Request) {
       if (!shopifyApiKey) {
         return Response.json({ ok: false, reason: "Clé API Shopify manquante" }, { status: 400 });
       }
-      const baseUrl = siteUrl.replace(/\/$/, "");
-      // Shopify Admin API requires the .myshopify.com domain
-      if (!baseUrl.includes(".myshopify.com")) {
+      // Use shopifyStoreUrl for API calls (the .myshopify.com URL)
+      const apiUrl = (shopifyStoreUrl || siteUrl || "").replace(/\/$/, "");
+      if (!apiUrl.includes(".myshopify.com")) {
         return Response.json({
           ok: false,
-          reason: "L'URL doit être au format https://nom-boutique.myshopify.com (pas votre domaine custom)",
+          reason: "L'URL Shopify (.myshopify.com) est requise pour la connexion API",
         });
       }
-      const res = await fetch(`${baseUrl}/admin/api/2024-01/shop.json`, {
+      const res = await fetch(`${apiUrl}/admin/api/2025-10/shop.json`, {
         headers: { "X-Shopify-Access-Token": shopifyApiKey },
       });
       if (res.ok) {
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         return Response.json({ ok: false, reason: "Clé API invalide ou permissions insuffisantes" });
       }
       if (res.status === 404) {
-        return Response.json({ ok: false, reason: "Boutique Shopify introuvable — vérifiez l'URL (.myshopify.com)" });
+        return Response.json({ ok: false, reason: "Boutique Shopify introuvable — vérifiez l'URL .myshopify.com" });
       }
       return Response.json({ ok: false, reason: `Erreur ${res.status} — vérifiez l'URL et la clé API` });
     }

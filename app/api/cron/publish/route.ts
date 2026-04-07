@@ -80,19 +80,19 @@ Respond ONLY with bullet points, no intro or conclusion:
 
 // ─── Analyse du site Shopify ──────────────────────────────────────────────────
 
-async function analyzeShopifySite(storeUrl: string, apiKey: string) {
+async function analyzeShopifySite(storeUrl: string, apiKey: string, _publicUrl?: string) {
   try {
     const baseUrl = storeUrl.replace(/\/$/, "");
     const headers = { "X-Shopify-Access-Token": apiKey };
 
-    const blogsRes = await fetch(`${baseUrl}/admin/api/2024-01/blogs.json`, { headers });
+    const blogsRes = await fetch(`${baseUrl}/admin/api/2025-10/blogs.json`, { headers });
     if (!blogsRes.ok) return { existingTitles: [], styleGuide: "" };
     const blogsData = await blogsRes.json() as { blogs: { id: number }[] };
     if (!blogsData.blogs?.length) return { existingTitles: [], styleGuide: "" };
 
     const blogId = blogsData.blogs[0].id;
     const articlesRes = await fetch(
-      `${baseUrl}/admin/api/2024-01/blogs/${blogId}/articles.json?limit=5&fields=title,body_html`,
+      `${baseUrl}/admin/api/2025-10/blogs/${blogId}/articles.json?limit=5&fields=title,body_html`,
       { headers }
     );
     if (!articlesRes.ok) return { existingTitles: [], styleGuide: "" };
@@ -295,15 +295,17 @@ async function publishToWordPress(
 async function publishToShopify(
   storeUrl: string, apiKey: string,
   title: string, content: string, metaDescription: string,
-  imageUrl?: string | null, imageAlt?: string | null
+  imageUrl?: string | null, imageAlt?: string | null,
+  publicUrl?: string
 ) {
-  const baseUrl = storeUrl.replace(/\/$/, "");
+  const apiBase = storeUrl.replace(/\/$/, "");
+  const publicBase = (publicUrl ?? storeUrl).replace(/\/$/, "");
   const headers = {
     "Content-Type": "application/json",
     "X-Shopify-Access-Token": apiKey,
   };
 
-  const blogsRes = await fetch(`${baseUrl}/admin/api/2024-01/blogs.json`, { headers });
+  const blogsRes = await fetch(`${apiBase}/admin/api/2025-10/blogs.json`, { headers });
   if (!blogsRes.ok) throw new Error(`Shopify blogs: ${await blogsRes.text()}`);
   const blogsData = await blogsRes.json();
 
@@ -313,7 +315,7 @@ async function publishToShopify(
     blogId = blogsData.blogs[0].id;
     blogHandle = blogsData.blogs[0].handle;
   } else {
-    const createBlogRes = await fetch(`${baseUrl}/admin/api/2024-01/blogs.json`, {
+    const createBlogRes = await fetch(`${apiBase}/admin/api/2025-10/blogs.json`, {
       method: "POST",
       headers,
       body: JSON.stringify({ blog: { title: "Actualités SEO" } }),
@@ -324,7 +326,7 @@ async function publishToShopify(
     blogHandle = newBlog.blog.handle;
   }
 
-  const articleRes = await fetch(`${baseUrl}/admin/api/2024-01/blogs/${blogId}/articles.json`, {
+  const articleRes = await fetch(`${apiBase}/admin/api/2025-10/blogs/${blogId}/articles.json`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -339,7 +341,7 @@ async function publishToShopify(
   });
   if (!articleRes.ok) throw new Error(`Shopify article: ${await articleRes.text()}`);
   const article = await articleRes.json();
-  return `${baseUrl}/blogs/${blogHandle}/${article.article.handle}`;
+  return `${publicBase}/blogs/${blogHandle}/${article.article.handle}`;
 }
 
 export const maxDuration = 300;
@@ -418,7 +420,7 @@ export async function GET(request: Request) {
           existingTitles = analysis.existingTitles;
           styleGuide = analysis.styleGuide;
         } else if (site.cms === "shopify") {
-          const analysis = await analyzeShopifySite(site.site_url, site.shopify_api_key);
+          const analysis = await analyzeShopifySite(site.shopify_store_url || site.site_url, site.shopify_api_key);
           existingTitles = analysis.existingTitles;
           styleGuide = analysis.styleGuide;
         } else if (site.cms === "wix") {
@@ -527,8 +529,9 @@ export async function GET(request: Request) {
               }
             }
             publishedUrl = await publishToShopify(
-              site.site_url, site.shopify_api_key,
-              title, content, meta_description, shopifyImageUrl, cover_alt_text ?? null
+              site.shopify_store_url || site.site_url, site.shopify_api_key,
+              title, content, meta_description, shopifyImageUrl, cover_alt_text ?? null,
+              site.site_url
             );
           } else if (site.cms === "wix") {
             publishedUrl = await publishToWix(

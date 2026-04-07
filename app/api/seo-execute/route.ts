@@ -18,7 +18,7 @@ export const maxDuration = 120;
 async function getSiteAndCreds(supabase: any, userId: string) {
   const { data: site } = await supabase
     .from("sites")
-    .select("id, cms, site_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, custom_api_url, custom_api_key, gsc_site_url, keywords, seo_context")
+    .select("id, cms, site_url, shopify_store_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, custom_api_url, custom_api_key, gsc_site_url, keywords, seo_context")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -30,6 +30,7 @@ async function getSiteAndCreds(supabase: any, userId: string) {
     wp_username: site.wp_username,
     wp_app_password: site.wp_app_password,
     shopify_api_key: site.shopify_api_key,
+    shopify_store_url: site.shopify_store_url,
     wix_api_key: site.wix_api_key,
     wix_site_id: site.wix_site_id,
     custom_api_url: site.custom_api_url,

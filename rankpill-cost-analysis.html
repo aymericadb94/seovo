@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Rankpill — Analyse des coûts IA & Stratégie Pricing</title>
+<style>
+  @page {
+    size: A4;
+    margin: 25mm 20mm 25mm 20mm;
+    @bottom-center {
+      content: "Rankpill — Analyse confidentielle — Avril 2026";
+      font-size: 8px;
+      color: #999;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " / " counter(pages);
+      font-size: 8px;
+      color: #999;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 10.5px;
+    line-height: 1.55;
+    color: #1a1a1a;
+  }
+
+  /* Cover */
+  .cover {
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    text-align: center;
+  }
+  .cover .logo {
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+  .cover .logo span { color: #f97316; }
+  .cover h1 {
+    font-size: 22px;
+    font-weight: 800;
+    color: #111;
+    margin-bottom: 6px;
+  }
+  .cover .subtitle {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 40px;
+  }
+  .cover .meta {
+    font-size: 10px;
+    color: #999;
+  }
+
+  /* Sections */
+  h2 {
+    font-size: 15px;
+    font-weight: 800;
+    color: #111;
+    border-bottom: 2px solid #f97316;
+    padding-bottom: 4px;
+    margin: 24px 0 12px 0;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 12px;
+    font-weight: 700;
+    color: #333;
+    margin: 16px 0 8px 0;
+    page-break-after: avoid;
+  }
+  p { margin: 6px 0; color: #333; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px 0;
+    font-size: 10px;
+  }
+  thead th {
+    background: #111;
+    color: white;
+    padding: 7px 8px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  tbody td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #eee;
+  }
+  tbody tr:nth-child(even) { background: #f9f9f9; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bold { font-weight: 700; }
+  .orange { color: #f97316; font-weight: 700; }
+  .red { color: #dc2626; }
+  .green { color: #16a34a; font-weight: 700; }
+  .highlight-row { background: #fff7ed !important; }
+
+  /* Callout */
+  .callout {
+    background: #fff7ed;
+    border-left: 3px solid #f97316;
+    padding: 10px 14px;
+    margin: 12px 0;
+    font-size: 10.5px;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout strong { color: #c2410c; }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .badge-opus { background: #fef3c7; color: #92400e; }
+  .badge-sonnet { background: #dbeafe; color: #1e40af; }
+  .badge-haiku { background: #dcfce7; color: #166534; }
+
+  /* Summary boxes */
+  .summary-grid {
+    display: flex;
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .summary-box {
+    flex: 1;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .summary-box .value {
+    font-size: 20px;
+    font-weight: 900;
+    color: #111;
+  }
+  .summary-box .label {
+    font-size: 9px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+
+  .page-break { page-break-before: always; }
+
+  ul { margin: 6px 0 6px 20px; }
+  li { margin: 3px 0; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ COVER ═══════════════════ -->
+<div class="cover">
+  <div class="logo">Rank<span>Pill</span></div>
+  <h1>Analyse des coûts IA & Stratégie Pricing</h1>
+  <p class="subtitle">Pipeline SEO automatisé — 15 étapes, 14 appels LLM</p>
+  <div style="width: 60px; height: 3px; background: #f97316; margin: 30px auto;"></div>
+  <p class="meta">Document confidentiel — Avril 2026</p>
+  <p class="meta">Modèles : Claude Opus 4 · Claude Sonnet 4 · Claude Haiku 3.5</p>
+</div>
+
+<!-- ═══════════════════ PAGE 1 ═══════════════════ -->
+
+<h2>1. Tarification API Anthropic</h2>
+
+<table>
+  <thead>
+    <tr><th>Modèle</th><th>Input (/ 1M tokens)</th><th>Output (/ 1M tokens)</th><th>Usage Rankpill</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="badge badge-opus">OPUS 4</span></td>
+      <td class="num">$15.00</td>
+      <td class="num bold">$75.00</td>
+      <td>Décisions stratégiques (intent, cocon)</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-sonnet">SONNET 4</span></td>
+      <td class="num">$3.00</td>
+      <td class="num bold">$15.00</td>
+      <td>Exécution (rédaction, enrichissement, audit)</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-haiku">HAIKU 3.5</span></td>
+      <td class="num">$0.80</td>
+      <td class="num bold">$4.00</td>
+      <td>Utilitaire (style extraction, formatting)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>2. Coût détaillé par étape — 1 génération complète</h2>
+
+<table>
+  <thead>
+    <tr><th>#</th><th>Étape</th><th>Modèle</th><th class="num">Input</th><th class="num">Output</th><th class="num">Coût input</th><th class="num">Coût output</th><th class="num">Total</th></tr>
+  </thead>
+  <tbody>
+    <tr class="highlight-row">
+      <td>0</td><td>Analyse d'intention</td>
+      <td><span class="badge badge-opus">OPUS</span></td>
+      <td class="num">1 200</td><td class="num">1 500</td>
+      <td class="num">$0.018</td><td class="num">$0.113</td>
+      <td class="num bold">$0.131</td>
+    </tr>
+    <tr class="highlight-row">
+      <td>1</td><td>Positionnement cocon</td>
+      <td><span class="badge badge-opus">OPUS</span></td>
+      <td class="num">1 800</td><td class="num">3 000</td>
+      <td class="num">$0.027</td><td class="num">$0.225</td>
+      <td class="num bold">$0.252</td>
+    </tr>
+    <tr>
+      <td>2</td><td>Stratégie mots-clés</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">1 500</td><td class="num">2 500</td>
+      <td class="num">$0.005</td><td class="num">$0.038</td>
+      <td class="num bold">$0.042</td>
+    </tr>
+    <tr>
+      <td>3</td><td>Structure contenu</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">1 400</td><td class="num">2 500</td>
+      <td class="num">$0.004</td><td class="num">$0.038</td>
+      <td class="num bold">$0.042</td>
+    </tr>
+    <tr>
+      <td>4</td><td>Featured snippet</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">1 200</td><td class="num">1 200</td>
+      <td class="num">$0.004</td><td class="num">$0.018</td>
+      <td class="num bold">$0.022</td>
+    </tr>
+    <tr>
+      <td>5</td><td>Plan éditorial</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">1 600</td><td class="num">4 000</td>
+      <td class="num">$0.005</td><td class="num">$0.060</td>
+      <td class="num bold">$0.065</td>
+    </tr>
+    <tr>
+      <td>6</td><td><strong>Génération SEO</strong></td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">3 500</td><td class="num">6 000</td>
+      <td class="num">$0.011</td><td class="num">$0.090</td>
+      <td class="num bold">$0.101</td>
+    </tr>
+    <tr>
+      <td>7</td><td>Enrichissement sémantique</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">5 500</td><td class="num">8 000</td>
+      <td class="num">$0.017</td><td class="num">$0.120</td>
+      <td class="num bold">$0.137</td>
+    </tr>
+    <tr>
+      <td>8</td><td>Valeur ajoutée</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">5 500</td><td class="num">8 000</td>
+      <td class="num">$0.017</td><td class="num">$0.120</td>
+      <td class="num bold">$0.137</td>
+    </tr>
+    <tr>
+      <td>9</td><td>Maillage interne</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">5 000</td><td class="num">7 000</td>
+      <td class="num">$0.015</td><td class="num">$0.105</td>
+      <td class="num bold">$0.120</td>
+    </tr>
+    <tr>
+      <td>10</td><td>Audit qualité SEO</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">6 000</td><td class="num">8 000</td>
+      <td class="num">$0.018</td><td class="num">$0.120</td>
+      <td class="num bold">$0.138</td>
+    </tr>
+    <tr>
+      <td>11</td><td>Optimisation meta/title</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">1 500</td><td class="num">800</td>
+      <td class="num">$0.005</td><td class="num">$0.012</td>
+      <td class="num bold">$0.017</td>
+    </tr>
+    <tr>
+      <td>12</td><td>Contrôle final</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">6 500</td><td class="num">8 000</td>
+      <td class="num">$0.020</td><td class="num">$0.120</td>
+      <td class="num bold">$0.140</td>
+    </tr>
+    <tr>
+      <td>13</td><td>Intégration roadmap</td>
+      <td><span class="badge badge-sonnet">SONNET</span></td>
+      <td class="num">2 000</td><td class="num">2 500</td>
+      <td class="num">$0.006</td><td class="num">$0.038</td>
+      <td class="num bold">$0.044</td>
+    </tr>
+    <tr style="background: #111; color: white;">
+      <td colspan="2" class="bold">TOTAL</td>
+      <td>14 appels</td>
+      <td class="num bold">44 200</td><td class="num bold">63 000</td>
+      <td class="num bold">$0.169</td><td class="num bold">$1.115</td>
+      <td class="num bold orange" style="color:#f97316; font-size: 12px;">$1.284</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="summary-grid">
+  <div class="summary-box">
+    <div class="value">$1.28</div>
+    <div class="label">Coût / génération</div>
+  </div>
+  <div class="summary-box">
+    <div class="value">107K</div>
+    <div class="label">Tokens / génération</div>
+  </div>
+  <div class="summary-box">
+    <div class="value">14</div>
+    <div class="label">Appels LLM</div>
+  </div>
+  <div class="summary-box">
+    <div class="value">29.8%</div>
+    <div class="label">Part Opus (2 appels)</div>
+  </div>
+</div>
+
+<div class="callout">
+  <strong>Observation clé :</strong> Les 2 appels Opus (intent + cocon) représentent <strong>30% du coût total</strong> alors qu'ils ne produisent que <strong>7% des tokens output</strong>. L'output Opus coûte 5× plus cher que Sonnet.
+</div>
+
+<!-- ═══════════════════ PAGE 2 ═══════════════════ -->
+<div class="page-break"></div>
+
+<h2>3. Répartition des coûts par modèle</h2>
+
+<table>
+  <thead>
+    <tr><th>Modèle</th><th class="num">Appels</th><th class="num">Coût total</th><th class="num">% du coût</th></tr>
+  </thead>
+  <tbody>
+    <tr class="highlight-row">
+      <td><span class="badge badge-opus">OPUS 4</span> (étapes 0-1)</td>
+      <td class="num">2</td>
+      <td class="num bold">$0.383</td>
+      <td class="num bold red">29.8%</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-sonnet">SONNET 4</span> (étapes 2-13)</td>
+      <td class="num">12</td>
+      <td class="num bold">$0.901</td>
+      <td class="num">70.2%</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>4. Top 6 des postes de coût</h2>
+
+<table>
+  <thead>
+    <tr><th>Rang</th><th>Étape</th><th class="num">Coût</th><th class="num">%</th><th>Cause principale</th></tr>
+  </thead>
+  <tbody>
+    <tr class="highlight-row">
+      <td class="bold">1</td><td>Positionnement cocon</td>
+      <td class="num bold">$0.252</td><td class="num red">19.6%</td>
+      <td>Opus output × 3 000 tokens</td>
+    </tr>
+    <tr>
+      <td class="bold">2</td><td>Contrôle final</td>
+      <td class="num bold">$0.140</td><td class="num">10.9%</td>
+      <td>Re-traite tout le HTML (6.5K in, 8K out)</td>
+    </tr>
+    <tr>
+      <td class="bold">3</td><td>Audit qualité SEO</td>
+      <td class="num bold">$0.138</td><td class="num">10.8%</td>
+      <td>Re-traite tout le HTML (6K in, 8K out)</td>
+    </tr>
+    <tr>
+      <td class="bold">4</td><td>Enrichissement sémantique</td>
+      <td class="num bold">$0.137</td><td class="num">10.6%</td>
+      <td>Régénère contenu enrichi complet</td>
+    </tr>
+    <tr>
+      <td class="bold">5</td><td>Valeur ajoutée</td>
+      <td class="num bold">$0.137</td><td class="num">10.6%</td>
+      <td>Régénère contenu amélioré complet</td>
+    </tr>
+    <tr>
+      <td class="bold">6</td><td>Analyse d'intention</td>
+      <td class="num bold">$0.131</td><td class="num">10.2%</td>
+      <td>Opus output même pour 1 500 tokens</td>
+    </tr>
+    <tr style="background: #fef2f2;">
+      <td colspan="2" class="bold">Sous-total top 6</td>
+      <td class="num bold red">$0.935</td>
+      <td class="num bold red">72.7%</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>5. Coût mensuel par profil utilisateur</h2>
+
+<table>
+  <thead>
+    <tr><th>Profil</th><th class="num">Gén./mois</th><th class="num">Coût/mois</th><th class="num">Coût/an</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Light</td><td class="num">10</td><td class="num">$12.84</td><td class="num">$154</td></tr>
+    <tr><td>Standard</td><td class="num">20</td><td class="num bold">$25.68</td><td class="num">$308</td></tr>
+    <tr><td>Actif</td><td class="num">30</td><td class="num">$38.52</td><td class="num">$462</td></tr>
+    <tr class="highlight-row"><td class="bold">Power user</td><td class="num bold">60</td><td class="num bold red">$77.04</td><td class="num bold">$924</td></tr>
+  </tbody>
+</table>
+
+<h2>6. Projection infrastructure (coût IA pur)</h2>
+
+<table>
+  <thead>
+    <tr><th>Utilisateurs</th><th class="num">Gén./mois</th><th class="num">Coût IA/mois</th><th class="num">Coût IA/an</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>100</td><td class="num">2 000</td><td class="num bold">$2 568</td><td class="num">$30 816</td></tr>
+    <tr><td>500</td><td class="num">10 000</td><td class="num bold">$12 840</td><td class="num">$154 080</td></tr>
+    <tr class="highlight-row"><td class="bold">1 000</td><td class="num">20 000</td><td class="num bold orange">$25 680</td><td class="num bold">$308 160</td></tr>
+    <tr><td>5 000</td><td class="num">100 000</td><td class="num bold">$128 400</td><td class="num">$1 540 800</td></tr>
+    <tr><td>10 000</td><td class="num">200 000</td><td class="num bold red">$256 800</td><td class="num bold">$3 081 600</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size: 9px; color: #999;">Hypothèse : 20 générations/mois en moyenne par utilisateur actif.</p>
+
+<!-- ═══════════════════ PAGE 3 ═══════════════════ -->
+<div class="page-break"></div>
+
+<h2>7. Optimisations recommandées</h2>
+
+<h3>Optimisation A — Downgrade Opus → Sonnet (impact : −24%)</h3>
+<p>L'intent analysis et le cocoon positioning sont des analyses structurées avec output JSON prédéterminé. Sonnet 4 est parfaitement capable de les exécuter.</p>
+
+<table>
+  <thead>
+    <tr><th>Étape</th><th class="num">Avant (Opus)</th><th class="num">Après (Sonnet)</th><th class="num">Économie</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Intent analysis</td><td class="num">$0.131</td><td class="num">$0.027</td><td class="num green">−$0.104</td></tr>
+    <tr><td>Cocoon positioning</td><td class="num">$0.252</td><td class="num">$0.052</td><td class="num green">−$0.200</td></tr>
+    <tr style="background: #f0fdf4;"><td class="bold">Total économisé</td><td></td><td></td><td class="num bold green">−$0.304/gen</td></tr>
+  </tbody>
+</table>
+
+<h3>Optimisation B — Fusionner audit + contrôle final (impact : −11%)</h3>
+<p>Ces deux étapes re-traitent le HTML complet avec un objectif similaire (détecter les défauts, corriger). Fusionner en une seule étape "Quality Gate" élimine un appel de ~$0.14.</p>
+
+<h3>Optimisation C — Fusionner enrichissement + valeur ajoutée (impact : −10%)</h3>
+<p>Même pattern : deux passes séparées sur le même HTML. Fusionner en une étape "Content Improvement" unique.</p>
+
+<h3>Optimisation D — Cache par keyword (impact variable)</h3>
+<p>Les étapes 0-5 (pré-génération) produisent le même résultat pour le même keyword + même site. Cache Redis/Supabase avec TTL 7 jours. Économie estimée : ~$0.03/gen en moyenne (15-25% cache hit).</p>
+
+<h3>Optimisation E — Truncate HTML dans les post-steps</h3>
+<p>Réduire le contenu injecté de 12-14K chars à 8K chars et envoyer un résumé structuré plutôt que le HTML brut. Réduction input de ~30%.</p>
+
+<h3>Impact cumulé des optimisations</h3>
+
+<table>
+  <thead>
+    <tr><th>Scénario</th><th class="num">Coût/gen</th><th class="num">Économie</th><th class="num">%</th></tr>
+  </thead>
+  <tbody>
+    <tr class="highlight-row"><td class="bold">Actuel</td><td class="num bold">$1.28</td><td class="num">—</td><td class="num">—</td></tr>
+    <tr><td>A : Sonnet everywhere</td><td class="num">$0.97</td><td class="num green">−$0.31</td><td class="num">−24%</td></tr>
+    <tr><td>A + B : Merge audit/check</td><td class="num">$0.83</td><td class="num green">−$0.45</td><td class="num">−35%</td></tr>
+    <tr><td>A + B + C : Merge enrich/enhance</td><td class="num">$0.70</td><td class="num green">−$0.58</td><td class="num">−45%</td></tr>
+    <tr style="background: #f0fdf4;"><td class="bold">A + B + C + D + E : Full optim</td><td class="num bold green">$0.60</td><td class="num bold green">−$0.68</td><td class="num bold green">−53%</td></tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════ PAGE 4 ═══════════════════ -->
+<div class="page-break"></div>
+
+<h2>8. Stratégie Pricing — Recommandation finale</h2>
+
+<p>Base de calcul : <strong>coût optimisé $0.70/génération</strong> (optimisations A + B + C appliquées).</p>
+
+<h3>Grille tarifaire recommandée</h3>
+
+<table>
+  <thead>
+    <tr><th>Plan</th><th class="num">Prix/mois</th><th class="num">Gén. incluses</th><th class="num">Extra gen.</th><th class="num">Coût IA</th><th class="num">Marge brute</th><th class="num">Marge %</th></tr>
+  </thead>
+  <tbody>
+    <tr style="background: #f9fafb;">
+      <td class="bold">Free</td>
+      <td class="num">$0</td>
+      <td class="num">2</td>
+      <td class="num">—</td>
+      <td class="num">$1.40</td>
+      <td class="num red">−$1.40</td>
+      <td class="num" style="color:#999;">accroche</td>
+    </tr>
+    <tr>
+      <td class="bold" style="color: #2563eb;">Starter</td>
+      <td class="num bold">$49</td>
+      <td class="num">20</td>
+      <td class="num">$2.50</td>
+      <td class="num">$14.00</td>
+      <td class="num green">$35.00</td>
+      <td class="num bold green">71%</td>
+    </tr>
+    <tr class="highlight-row">
+      <td class="bold" style="color: #f97316;">Pro</td>
+      <td class="num bold">$129</td>
+      <td class="num">60</td>
+      <td class="num">$2.00</td>
+      <td class="num">$42.00</td>
+      <td class="num green">$87.00</td>
+      <td class="num bold green">67%</td>
+    </tr>
+    <tr>
+      <td class="bold" style="color: #7c3aed;">Agency</td>
+      <td class="num bold">$299</td>
+      <td class="num">200</td>
+      <td class="num">$1.50</td>
+      <td class="num">$140.00</td>
+      <td class="num green">$159.00</td>
+      <td class="num bold">53%</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>Marge cible :</strong> Le plan Starter atteint <strong>71% de marge</strong> (objectif 70%+). Le plan Pro est à 67%, acceptable grâce au volume. Le plan Agency génère <strong>$159 de marge brute/mois</strong> par client — le volume compense la marge % plus faible.
+</div>
+
+<h3>Projection revenus vs coûts (base 1 000 utilisateurs)</h3>
+
+<table>
+  <thead>
+    <tr><th>Répartition</th><th class="num">Utilisateurs</th><th class="num">Revenus/mois</th><th class="num">Coûts IA/mois</th><th class="num">Marge brute</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Free</td><td class="num">600 (60%)</td><td class="num">$0</td><td class="num red">$840</td><td class="num red">−$840</td></tr>
+    <tr><td>Starter</td><td class="num">250 (25%)</td><td class="num">$12 250</td><td class="num">$3 500</td><td class="num green">$8 750</td></tr>
+    <tr><td>Pro</td><td class="num">120 (12%)</td><td class="num">$15 480</td><td class="num">$5 040</td><td class="num green">$10 440</td></tr>
+    <tr><td>Agency</td><td class="num">30 (3%)</td><td class="num">$8 970</td><td class="num">$4 200</td><td class="num green">$4 770</td></tr>
+    <tr style="background: #111; color: white;">
+      <td class="bold">Total</td>
+      <td class="num bold">1 000</td>
+      <td class="num bold" style="color:#f97316;">$36 700</td>
+      <td class="num bold">$13 580</td>
+      <td class="num bold" style="color:#4ade80;">$23 120 (63%)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>9. Plan d'exécution</h2>
+
+<table>
+  <thead>
+    <tr><th>Phase</th><th>Action</th><th class="num">Impact</th><th>Délai</th></tr>
+  </thead>
+  <tbody>
+    <tr style="background: #f0fdf4;">
+      <td class="bold">Phase 1</td>
+      <td>Downgrade Opus → Sonnet (intent + cocon)</td>
+      <td class="num green bold">−24%</td>
+      <td>1 jour</td>
+    </tr>
+    <tr>
+      <td class="bold">Phase 2</td>
+      <td>Fusionner audit + final check en 1 étape</td>
+      <td class="num green">−35% cumulé</td>
+      <td>3 jours</td>
+    </tr>
+    <tr>
+      <td class="bold">Phase 3</td>
+      <td>Fusionner enrich + enhance en 1 étape</td>
+      <td class="num green">−45% cumulé</td>
+      <td>3 jours</td>
+    </tr>
+    <tr>
+      <td class="bold">Phase 4</td>
+      <td>Cache Redis + truncate HTML</td>
+      <td class="num green bold">−53% cumulé</td>
+      <td>1 semaine</td>
+    </tr>
+    <tr>
+      <td class="bold">Phase 5</td>
+      <td>Monitoring tokens réels via msg.usage</td>
+      <td class="num">mesure</td>
+      <td>2 jours</td>
+    </tr>
+  </tbody>
+</table>
+
+<div style="margin-top: 30px; padding: 16px; background: #111; color: white; border-radius: 8px; text-align: center;">
+  <p style="font-size: 14px; font-weight: 800; color: #f97316; margin-bottom: 4px;">Résumé exécutif</p>
+  <p style="font-size: 11px; color: #ccc; line-height: 1.6;">
+    Coût actuel : <strong style="color:white;">$1.28/gen</strong> → Coût optimisé : <strong style="color:#4ade80;">$0.60/gen (−53%)</strong><br>
+    Pricing recommandé : <strong style="color:white;">Free / $49 / $129 / $299</strong> — Marge brute moyenne : <strong style="color:#4ade80;">63-71%</strong><br>
+    À 1 000 utilisateurs : <strong style="color:white;">$36.7K revenus/mois</strong> — <strong style="color:#4ade80;">$23.1K marge brute/mois</strong>
+  </p>
+</div>
+
+</body>
+</html>

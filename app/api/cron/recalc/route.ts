@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   // Get all sites with SEO analysis done (or a specific user)
   let query = supabase
     .from("sites")
-    .select("user_id, gsc_site_url, google_access_token, seo_analysis_done, cms, site_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
+    .select("user_id, gsc_site_url, google_access_token, seo_analysis_done, cms, site_url, shopify_store_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
     .eq("seo_analysis_done", true);
 
   if (targetUserId) {
@@ -136,6 +136,7 @@ export async function GET(request: Request) {
           wp_username: (site as Record<string, unknown>).wp_username as string | undefined,
           wp_app_password: (site as Record<string, unknown>).wp_app_password as string | undefined,
           shopify_api_key: (site as Record<string, unknown>).shopify_api_key as string | undefined,
+          shopify_store_url: (site as Record<string, unknown>).shopify_store_url as string | undefined,
           wix_api_key: (site as Record<string, unknown>).wix_api_key as string | undefined,
           wix_site_id: (site as Record<string, unknown>).wix_site_id as string | undefined,
           custom_api_url: (site as Record<string, unknown>).custom_api_url as string | undefined,

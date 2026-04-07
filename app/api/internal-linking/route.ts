@@ -46,7 +46,7 @@ export async function POST() {
     // Fetch site config
     const { data: site } = await supabase
       .from("sites")
-      .select("id, business_name, industry, site_url, keywords, gsc_site_url, cms, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
+      .select("id, business_name, industry, site_url, shopify_store_url, keywords, gsc_site_url, cms, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -59,6 +59,7 @@ export async function POST() {
       wp_username: site.wp_username,
       wp_app_password: site.wp_app_password,
       shopify_api_key: site.shopify_api_key,
+      shopify_store_url: site.shopify_store_url,
       wix_api_key: site.wix_api_key,
       wix_site_id: site.wix_site_id,
       custom_api_url: site.custom_api_url,

@@ -19,6 +19,8 @@ export type CmsCredentials = {
   wp_username?: string;
   wp_app_password?: string;
   shopify_api_key?: string;
+  /** The .myshopify.com URL for Admin API calls (falls back to site_url) */
+  shopify_store_url?: string;
   wix_api_key?: string;
   wix_site_id?: string;
   custom_api_url?: string;
@@ -137,13 +139,15 @@ async function wpListPosts(
 async function shopifyListArticles(
   storeUrl: string,
   apiKey: string,
-  limit: number = 50
+  limit: number = 50,
+  publicUrl?: string
 ): Promise<(CmsPost & { blog_id: number })[]> {
-  const baseUrl = storeUrl.replace(/\/$/, "");
+  const apiBase = storeUrl.replace(/\/$/, "");
+  const publicBase = (publicUrl ?? storeUrl).replace(/\/$/, "");
   const headers = { "Content-Type": "application/json", "X-Shopify-Access-Token": apiKey };
 
   try {
-    const blogsRes = await fetch(`${baseUrl}/admin/api/2024-01/blogs.json`, { headers });
+    const blogsRes = await fetch(`${apiBase}/admin/api/2025-10/blogs.json`, { headers });
     if (!blogsRes.ok) return [];
     const blogsData = await blogsRes.json() as { blogs: { id: number; handle: string }[] };
     if (!blogsData.blogs?.length) return [];
@@ -151,7 +155,7 @@ async function shopifyListArticles(
     const articles: (CmsPost & { blog_id: number })[] = [];
     for (const blog of blogsData.blogs) {
       const res = await fetch(
-        `${baseUrl}/admin/api/2024-01/blogs/${blog.id}/articles.json?limit=${limit}&fields=id,title,body_html,handle,summary_html`,
+        `${apiBase}/admin/api/2025-10/blogs/${blog.id}/articles.json?limit=${limit}&fields=id,title,body_html,handle,summary_html`,
         { headers }
       );
       if (!res.ok) continue;
@@ -164,7 +168,7 @@ async function shopifyListArticles(
           blog_id: blog.id,
           title: a.title,
           content: a.body_html,
-          url: `${baseUrl}/blogs/${blog.handle}/${a.handle}`,
+          url: `${publicBase}/blogs/${blog.handle}/${a.handle}`,
           excerpt: a.summary_html,
         });
       }
@@ -180,12 +184,14 @@ async function shopifyUpdateArticle(
   apiKey: string,
   blogId: number,
   articleId: number,
-  updates: { body_html?: string; title?: string; summary_html?: string }
+  updates: { body_html?: string; title?: string; summary_html?: string },
+  publicUrl?: string
 ): Promise<UpdateResult> {
-  const baseUrl = storeUrl.replace(/\/$/, "");
+  const apiBase = storeUrl.replace(/\/$/, "");
+  const publicBase = (publicUrl ?? storeUrl).replace(/\/$/, "");
   try {
     const res = await fetch(
-      `${baseUrl}/admin/api/2024-01/blogs/${blogId}/articles/${articleId}.json`,
+      `${apiBase}/admin/api/2025-10/blogs/${blogId}/articles/${articleId}.json`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": apiKey },
@@ -196,7 +202,7 @@ async function shopifyUpdateArticle(
       return { success: false, post_id: articleId, url: "", error: `Shopify PUT failed: ${await res.text()}` };
     }
     const data = await res.json() as { article: { id: number; handle: string } };
-    return { success: true, post_id: data.article.id, url: `${baseUrl}/blogs/news/${data.article.handle}` };
+    return { success: true, post_id: data.article.id, url: `${publicBase}/blogs/news/${data.article.handle}` };
   } catch (err) {
     return { success: false, post_id: articleId, url: "", error: err instanceof Error ? err.message : "Unknown" };
   }
@@ -279,7 +285,7 @@ export async function listCmsPosts(creds: CmsCredentials, limit: number = 50): P
       return wpListPosts(creds.site_url, wpAuth(creds.wp_username, creds.wp_app_password), limit);
     case "shopify":
       if (!creds.shopify_api_key) return [];
-      return shopifyListArticles(creds.site_url, creds.shopify_api_key, limit);
+      return shopifyListArticles(creds.shopify_store_url || creds.site_url, creds.shopify_api_key, limit, creds.site_url);
     case "wix":
       if (!creds.wix_api_key || !creds.wix_site_id) return [];
       return wixListPosts(creds.wix_api_key, creds.wix_site_id, limit);
@@ -407,17 +413,19 @@ export async function rollbackCmsPost(
         return { success: false, error: "Shopify credentials missing" };
       }
       // For shopify rollback, we need the blog_id — try to find it
-      const posts = await shopifyListArticles(creds.site_url, creds.shopify_api_key, 100);
+      const shopifyApiUrl = creds.shopify_store_url || creds.site_url;
+      const posts = await shopifyListArticles(shopifyApiUrl, creds.shopify_api_key, 100, creds.site_url);
       const shopifyPost = posts.find(p => String(p.id) === String(snapshot.post_id));
       if (!shopifyPost) {
         return { success: false, error: "Article Shopify introuvable pour rollback" };
       }
       result = await shopifyUpdateArticle(
-        creds.site_url,
+        shopifyApiUrl,
         creds.shopify_api_key,
         shopifyPost.blog_id,
         Number(snapshot.post_id),
-        { body_html: snapshot.content, title: snapshot.title, summary_html: snapshot.excerpt }
+        { body_html: snapshot.content, title: snapshot.title, summary_html: snapshot.excerpt },
+        creds.site_url
       );
       break;
 
@@ -474,11 +482,12 @@ export async function updateCmsPost(
         return { success: false, post_id: postId, url: "", error: "Shopify credentials or blog_id missing" };
       }
       return shopifyUpdateArticle(
-        creds.site_url,
+        creds.shopify_store_url || creds.site_url,
         creds.shopify_api_key,
         extra.blog_id,
         postId as number,
-        { body_html: updates.content, title: updates.title, summary_html: updates.excerpt }
+        { body_html: updates.content, title: updates.title, summary_html: updates.excerpt },
+        creds.site_url
       );
 
     case "wix":

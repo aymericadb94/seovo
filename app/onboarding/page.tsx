@@ -14,6 +14,7 @@ type FormData = {
   wp_username: string;
   wp_app_password: string;
   shopify_api_key: string;
+  shopify_store_url: string;
   wix_api_key: string;
   wix_site_id: string;
   custom_api_url: string;
@@ -363,7 +364,7 @@ export default function OnboardingPage() {
   const FORM_STORAGE_KEY = "rankpill_onboarding_form";
   const emptyForm: FormData = {
     business_name: "", industry: "", cms: "", site_url: "",
-    wp_username: "", wp_app_password: "", shopify_api_key: "",
+    wp_username: "", wp_app_password: "", shopify_api_key: "", shopify_store_url: "",
     wix_api_key: "", wix_site_id: "",
     custom_api_url: "", custom_api_key: "",
     objective: "", main_offer: "", target_customer: "",
@@ -434,7 +435,7 @@ export default function OnboardingPage() {
     if (step === 1) {
       if (!form.cms || !form.site_url.trim()) return false;
       if (form.cms === "wordpress") return form.wp_username.trim() && form.wp_app_password.trim();
-      if (form.cms === "shopify") return form.shopify_api_key.trim() && form.site_url.includes(".myshopify.com");
+      if (form.cms === "shopify") return form.shopify_api_key.trim() && form.shopify_store_url.includes(".myshopify.com");
       if (form.cms === "wix") return form.wix_api_key.trim() && form.wix_site_id.trim();
       if (form.cms === "custom") return form.custom_api_url.trim();
     }
@@ -484,6 +485,7 @@ export default function OnboardingPage() {
         wp_username: form.wp_username,
         wp_app_password: form.wp_app_password,
         shopify_api_key: form.shopify_api_key,
+        shopify_store_url: form.shopify_store_url || null,
         wix_api_key: form.wix_api_key,
         wix_site_id: form.wix_site_id,
         custom_api_url: form.custom_api_url,
@@ -752,20 +754,41 @@ export default function OnboardingPage() {
                 {form.cms && (
                   <div className="flex flex-col gap-5 animate-[fadeInUp_0.3s_ease-out_both]">
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.siteUrl}</label>
+                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
+                        {form.cms === "shopify" ? "Domaine principal (URL publique)" : t.onboarding.siteUrl}
+                      </label>
                       <input
                         type="url"
                         name="site-url-field"
                         autoComplete="one-time-code"
                         value={form.site_url}
                         onChange={(e) => update("site_url", e.target.value)}
-                        placeholder={form.cms === "shopify" ? "https://maboutique.myshopify.com" : "https://votresite.com"}
+                        placeholder={form.cms === "shopify" ? "https://maboutique.fr ou https://maboutique.myshopify.com" : "https://votresite.com"}
                         className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
                       />
-                      {form.cms === "shopify" && form.site_url.trim() && !form.site_url.includes(".myshopify.com") && (
-                        <p className="mt-1.5 text-xs text-orange-400">Utilisez votre URL Shopify : https://nom-boutique.myshopify.com (pas votre domaine custom)</p>
+                      {form.cms === "shopify" && (
+                        <p className="mt-1.5 text-xs text-gray-500">Votre domaine custom ou votre URL .myshopify.com — utilisé pour les liens publics des articles</p>
                       )}
                     </div>
+
+                    {form.cms === "shopify" && (
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">URL Shopify (API)</label>
+                        <input
+                          type="url"
+                          name="shopify-store-url-field"
+                          autoComplete="one-time-code"
+                          value={form.shopify_store_url}
+                          onChange={(e) => update("shopify_store_url", e.target.value)}
+                          placeholder="https://nom-boutique.myshopify.com"
+                          className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
+                        />
+                        {form.shopify_store_url.trim() && !form.shopify_store_url.includes(".myshopify.com") && (
+                          <p className="mt-1.5 text-xs text-orange-400">Cette URL doit être au format https://nom-boutique.myshopify.com</p>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500">Obligatoire — trouvable dans Shopify Admin &gt; Paramètres</p>
+                      </div>
+                    )}
 
                     {form.cms === "wordpress" && (
                       <>

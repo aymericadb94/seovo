@@ -12,6 +12,7 @@ type SiteConfig = {
   industry: string;
   cms: "wordpress" | "shopify" | "wix" | "custom";
   site_url: string;
+  shopify_store_url: string;
   wp_username: string;
   wp_app_password: string;
   shopify_api_key: string;
@@ -96,6 +97,7 @@ export default function SettingsPage() {
           wpUsername: config.wp_username,
           wpAppPassword: config.wp_app_password,
           shopifyApiKey: config.shopify_api_key,
+          shopifyStoreUrl: config.shopify_store_url,
           wixApiKey: config.wix_api_key,
           wixSiteId: config.wix_site_id,
           customApiUrl: config.custom_api_url,
@@ -265,18 +267,36 @@ export default function SettingsPage() {
             <h2 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-5">{t.settings.siteConnection}</h2>
             <div className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.settings.siteUrl}</label>
+                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
+                  {config.cms === "shopify" ? "Domaine principal" : t.settings.siteUrl}
+                </label>
                 <input
                   type="url"
                   value={config.site_url}
                   onChange={(e) => update("site_url", e.target.value)}
-                  placeholder={config.cms === "shopify" ? "https://nom-boutique.myshopify.com" : "https://votresite.com"}
+                  placeholder={config.cms === "shopify" ? "https://maboutique.fr ou https://maboutique.myshopify.com" : "https://votresite.com"}
                   className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
                 />
-                {config.cms === "shopify" && config.site_url.trim() && !config.site_url.includes(".myshopify.com") && (
-                  <p className="mt-1.5 text-xs text-orange-400">Utilisez votre URL Shopify : https://nom-boutique.myshopify.com (pas votre domaine custom)</p>
+                {config.cms === "shopify" && (
+                  <p className="mt-1.5 text-xs text-gray-500">URL publique de votre site (domaine custom ou .myshopify.com)</p>
                 )}
               </div>
+              {config.cms === "shopify" && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">URL Shopify (API)</label>
+                  <input
+                    type="url"
+                    value={config.shopify_store_url}
+                    onChange={(e) => update("shopify_store_url", e.target.value)}
+                    placeholder="https://nom-boutique.myshopify.com"
+                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
+                  />
+                  {config.shopify_store_url?.trim() && !config.shopify_store_url.includes(".myshopify.com") && (
+                    <p className="mt-1.5 text-xs text-orange-400">Cette URL doit être au format https://nom-boutique.myshopify.com</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">Obligatoire — utilisée pour la connexion API Shopify</p>
+                </div>
+              )}
               {config.cms === "wordpress" && (
                 <>
                   <div>

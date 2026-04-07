@@ -47,14 +47,14 @@ async function fetchStyleGuideShopify(storeUrl: string, apiKey: string): Promise
     const baseUrl = storeUrl.replace(/\/$/, "");
     const headers = { "X-Shopify-Access-Token": apiKey };
 
-    const blogsRes = await fetch(`${baseUrl}/admin/api/2024-01/blogs.json`, { headers });
+    const blogsRes = await fetch(`${baseUrl}/admin/api/2025-10/blogs.json`, { headers });
     if (!blogsRes.ok) return "";
     const blogsData = await blogsRes.json() as { blogs: { id: number }[] };
     if (!blogsData.blogs?.length) return "";
 
     const blogId = blogsData.blogs[0].id;
     const articlesRes = await fetch(
-      `${baseUrl}/admin/api/2024-01/blogs/${blogId}/articles.json?limit=5&fields=title,body_html`,
+      `${baseUrl}/admin/api/2025-10/blogs/${blogId}/articles.json?limit=5&fields=title,body_html`,
       { headers }
     );
     if (!articlesRes.ok) return "";
@@ -87,14 +87,14 @@ export async function POST(request: Request) {
     try {
       const { data: site } = await supabase
         .from("sites")
-        .select("cms, site_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id")
+        .select("cms, site_url, shopify_store_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id")
         .eq("user_id", user.id)
         .limit(1)
         .single();
       if (site?.cms === "wordpress" && site.wp_username && site.wp_app_password) {
         styleGuide = await fetchStyleGuideWordPress(site.site_url, site.wp_username, site.wp_app_password);
       } else if (site?.cms === "shopify" && site.shopify_api_key) {
-        styleGuide = await fetchStyleGuideShopify(site.site_url, site.shopify_api_key);
+        styleGuide = await fetchStyleGuideShopify(site.shopify_store_url || site.site_url, site.shopify_api_key);
       }
       // Wix : DA non disponible via API publique, on génère sans style guide
     } catch {
