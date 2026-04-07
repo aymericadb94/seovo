@@ -56,7 +56,7 @@ const difficultyLabel: Record<string, string> = {
   hard: "Difficile",
 };
 
-const MATRIX_CHARS = "アイウエオカキクケコ01234ABCDEF#$<>{}|\\~_+=?!@";
+const MATRIX_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789._-+=";
 
 function randomChar() {
   return MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
@@ -69,7 +69,7 @@ function ScrambleLine({ text, isLast }: { text: string; isLast: boolean }) {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      stepRef.current += 0.6;
+      stepRef.current += 1;
       const resolved = Math.floor(stepRef.current);
       if (resolved >= text.length) {
         setChars(text.split(""));
@@ -438,19 +438,37 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
                     R
                   </span>
                 </div>
-                <h2 className="text-xl font-black text-white mb-1">Analyse en cours</h2>
-                <p className="text-gray-600 text-xs">
-                  {scanLines.length} / 7 signaux analysés
-                </p>
+                <h2 className="text-xl font-black text-white mb-2">Analyse en cours</h2>
+                <div className="flex items-center justify-center gap-3">
+                  <div className="flex gap-1">
+                    {Array.from({ length: 7 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-1.5 h-1.5 rounded-full transition-all duration-500"
+                        style={{
+                          background: i < scanLines.length
+                            ? "linear-gradient(135deg, #f97316, #ef4444)"
+                            : "rgba(255,255,255,0.08)",
+                          boxShadow: i < scanLines.length ? "0 0 6px rgba(249,115,22,0.5)" : "none",
+                          transform: i === scanLines.length - 1 ? "scale(1.3)" : "scale(1)",
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-gray-500 text-xs font-medium">
+                    {scanLines.length} / 7
+                  </p>
+                </div>
               </div>
 
               {/* Terminal */}
               <div
-                className="rounded-xl p-5 font-mono text-xs space-y-2.5 min-h-[180px] relative overflow-hidden"
+                className="rounded-xl p-5 font-mono text-xs relative overflow-hidden"
                 style={{
                   background: "#060606",
                   border: "1px solid rgba(249,115,22,0.12)",
                   boxShadow: "inset 0 0 40px rgba(249,115,22,0.03)",
+                  height: 180,
                 }}
               >
                 {/* Scanline CRT overlay */}
@@ -458,19 +476,26 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px)",
-                    zIndex: 1,
+                    zIndex: 2,
                   }}
                 />
-                {/* Glow */}
+                {/* Glow top */}
                 <div className="absolute top-0 left-0 right-0 h-8 pointer-events-none"
                   style={{ background: "linear-gradient(180deg, rgba(249,115,22,0.04), transparent)", zIndex: 0 }} />
+                {/* Fade top — masque les lignes qui sortent */}
+                <div className="absolute top-0 left-0 right-0 h-10 pointer-events-none"
+                  style={{ background: "linear-gradient(180deg, #060606, transparent)", zIndex: 3 }} />
 
-                <div className="relative z-10 space-y-2">
-                  {scanLines.map((line, i) => (
+                <div
+                  className="relative z-10 space-y-2.5 flex flex-col justify-end"
+                  style={{ height: "100%", overflow: "hidden" }}
+                >
+                  {/* Affiche seulement les 4 dernières lignes visibles */}
+                  {scanLines.slice(-4).map((line, i) => (
                     <ScrambleLine
-                      key={i}
+                      key={`${scanLines.length - Math.min(scanLines.length, 4) + i}`}
                       text={line}
-                      isLast={i === scanLines.length - 1}
+                      isLast={i === Math.min(scanLines.length, 4) - 1}
                     />
                   ))}
                   {scanLines.length === 0 && (
