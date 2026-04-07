@@ -50,9 +50,22 @@ export async function POST(request: Request) {
         return Response.json({ error: "L'URL Shopify (.myshopify.com) est requise pour la connexion API." }, { status: 400 });
       }
 
-      const result = await testShopifyConnection(shopifyStoreUrl, body.shopify_api_key);
-      if (!result.ok) {
-        return Response.json({ error: `Connexion Shopify échouée : ${result.reason}` }, { status: 400 });
+      // Check if we got a token via OAuth (stored in user metadata by /api/shopify/callback)
+      const metadata = user.user_metadata as { shopify_pending_token?: string; shopify_pending_store_url?: string } | null;
+      if (body.shopify_oauth && metadata?.shopify_pending_token) {
+        // Use OAuth token — already verified by callback
+        body.shopify_api_key = metadata.shopify_pending_token;
+        if (metadata.shopify_pending_store_url) {
+          body.shopify_store_url = metadata.shopify_pending_store_url;
+        }
+      } else if (body.shopify_api_key) {
+        // Manual token — test connection
+        const result = await testShopifyConnection(shopifyStoreUrl, body.shopify_api_key);
+        if (!result.ok) {
+          return Response.json({ error: `Connexion Shopify échouée : ${result.reason}` }, { status: 400 });
+        }
+      } else {
+        return Response.json({ error: "Connectez votre boutique Shopify via le bouton 'Connecter Shopify'." }, { status: 400 });
       }
     }
 
@@ -109,13 +122,20 @@ export async function POST(request: Request) {
 
     const { error } = await supabase.from("sites").insert(insertData);
 
-    // Clear pending GSC tokens from user metadata (non-fatal)
+    // Clear pending OAuth tokens from user metadata (non-fatal)
+    const clearMetadata: Record<string, null> = {};
     if (gscTokens?.gsc_pending_access_token) {
-      supabase.auth.updateUser({ data: {
-        gsc_pending_access_token: null,
-        gsc_pending_refresh_token: null,
-        gsc_pending_token_expiry: null,
-      } }).catch(() => {});
+      clearMetadata.gsc_pending_access_token = null;
+      clearMetadata.gsc_pending_refresh_token = null;
+      clearMetadata.gsc_pending_token_expiry = null;
+    }
+    if (body.shopify_oauth) {
+      clearMetadata.shopify_pending_token = null;
+      clearMetadata.shopify_pending_store_url = null;
+      clearMetadata.shopify_pending_secret = null;
+    }
+    if (Object.keys(clearMetadata).length > 0) {
+      supabase.auth.updateUser({ data: clearMetadata }).catch(() => {});
     }
 
     if (error) return Response.json({ error: error.message }, { status: 500 });

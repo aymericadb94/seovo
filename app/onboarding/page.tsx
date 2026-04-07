@@ -15,6 +15,8 @@ type FormData = {
   wp_app_password: string;
   shopify_api_key: string;
   shopify_store_url: string;
+  shopify_client_id: string;
+  shopify_client_secret: string;
   wix_api_key: string;
   wix_site_id: string;
   custom_api_url: string;
@@ -103,11 +105,11 @@ const SHOPIFY_TUTORIAL = {
     { num: "02", title: "Créez une nouvelle app", detail: "Sur le Dev Dashboard (dev.shopify.com), cliquez sur \"Create an app\". Donnez-lui le nom :", code: "RankPill" },
     { num: "03", title: "Configurez l'API Admin", detail: "Dans votre app, allez dans \"Configuration\" puis \"Admin API integration\". Activez les permissions :", permissions: true },
     { num: "04", title: "Créez une version et installez", detail: "Allez dans \"Versions\" → \"Créer une version\". Puis dans \"Installations\" → \"Installer l'application\" sur votre boutique." },
-    { num: "05", title: "Copiez le Secret de l'app", detail: "Dans votre app, allez dans \"Paramètres\" → \"Identifiants\". Cliquez sur l'icone oeil pour révéler le Secret, puis copiez-le :", code: "Secret (clé secrète de l'app)" },
-    { num: "06", title: "Trouvez votre URL .myshopify.com", detail: "Dans votre admin Shopify → Paramètres → Domaines. Repérez l'URL qui se termine par .myshopify.com (ex: maboutique.myshopify.com)." },
-    { num: "07", title: "Remplissez les champs à gauche", detail: "Collez le Secret dans \"Clé API Admin Shopify\". Entrez votre URL .myshopify.com dans le champ dédié. Votre domaine principal (ex: maboutique.fr) va dans \"Domaine principal\"." },
+    { num: "05", title: "Copiez le Client ID et le Secret", detail: "Dans votre app → \"Paramètres\" → \"Identifiants\". Copiez le Client ID et cliquez sur l'oeil pour révéler et copier le Secret." },
+    { num: "06", title: "Trouvez votre URL .myshopify.com", detail: "Dans votre admin Shopify → Paramètres → Domaines. Repérez l'URL .myshopify.com (ex: maboutique.myshopify.com)." },
+    { num: "07", title: "Remplissez et connectez", detail: "Remplissez les 3 champs à gauche (URL .myshopify.com, Client ID, Secret), puis cliquez sur \"Connecter Shopify\". Shopify vous demandera d'autoriser l'accès." },
   ],
-  warning: "Le Secret se trouve dans \"Paramètres\" → \"Identifiants\" de votre app sur le Dev Dashboard. Ne confondez pas avec le Client ID (l'identifiant public) — c'est le Secret qu'il faut copier.",
+  warning: "RankPill se connecte via OAuth — vous serez redirigé vers Shopify pour autoriser l'accès. Aucun mot de passe n'est stocké, uniquement un token d'accès sécurisé.",
 };
 
 const WIX_TUTORIAL = {
@@ -357,6 +359,8 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [animKey, setAnimKey] = useState(0);
+  const [shopifyConnected, setShopifyConnected] = useState(false);
+  const [shopifyConnecting, setShopifyConnecting] = useState(false);
   const [gscConnected, setGscConnected] = useState(false);
   const [gscProperties, setGscProperties] = useState<{ url: string }[]>([]);
   const [loadingGscSites, setLoadingGscSites] = useState(false);
@@ -364,6 +368,7 @@ export default function OnboardingPage() {
   const emptyForm: FormData = {
     business_name: "", industry: "", cms: "", site_url: "",
     wp_username: "", wp_app_password: "", shopify_api_key: "", shopify_store_url: "",
+    shopify_client_id: "", shopify_client_secret: "",
     wix_api_key: "", wix_site_id: "",
     custom_api_url: "", custom_api_key: "",
     objective: "", main_offer: "", target_customer: "",
@@ -382,9 +387,29 @@ export default function OnboardingPage() {
     return emptyForm;
   });
 
-  // Detect GSC OAuth return — restaurer le form sauvegardé avant le redirect
+  // Detect Shopify/GSC OAuth return — restaurer le form sauvegardé avant le redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // Shopify OAuth return
+    const shopifyResult = params.get("shopify");
+    if (shopifyResult) {
+      const saved = localStorage.getItem("rankpill_onboarding_form");
+      if (saved) {
+        try { setForm(f => ({ ...f, ...JSON.parse(saved) as FormData })); } catch { /* ignore */ }
+      }
+      if (shopifyResult === "success") {
+        setShopifyConnected(true);
+      } else {
+        const reason = params.get("reason");
+        setError(reason ? `Connexion Shopify échouée : ${reason}` : "La connexion Shopify a échoué. Réessayez.");
+      }
+      setStep(1);
+      setAnimKey(k => k + 1);
+      window.history.replaceState({}, "", "/onboarding");
+      return;
+    }
+
     const gsc = params.get("gsc");
     if (gsc === "connected" || gsc === "error") {
       const saved = localStorage.getItem("rankpill_onboarding_form");
@@ -422,6 +447,30 @@ export default function OnboardingPage() {
     });
   }
 
+  async function connectShopify() {
+    if (!form.shopify_store_url.includes(".myshopify.com") || !form.shopify_client_id.trim() || !form.shopify_client_secret.trim()) {
+      setError("Remplissez l'URL .myshopify.com, le Client ID et le Secret avant de connecter.");
+      return;
+    }
+    setShopifyConnecting(true);
+    setError("");
+    try {
+      // Save form to localStorage so we can restore after redirect
+      localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(form));
+      // Store the secret temporarily in user metadata (needed by callback)
+      await fetch("/api/shopify/prepare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientSecret: form.shopify_client_secret }),
+      });
+      // Redirect to Shopify OAuth
+      window.location.href = `/api/shopify/auth?shopifyStoreUrl=${encodeURIComponent(form.shopify_store_url)}&clientId=${encodeURIComponent(form.shopify_client_id)}&context=onboarding`;
+    } catch {
+      setError("Erreur lors de la connexion Shopify");
+      setShopifyConnecting(false);
+    }
+  }
+
   function goToStep(n: number) {
     setStep(n);
     setAnimKey(k => k + 1);
@@ -434,7 +483,14 @@ export default function OnboardingPage() {
     if (step === 1) {
       if (!form.cms || !form.site_url.trim()) return false;
       if (form.cms === "wordpress") return form.wp_username.trim() && form.wp_app_password.trim();
-      if (form.cms === "shopify") return form.shopify_api_key.trim() && form.shopify_store_url.includes(".myshopify.com");
+      if (form.cms === "shopify") {
+        // OAuth flow: connected via redirect
+        if (shopifyConnected) return true;
+        // Manual token flow (shpat_ legacy)
+        if (form.shopify_api_key.trim() && form.shopify_store_url.includes(".myshopify.com")) return true;
+        // OAuth flow: has credentials to connect
+        return false;
+      }
       if (form.cms === "wix") return form.wix_api_key.trim() && form.wix_site_id.trim();
       if (form.cms === "custom") return form.custom_api_url.trim();
     }
@@ -483,8 +539,9 @@ export default function OnboardingPage() {
         site_url: form.site_url,
         wp_username: form.wp_username,
         wp_app_password: form.wp_app_password,
-        shopify_api_key: form.shopify_api_key,
+        shopify_api_key: form.shopify_api_key || null,
         shopify_store_url: form.shopify_store_url || null,
+        shopify_oauth: shopifyConnected || false,
         wix_api_key: form.wix_api_key,
         wix_site_id: form.wix_site_id,
         custom_api_url: form.custom_api_url,
@@ -770,22 +827,67 @@ export default function OnboardingPage() {
                       )}
                     </div>
 
-                    {form.cms === "shopify" && (
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">URL Shopify (API)</label>
-                        <input
-                          type="url"
-                          name="shopify-store-url-field"
-                          autoComplete="one-time-code"
-                          value={form.shopify_store_url}
-                          onChange={(e) => update("shopify_store_url", e.target.value)}
-                          placeholder="https://nom-boutique.myshopify.com"
-                          className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
-                        />
-                        {form.shopify_store_url.trim() && !form.shopify_store_url.includes(".myshopify.com") && (
-                          <p className="mt-1.5 text-xs text-orange-400">Cette URL doit être au format https://nom-boutique.myshopify.com</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">Obligatoire — trouvable dans Shopify Admin &gt; Paramètres</p>
+                    {form.cms === "shopify" && !shopifyConnected && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">URL Shopify (.myshopify.com)</label>
+                          <input
+                            type="url"
+                            name="shopify-store-url-field"
+                            autoComplete="one-time-code"
+                            value={form.shopify_store_url}
+                            onChange={(e) => update("shopify_store_url", e.target.value)}
+                            placeholder="https://nom-boutique.myshopify.com"
+                            className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
+                          />
+                          {form.shopify_store_url.trim() && !form.shopify_store_url.includes(".myshopify.com") && (
+                            <p className="mt-1.5 text-xs text-orange-400">Cette URL doit être au format https://nom-boutique.myshopify.com</p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-500">Trouvable dans Shopify Admin &gt; Paramètres &gt; Domaines</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Client ID</label>
+                          <input
+                            type="text"
+                            name="shopify-client-id-field"
+                            autoComplete="one-time-code"
+                            value={form.shopify_client_id}
+                            onChange={(e) => update("shopify_client_id", e.target.value)}
+                            placeholder="ex: 74b7ead0fbc3e031f69c62cbd4bc6f63"
+                            className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all font-mono text-sm"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Dev Dashboard &gt; votre app &gt; Paramètres &gt; Identifiants</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Client Secret</label>
+                          <input
+                            type="password"
+                            name="shopify-client-secret-field"
+                            autoComplete="one-time-code"
+                            value={form.shopify_client_secret}
+                            onChange={(e) => update("shopify_client_secret", e.target.value)}
+                            placeholder="Cliquez sur l'oeil pour révéler, puis copiez"
+                            className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all font-mono text-sm"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Dev Dashboard &gt; votre app &gt; Paramètres &gt; Identifiants &gt; Secret</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={connectShopify}
+                          disabled={shopifyConnecting || !form.shopify_store_url.includes(".myshopify.com") || !form.shopify_client_id.trim() || !form.shopify_client_secret.trim()}
+                          className="w-full py-3 px-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-[#96bf48] hover:bg-[#7aa83a] text-black"
+                        >
+                          {shopifyConnecting ? "Connexion en cours..." : "Connecter Shopify"}
+                        </button>
+                      </>
+                    )}
+                    {form.cms === "shopify" && shopifyConnected && (
+                      <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-3">
+                        <svg className="w-5 h-5 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        <div>
+                          <p className="text-green-400 font-bold text-sm">Shopify connecté</p>
+                          <p className="text-gray-400 text-xs mt-0.5">Token d'accès obtenu via OAuth. Vous pouvez continuer.</p>
+                        </div>
                       </div>
                     )}
 
@@ -819,21 +921,7 @@ export default function OnboardingPage() {
                       </>
                     )}
 
-                    {form.cms === "shopify" && (
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.shopifyKey}</label>
-                        <input
-                          type="text"
-                          name="shopify-key-field"
-                          autoComplete="one-time-code"
-                          value={form.shopify_api_key}
-                          onChange={(e) => update("shopify_api_key", e.target.value)}
-                          placeholder={t.onboarding.shopifyKeyPlaceholder}
-                          className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
-                        />
-                        <p className="text-gray-600 text-xs mt-1.5">{t.onboarding.tutorialHint}</p>
-                      </div>
-                    )}
+                    {/* Shopify fields are handled above with OAuth flow */}
 
                     {form.cms === "wix" && (
                       <>
