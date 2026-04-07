@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { testWixConnection } from "@/lib/wix";
-import { testShopifyConnection } from "@/lib/shopify";
+
 import { sendOnboardingRecapEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
         return Response.json({ error: "L'URL Shopify (.myshopify.com) est requise pour la connexion API." }, { status: 400 });
       }
 
-      // Check if we got a token via OAuth (stored in user metadata by /api/shopify/callback)
+      // OAuth is required for Shopify (Dev Dashboard 2026)
       const metadata = user.user_metadata as { shopify_pending_token?: string; shopify_pending_store_url?: string } | null;
       if (body.shopify_oauth && metadata?.shopify_pending_token) {
         // Use OAuth token — already verified by callback
@@ -58,14 +58,8 @@ export async function POST(request: Request) {
         if (metadata.shopify_pending_store_url) {
           body.shopify_store_url = metadata.shopify_pending_store_url;
         }
-      } else if (body.shopify_api_key) {
-        // Manual token — test connection
-        const result = await testShopifyConnection(shopifyStoreUrl, body.shopify_api_key);
-        if (!result.ok) {
-          return Response.json({ error: `Connexion Shopify échouée : ${result.reason}` }, { status: 400 });
-        }
       } else {
-        return Response.json({ error: "Connectez votre boutique Shopify via le bouton 'Connecter Shopify'." }, { status: 400 });
+        return Response.json({ error: "Connectez votre boutique Shopify via le bouton 'Connecter Shopify' avant de continuer." }, { status: 400 });
       }
     }
 

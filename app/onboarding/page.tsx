@@ -491,12 +491,8 @@ export default function OnboardingPage() {
       if (!form.cms || !form.site_url.trim()) return false;
       if (form.cms === "wordpress") return form.wp_username.trim() && form.wp_app_password.trim();
       if (form.cms === "shopify") {
-        // OAuth flow: connected via redirect
-        if (shopifyConnected) return true;
-        // Manual token flow (shpat_ legacy)
-        if (form.shopify_api_key.trim() && form.shopify_store_url.includes(".myshopify.com")) return true;
-        // OAuth flow: has credentials to connect
-        return false;
+        // OAuth obligatoire — pas de token manuel
+        return shopifyConnected;
       }
       if (form.cms === "wix") return form.wix_api_key.trim() && form.wix_site_id.trim();
       if (form.cms === "custom") return form.custom_api_url.trim();
@@ -546,9 +542,9 @@ export default function OnboardingPage() {
         site_url: form.site_url,
         wp_username: form.wp_username,
         wp_app_password: form.wp_app_password,
-        shopify_api_key: form.shopify_api_key || null,
+        shopify_api_key: null,
         shopify_store_url: form.shopify_store_url || null,
-        shopify_oauth: shopifyConnected || false,
+        shopify_oauth: shopifyConnected,
         wix_api_key: form.wix_api_key,
         wix_site_id: form.wix_site_id,
         custom_api_url: form.custom_api_url,
