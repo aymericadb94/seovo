@@ -131,7 +131,7 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   content_audit: 10000,
   final_check: 10000,
 
-  content_generation: 16000,
+  content_generation: 24000,
   content_enrichment: 4000,
   meta_optimization: 3000,
   linking_enrichment: 500,
