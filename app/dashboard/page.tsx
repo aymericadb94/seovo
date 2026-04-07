@@ -67,6 +67,7 @@ export default function Dashboard() {
   const [cronRunning, setCronRunning] = useState(false);
   const [cronResult, setCronResult] = useState<string | null>(null);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
+  const [showOptimizeConfirm, setShowOptimizeConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "performance" | "linking" | "publications" | "keywords" | "calendar">("overview");
   const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null);
   const [indexationResults, setIndexationResults] = useState<Record<string, { indexed: boolean | null; verdict: string; coverage: string }>>({});
@@ -546,6 +547,52 @@ export default function Dashboard() {
                 <button onClick={() => setShowDailyLimitModal(false)} className="flex-1 px-4 py-3 rounded-xl text-white/50 hover:text-white/80 transition-all text-sm font-medium" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>Annuler</button>
                 <button onClick={() => handleManualPublish(true)} className="flex-1 px-4 py-3 rounded-xl text-white font-bold text-sm transition-all hover:opacity-90 active:scale-95 relative overflow-hidden" style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 4px 24px rgba(249,115,22,0.35)" }}>
                   <span className="relative z-10">Générer quand même</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup confirmation optimisation automatique */}
+      {showOptimizeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+          <div className="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ animation: "modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1) both" }}>
+            <div className="absolute inset-0 rounded-2xl" style={{ background: "linear-gradient(135deg, #021a09 0%, #0a120e 40%, #0e0e0e 100%)" }} />
+            <div className="absolute inset-0 rounded-2xl p-px" style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.5), rgba(34,168,83,0.3), rgba(34,197,94,0.1))" }}>
+              <div className="absolute inset-0 rounded-2xl" style={{ background: "linear-gradient(135deg, #021a09 0%, #0a120e 40%, #0e0e0e 100%)" }} />
+            </div>
+            <div className="absolute top-0 left-0 w-64 h-64 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(34,197,94,0.12) 0%, transparent 65%)" }} />
+            <div className="relative p-7">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="relative flex-shrink-0">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(34,168,83,0.15))", border: "1px solid rgba(34,197,94,0.3)" }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-green-400">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" stroke="none"/>
+                    </svg>
+                  </div>
+                  <div className="absolute inset-0 rounded-2xl animate-ping opacity-20" style={{ background: "rgba(34,197,94,0.4)", animationDuration: "2s" }} />
+                </div>
+                <div>
+                  <h3 className="text-white font-black text-lg leading-tight">Générer une page<br/>automatiquement ?</h3>
+                  <p className="text-gray-500 text-xs mt-1">Optimisation basée sur vos données GSC</p>
+                </div>
+              </div>
+              <p className="text-white/70 text-sm leading-relaxed mb-2">
+                RankPill va générer et publier automatiquement une page optimisée pour <span className="font-bold text-green-400">améliorer votre positionnement</span> sur cette opportunité.
+              </p>
+              <p className="text-white/35 text-xs leading-relaxed mb-7">L&apos;article sera créé à partir de votre stratégie SEO et publié directement sur votre site via votre CMS connecté.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowOptimizeConfirm(false)} className="flex-1 px-4 py-3 rounded-xl text-white/50 hover:text-white/80 transition-all text-sm font-medium active:scale-[0.97]" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  Annuler
+                </button>
+                <button
+                  onClick={() => { setShowOptimizeConfirm(false); handleManualPublish(); }}
+                  className="flex-1 px-4 py-3 rounded-xl text-white font-bold text-sm transition-all hover:opacity-90 active:scale-[0.97] relative overflow-hidden"
+                  style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", boxShadow: "0 4px 24px rgba(34,197,94,0.35)" }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] hover:translate-x-[200%] transition-transform duration-700" />
+                  <span className="relative z-10">Continuer →</span>
                 </button>
               </div>
             </div>
@@ -1680,8 +1727,8 @@ export default function Dashboard() {
                             </div>
                           </div>
                           <button
-                            onClick={() => handleManualPublish()}
-                            className="relative w-full overflow-hidden py-3 rounded-xl font-black text-white text-sm transition-all group"
+                            onClick={() => setShowOptimizeConfirm(true)}
+                            className="relative w-full overflow-hidden py-3 rounded-xl font-black text-white text-sm transition-all group active:scale-[0.97]"
                             style={{ background: "linear-gradient(135deg, #34A853, #22c55e)", boxShadow: "0 8px 24px rgba(34,168,83,0.25)" }}
                           >
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
