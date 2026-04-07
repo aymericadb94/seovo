@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { testWixConnection } from "@/lib/wix";
+import { testShopifyConnection } from "@/lib/shopify";
 import { sendOnboardingRecapEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
@@ -44,22 +45,14 @@ export async function POST(request: Request) {
     }
 
     if (body.cms === "shopify") {
-      try {
-        const shopifyStoreUrl = ((body.shopify_store_url || body.site_url) as string).replace(/\/$/, "");
-        if (!shopifyStoreUrl.includes(".myshopify.com")) {
-          return Response.json({ error: "L'URL Shopify (.myshopify.com) est requise pour la connexion API." }, { status: 400 });
-        }
-        const testRes = await fetch(`${shopifyStoreUrl}/admin/api/2025-10/shop.json`, {
-          headers: {
-            "X-Shopify-Access-Token": body.shopify_api_key,
-            "Content-Type": "application/json",
-          },
-        });
-        if (!testRes.ok) {
-          return Response.json({ error: "Connexion Shopify échouée. Vérifiez l'URL .myshopify.com et la clé API." }, { status: 400 });
-        }
-      } catch {
-        return Response.json({ error: "Impossible de joindre la boutique Shopify. Vérifiez l'URL." }, { status: 400 });
+      const shopifyStoreUrl = ((body.shopify_store_url || body.site_url) as string).replace(/\/$/, "");
+      if (!shopifyStoreUrl.includes(".myshopify.com")) {
+        return Response.json({ error: "L'URL Shopify (.myshopify.com) est requise pour la connexion API." }, { status: 400 });
+      }
+
+      const result = await testShopifyConnection(shopifyStoreUrl, body.shopify_api_key);
+      if (!result.ok) {
+        return Response.json({ error: `Connexion Shopify échouée : ${result.reason}` }, { status: 400 });
       }
     }
 

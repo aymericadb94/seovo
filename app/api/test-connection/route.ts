@@ -1,4 +1,5 @@
 import { testWixConnection } from "@/lib/wix";
+import { testShopifyConnection } from "@/lib/shopify";
 
 export async function POST(request: Request) {
   try {
@@ -35,7 +36,6 @@ export async function POST(request: Request) {
       if (!shopifyApiKey) {
         return Response.json({ ok: false, reason: "Clé API Shopify manquante" }, { status: 400 });
       }
-      // Use shopifyStoreUrl for API calls (the .myshopify.com URL)
       const apiUrl = (shopifyStoreUrl || siteUrl || "").replace(/\/$/, "");
       if (!apiUrl.includes(".myshopify.com")) {
         return Response.json({
@@ -43,19 +43,8 @@ export async function POST(request: Request) {
           reason: "L'URL Shopify (.myshopify.com) est requise pour la connexion API",
         });
       }
-      const res = await fetch(`${apiUrl}/admin/api/2025-10/shop.json`, {
-        headers: { "X-Shopify-Access-Token": shopifyApiKey },
-      });
-      if (res.ok) {
-        return Response.json({ ok: true });
-      }
-      if (res.status === 401 || res.status === 403) {
-        return Response.json({ ok: false, reason: "Clé API invalide ou permissions insuffisantes" });
-      }
-      if (res.status === 404) {
-        return Response.json({ ok: false, reason: "Boutique Shopify introuvable — vérifiez l'URL .myshopify.com" });
-      }
-      return Response.json({ ok: false, reason: `Erreur ${res.status} — vérifiez l'URL et la clé API` });
+      const result = await testShopifyConnection(apiUrl, shopifyApiKey);
+      return Response.json(result);
     }
 
     if (cms === "wix") {

@@ -6,6 +6,7 @@ import { fetchPexelsImage } from "@/lib/pexels";
 import { emitEvent, createPublicationEvent, createMilestoneEvent } from "@/lib/seo-events";
 import { recordAction } from "@/lib/seo-feedback";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
+import { shopifyFetch } from "@/lib/shopify";
 import { logger } from "@/lib/logger";
 
 function createAdminClient() {
@@ -82,19 +83,13 @@ Respond ONLY with bullet points, no intro or conclusion:
 
 async function analyzeShopifySite(storeUrl: string, apiKey: string, _publicUrl?: string) {
   try {
-    const baseUrl = storeUrl.replace(/\/$/, "");
-    const headers = { "X-Shopify-Access-Token": apiKey };
-
-    const blogsRes = await fetch(`${baseUrl}/admin/api/2025-10/blogs.json`, { headers });
+    const blogsRes = await shopifyFetch(storeUrl, apiKey, "blogs.json");
     if (!blogsRes.ok) return { existingTitles: [], styleGuide: "" };
     const blogsData = await blogsRes.json() as { blogs: { id: number }[] };
     if (!blogsData.blogs?.length) return { existingTitles: [], styleGuide: "" };
 
     const blogId = blogsData.blogs[0].id;
-    const articlesRes = await fetch(
-      `${baseUrl}/admin/api/2025-10/blogs/${blogId}/articles.json?limit=5&fields=title,body_html`,
-      { headers }
-    );
+    const articlesRes = await shopifyFetch(storeUrl, apiKey, `blogs/${blogId}/articles.json?limit=5&fields=title,body_html`);
     if (!articlesRes.ok) return { existingTitles: [], styleGuide: "" };
     const articlesData = await articlesRes.json() as { articles: { title: string; body_html: string }[] };
     const articles = articlesData.articles ?? [];
@@ -298,14 +293,9 @@ async function publishToShopify(
   imageUrl?: string | null, imageAlt?: string | null,
   publicUrl?: string
 ) {
-  const apiBase = storeUrl.replace(/\/$/, "");
   const publicBase = (publicUrl ?? storeUrl).replace(/\/$/, "");
-  const headers = {
-    "Content-Type": "application/json",
-    "X-Shopify-Access-Token": apiKey,
-  };
 
-  const blogsRes = await fetch(`${apiBase}/admin/api/2025-10/blogs.json`, { headers });
+  const blogsRes = await shopifyFetch(storeUrl, apiKey, "blogs.json");
   if (!blogsRes.ok) throw new Error(`Shopify blogs: ${await blogsRes.text()}`);
   const blogsData = await blogsRes.json();
 
@@ -315,9 +305,8 @@ async function publishToShopify(
     blogId = blogsData.blogs[0].id;
     blogHandle = blogsData.blogs[0].handle;
   } else {
-    const createBlogRes = await fetch(`${apiBase}/admin/api/2025-10/blogs.json`, {
+    const createBlogRes = await shopifyFetch(storeUrl, apiKey, "blogs.json", {
       method: "POST",
-      headers,
       body: JSON.stringify({ blog: { title: "Actualités SEO" } }),
     });
     if (!createBlogRes.ok) throw new Error(`Shopify create blog: ${await createBlogRes.text()}`);
@@ -326,9 +315,8 @@ async function publishToShopify(
     blogHandle = newBlog.blog.handle;
   }
 
-  const articleRes = await fetch(`${apiBase}/admin/api/2025-10/blogs/${blogId}/articles.json`, {
+  const articleRes = await shopifyFetch(storeUrl, apiKey, `blogs/${blogId}/articles.json`, {
     method: "POST",
-    headers,
     body: JSON.stringify({
       article: {
         title,

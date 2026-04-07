@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { publishToWix } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
 import { fetchPexelsImage } from "@/lib/pexels";
+import { shopifyFetch } from "@/lib/shopify";
 
 async function uploadImageToWordPress(
   siteUrl: string, username: string, appPassword: string,
@@ -69,15 +70,10 @@ async function publishToShopify(
   imageUrl?: string | null, imageAlt?: string | null,
   publicUrl?: string
 ) {
-  const apiBase = storeUrl.replace(/\/$/, "");
   const publicBase = (publicUrl ?? storeUrl).replace(/\/$/, "");
-  const headers = {
-    "Content-Type": "application/json",
-    "X-Shopify-Access-Token": apiKey,
-  };
 
   // Récupérer ou créer un blog
-  const blogsRes = await fetch(`${apiBase}/admin/api/2025-10/blogs.json`, { headers });
+  const blogsRes = await shopifyFetch(storeUrl, apiKey, "blogs.json");
   if (!blogsRes.ok) throw new Error(`Shopify blogs: ${await blogsRes.text()}`);
   const blogsData = await blogsRes.json();
 
@@ -87,9 +83,8 @@ async function publishToShopify(
     blogId = blogsData.blogs[0].id;
     blogHandle = blogsData.blogs[0].handle;
   } else {
-    const createBlogRes = await fetch(`${apiBase}/admin/api/2025-10/blogs.json`, {
+    const createBlogRes = await shopifyFetch(storeUrl, apiKey, "blogs.json", {
       method: "POST",
-      headers,
       body: JSON.stringify({ blog: { title: "SEO Blog" } }),
     });
     if (!createBlogRes.ok) throw new Error(`Shopify create blog: ${await createBlogRes.text()}`);
@@ -99,9 +94,8 @@ async function publishToShopify(
   }
 
   // Publier l'article
-  const articleRes = await fetch(`${apiBase}/admin/api/2025-10/blogs/${blogId}/articles.json`, {
+  const articleRes = await shopifyFetch(storeUrl, apiKey, `blogs/${blogId}/articles.json`, {
     method: "POST",
-    headers,
     body: JSON.stringify({
       article: {
         title,

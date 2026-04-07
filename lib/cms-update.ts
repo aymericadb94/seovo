@@ -8,6 +8,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { shopifyFetch } from "@/lib/shopify";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -142,22 +143,17 @@ async function shopifyListArticles(
   limit: number = 50,
   publicUrl?: string
 ): Promise<(CmsPost & { blog_id: number })[]> {
-  const apiBase = storeUrl.replace(/\/$/, "");
   const publicBase = (publicUrl ?? storeUrl).replace(/\/$/, "");
-  const headers = { "Content-Type": "application/json", "X-Shopify-Access-Token": apiKey };
 
   try {
-    const blogsRes = await fetch(`${apiBase}/admin/api/2025-10/blogs.json`, { headers });
+    const blogsRes = await shopifyFetch(storeUrl, apiKey, "blogs.json");
     if (!blogsRes.ok) return [];
     const blogsData = await blogsRes.json() as { blogs: { id: number; handle: string }[] };
     if (!blogsData.blogs?.length) return [];
 
     const articles: (CmsPost & { blog_id: number })[] = [];
     for (const blog of blogsData.blogs) {
-      const res = await fetch(
-        `${apiBase}/admin/api/2025-10/blogs/${blog.id}/articles.json?limit=${limit}&fields=id,title,body_html,handle,summary_html`,
-        { headers }
-      );
+      const res = await shopifyFetch(storeUrl, apiKey, `blogs/${blog.id}/articles.json?limit=${limit}&fields=id,title,body_html,handle,summary_html`);
       if (!res.ok) continue;
       const data = await res.json() as {
         articles: { id: number; title: string; body_html: string; handle: string; summary_html: string }[];
@@ -187,17 +183,12 @@ async function shopifyUpdateArticle(
   updates: { body_html?: string; title?: string; summary_html?: string },
   publicUrl?: string
 ): Promise<UpdateResult> {
-  const apiBase = storeUrl.replace(/\/$/, "");
   const publicBase = (publicUrl ?? storeUrl).replace(/\/$/, "");
   try {
-    const res = await fetch(
-      `${apiBase}/admin/api/2025-10/blogs/${blogId}/articles/${articleId}.json`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": apiKey },
-        body: JSON.stringify({ article: updates }),
-      }
-    );
+    const res = await shopifyFetch(storeUrl, apiKey, `blogs/${blogId}/articles/${articleId}.json`, {
+      method: "PUT",
+      body: JSON.stringify({ article: updates }),
+    });
     if (!res.ok) {
       return { success: false, post_id: articleId, url: "", error: `Shopify PUT failed: ${await res.text()}` };
     }

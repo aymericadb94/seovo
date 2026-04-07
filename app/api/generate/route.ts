@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { aiCall, aiCallStream, parseAiJson } from "@/lib/ai-router";
 import { rateLimit } from "@/lib/rate-limit";
+import { shopifyFetch } from "@/lib/shopify";
 
 async function extractStyleGuide(samples: string[]): Promise<string> {
   try {
@@ -44,19 +45,13 @@ async function fetchStyleGuideWordPress(siteUrl: string, username: string, appPa
 
 async function fetchStyleGuideShopify(storeUrl: string, apiKey: string): Promise<string> {
   try {
-    const baseUrl = storeUrl.replace(/\/$/, "");
-    const headers = { "X-Shopify-Access-Token": apiKey };
-
-    const blogsRes = await fetch(`${baseUrl}/admin/api/2025-10/blogs.json`, { headers });
+    const blogsRes = await shopifyFetch(storeUrl, apiKey, "blogs.json");
     if (!blogsRes.ok) return "";
     const blogsData = await blogsRes.json() as { blogs: { id: number }[] };
     if (!blogsData.blogs?.length) return "";
 
     const blogId = blogsData.blogs[0].id;
-    const articlesRes = await fetch(
-      `${baseUrl}/admin/api/2025-10/blogs/${blogId}/articles.json?limit=5&fields=title,body_html`,
-      { headers }
-    );
+    const articlesRes = await shopifyFetch(storeUrl, apiKey, `blogs/${blogId}/articles.json?limit=5&fields=title,body_html`);
     if (!articlesRes.ok) return "";
     const articlesData = await articlesRes.json() as { articles: { title: string; body_html: string }[] };
     const articles = articlesData.articles ?? [];
