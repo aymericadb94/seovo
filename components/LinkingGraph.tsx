@@ -108,6 +108,8 @@ export default function LinkingGraph() {
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
+  const hoveredNodeRef = useRef<GraphNode | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [filter, setFilter] = useState<FilterMode>("all");
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -115,6 +117,19 @@ export default function LinkingGraph() {
   const graphRef = useRef<any>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
+
+  // Pré-calculer les voisins pour l'effet de focus
+  const neighborMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    if (!data) return map;
+    data.suggestions.forEach(s => {
+      if (!map.has(s.from_url)) map.set(s.from_url, new Set());
+      if (!map.has(s.to_url)) map.set(s.to_url, new Set());
+      map.get(s.from_url)!.add(s.to_url);
+      map.get(s.to_url)!.add(s.from_url);
+    });
+    return map;
+  }, [data]);
 
   // ── Load data ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -255,18 +270,28 @@ export default function LinkingGraph() {
   // ── Node rendering ────────────────────────────────────────────────────────
   const paintNode = useCallback((node: GraphNode, ctx: CanvasRenderingContext2D) => {
     const { x = 0, y = 0, size, color, role, borderColor } = node;
-    const isHovered = hoveredNode?.id === node.id;
+    const hovered = hoveredNodeRef.current;
+    const isHovered = hovered?.id === node.id;
     const isSelected = selectedNode?.id === node.id;
     const isHighlighted = isHovered || isSelected;
 
-    // Glow effect
+    // Déterminer si ce nœud est "en focus" (voisin du nœud survolé/sélectionné)
+    const activeNode = hovered || selectedNode;
+    const isNeighbor = activeNode
+      ? neighborMap.get(activeNode.id)?.has(node.id) ?? false
+      : false;
+    const isDimmed = activeNode && !isHighlighted && !isNeighbor;
+    const opacity = isDimmed ? 0.15 : 1;
+
+    ctx.globalAlpha = opacity;
+
+    // Glow effect — subtil et propre
     if (isHighlighted) {
-      ctx.beginPath();
-      ctx.arc(x, y, size + 6, 0, 2 * Math.PI);
-      ctx.fillStyle = color.replace(/[\d.]+\)$/, "0.2)").replace(/^#/, "");
-      const gradient = ctx.createRadialGradient(x, y, size, x, y, size + 8);
-      gradient.addColorStop(0, `${color}44`);
+      const gradient = ctx.createRadialGradient(x, y, size * 0.5, x, y, size + 10);
+      gradient.addColorStop(0, `${color}55`);
       gradient.addColorStop(1, `${color}00`);
+      ctx.beginPath();
+      ctx.arc(x, y, size + 10, 0, 2 * Math.PI);
       ctx.fillStyle = gradient;
       ctx.fill();
     }
@@ -290,15 +315,17 @@ export default function LinkingGraph() {
       ctx.fill();
     }
 
-    // Label
-    if (isHighlighted || size >= 10) {
+    // Label — affiché pour les nœuds en focus ou les piliers
+    if (isHighlighted || (isNeighbor && activeNode) || size >= 10) {
       ctx.font = `${isHighlighted ? "bold " : ""}${isHighlighted ? 11 : 9}px Inter, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      ctx.fillStyle = isHighlighted ? "#fff" : "rgba(255,255,255,0.6)";
+      ctx.fillStyle = isHighlighted ? "#fff" : isNeighbor ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.6)";
       ctx.fillText(node.label, x, y + size + 3);
     }
-  }, [hoveredNode, selectedNode]);
+
+    ctx.globalAlpha = 1;
+  }, [selectedNode, neighborMap]);
 
   // ── Link rendering ────────────────────────────────────────────────────────
   const paintLink = useCallback((link: GraphLink, ctx: CanvasRenderingContext2D) => {
@@ -307,18 +334,23 @@ export default function LinkingGraph() {
     const sx = src?.x ?? 0, sy = src?.y ?? 0, tx = tgt?.x ?? 0, ty = tgt?.y ?? 0;
     if (sx === 0 && sy === 0 && tx === 0 && ty === 0) return;
 
-    const isRelated = selectedNode && (src.id === selectedNode.id || tgt.id === selectedNode.id);
+    const hovered = hoveredNodeRef.current;
+    const activeNode = hovered || selectedNode;
+    const isRelated = activeNode && (src.id === activeNode.id || tgt.id === activeNode.id);
+    const isDimmed = activeNode && !isRelated;
+
+    ctx.globalAlpha = isDimmed ? 0.06 : 1;
 
     ctx.beginPath();
     ctx.moveTo(sx, sy);
     ctx.lineTo(tx, ty);
-    ctx.strokeStyle = isRelated ? link.color.replace(/[\d.]+\)$/, "0.7)") : link.color;
-    ctx.lineWidth = isRelated ? link.weight * 1.5 : link.weight;
+    ctx.strokeStyle = isRelated ? link.color.replace(/[\d.]+\)$/, "0.8)") : link.color;
+    ctx.lineWidth = isRelated ? link.weight * 2 : link.weight;
     ctx.stroke();
 
     // Arrow
     const angle = Math.atan2(ty - sy, tx - sx);
-    const arrowLen = 4;
+    const arrowLen = isRelated ? 6 : 4;
     const midX = (sx + tx) / 2;
     const midY = (sy + ty) / 2;
     ctx.beginPath();
@@ -326,9 +358,11 @@ export default function LinkingGraph() {
     ctx.lineTo(midX - arrowLen * Math.cos(angle - Math.PI / 6), midY - arrowLen * Math.sin(angle - Math.PI / 6));
     ctx.moveTo(midX, midY);
     ctx.lineTo(midX - arrowLen * Math.cos(angle + Math.PI / 6), midY - arrowLen * Math.sin(angle + Math.PI / 6));
-    ctx.strokeStyle = isRelated ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.15)";
+    ctx.strokeStyle = isRelated ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.15)";
     ctx.lineWidth = 1;
     ctx.stroke();
+
+    ctx.globalAlpha = 1;
   }, [selectedNode]);
 
   // ── Get suggestions for selected node ─────────────────────────────────────
@@ -582,7 +616,17 @@ export default function LinkingGraph() {
               ctx.fill();
             }}
             linkCanvasObject={(link, ctx) => paintLink(link as unknown as GraphLink, ctx)}
-            onNodeHover={(node) => setHoveredNode(node as GraphNode | null)}
+            onNodeHover={(node) => {
+              const gn = node as GraphNode | null;
+              hoveredNodeRef.current = gn;
+              // Debounce le tooltip React (state) pour éviter le flickering
+              if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+              if (gn) {
+                hoverTimeoutRef.current = setTimeout(() => setHoveredNode(gn), 80);
+              } else {
+                hoverTimeoutRef.current = setTimeout(() => setHoveredNode(null), 120);
+              }
+            }}
             onNodeClick={(node) => setSelectedNode(prev => prev?.id === (node as GraphNode).id ? null : node as GraphNode)}
             d3AlphaDecay={0.04}
             d3VelocityDecay={0.35}
