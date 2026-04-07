@@ -101,15 +101,16 @@ const SHOPIFY_TUTORIAL = {
   title: "Comment connecter Shopify",
   permissions: ["write_content — Publier des articles de blog", "read_content — Lire les blogs existants"],
   steps: [
-    { num: "01", title: "Ouvrez le Dev Dashboard", detail: "Dans votre admin Shopify, allez dans :", path: ["Paramètres", "Applications", "Développer des applications dans le Dev Dashboard"] },
-    { num: "02", title: "Créez une nouvelle app", detail: "Sur le Dev Dashboard (dev.shopify.com), cliquez sur \"Create an app\". Donnez-lui le nom :", code: "RankPill" },
-    { num: "03", title: "Configurez l'API Admin", detail: "Dans votre app, allez dans \"Configuration\" puis \"Admin API integration\". Activez les permissions :", permissions: true },
-    { num: "04", title: "Créez une version et installez", detail: "Allez dans \"Versions\" → \"Créer une version\". Puis dans \"Installations\" → \"Installer l'application\" sur votre boutique." },
-    { num: "05", title: "Copiez le Client ID et le Secret", detail: "Dans votre app → \"Paramètres\" → \"Identifiants\". Copiez le Client ID et cliquez sur l'oeil pour révéler et copier le Secret." },
-    { num: "06", title: "Trouvez votre URL .myshopify.com", detail: "Dans votre admin Shopify → Paramètres → Domaines. Repérez l'URL .myshopify.com (ex: maboutique.myshopify.com)." },
-    { num: "07", title: "Remplissez et connectez", detail: "Remplissez les 3 champs à gauche (URL .myshopify.com, Client ID, Secret), puis cliquez sur \"Connecter Shopify\". Shopify vous demandera d'autoriser l'accès." },
+    { num: "01", title: "Ouvrez le Dev Dashboard Shopify", detail: "Dans votre admin Shopify, allez dans :", path: ["Paramètres", "Applications", "Développer des applications dans le Dev Dashboard"], note: "Vous serez redirigé vers dev.shopify.com — c'est normal." },
+    { num: "02", title: "Créez une nouvelle app", detail: "Sur le Dev Dashboard, cliquez sur \"Create an app\". Donnez-lui le nom :", code: "RankPill" },
+    { num: "03", title: "Configurez les permissions API", detail: "Dans votre app → \"Configuration\" → \"Admin API integration\". Cochez ces 2 permissions :", permissions: true, note: "Ce sont les seules permissions nécessaires — pas besoin d'en activer d'autres." },
+    { num: "04", title: "Ajoutez l'URL de redirection", detail: "Toujours dans \"Configuration\" → section \"URLs\" → \"Allowed redirection URLs\". Collez exactement cette URL :", code: "https://www.rankpill.fr/api/shopify/callback", note: "⚠️ Étape indispensable — sans cette URL, la connexion OAuth échouera." },
+    { num: "05", title: "Créez une version et installez", detail: "Allez dans l'onglet \"Versions\" → cliquez \"Créer une version\". Puis dans \"Installations\" → \"Installer l'application\" sur votre boutique. Acceptez les permissions demandées." },
+    { num: "06", title: "Copiez le Client ID et le Secret", detail: "Allez dans \"Paramètres\" → \"Identifiants\". Vous y trouverez le Client ID (visible) et le Client Secret (cliquez sur l'icône œil pour le révéler). Copiez les deux." },
+    { num: "07", title: "Trouvez votre URL .myshopify.com", detail: "Retournez dans votre admin Shopify → Paramètres → Domaines. Votre URL .myshopify.com est affichée en haut (ex: maboutique.myshopify.com). C'est l'URL technique de votre boutique." },
+    { num: "08", title: "Remplissez les champs et connectez", detail: "Dans le formulaire à gauche, remplissez les 3 champs : URL .myshopify.com, Client ID, et Client Secret. Puis cliquez sur \"Connecter Shopify\". Vous serez redirigé vers Shopify pour autoriser l'accès, puis revenu ici automatiquement." },
   ],
-  warning: "RankPill se connecte via OAuth — vous serez redirigé vers Shopify pour autoriser l'accès. Aucun mot de passe n'est stocké, uniquement un token d'accès sécurisé.",
+  warning: "RankPill utilise la connexion OAuth officielle de Shopify — vous serez redirigé vers Shopify pour autoriser l'accès en un clic. Aucun mot de passe n'est stocké. Seul un token d'accès sécurisé est enregistré.",
 };
 
 const WIX_TUTORIAL = {
@@ -149,6 +150,7 @@ type TutorialStep = {
   code?: string;
   path?: string[];
   permissions?: boolean;
+  note?: string;
 };
 
 function Tutorial({ cms, shopifyPermissions, requiredPermissionsLabel, attentionLabel }: {
@@ -232,6 +234,11 @@ function Tutorial({ cms, shopifyPermissions, requiredPermissionsLabel, attention
                     </li>
                   ))}
                 </ul>
+              )}
+              {s.note && (
+                <p className="mt-1.5 text-xs text-amber-400/80 bg-amber-500/5 border border-amber-500/10 rounded-lg px-2.5 py-1.5 leading-relaxed">
+                  {s.note}
+                </p>
               )}
             </div>
           </div>
