@@ -184,7 +184,13 @@ IMPORTANT : Suis ce plan section par section. Chaque section doit couvrir les po
     // Determine if we have pre-generated data (enriched mode) or not (legacy mode)
     const hasPreGenData = !!(struct || editPlan || snip || kwStrat);
 
-    const systemPrompt = `Tu es un rédacteur SEO senior (10+ ans d'expérience), spécialisé dans la rédaction web naturelle, le SEO avancé, la création de contenu qui rank sur Google, et l'UX/lisibilité. Chaque article que tu produis est unique, profond, utile et génère du trafic organique réel. Tu n'écris JAMAIS de contenu générique, répétitif ou robotique. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
+    const systemPrompt = `Tu es un expert SEO senior ET un rédacteur professionnel (10+ ans d'expérience). Tu es spécialisé dans :
+- Contenus SEO à forte valeur qui dominent la SERP
+- Stratégie éditoriale avancée
+- Contenu différenciant et non générique
+- Génération de trafic ET conversion
+
+Tu travailles pour Rankpill. Chaque article que tu produis doit être MEILLEUR que tous les résultats actuels de Google sur le sujet. Tu n'écris JAMAIS de contenu générique, répétitif ou robotique. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
 
     const userPrompt = `Tu es un rédacteur SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
@@ -194,49 +200,75 @@ MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${co
 
 ---
 
-MISSION : Rédiger un article SEO complet, naturel et de haute qualité.
+OBJECTIF : Créer un contenu meilleur que tous les résultats Google — concret, utile, différenciant, non générique.
 
 ${hasPreGenData ? `Tu disposes de données pré-analysées (structure SEO, plan éditorial, featured snippet, stratégie de mots-clés, positionnement cocon). SUIS ces données — elles sont le fruit d'une analyse stratégique en amont. Ne les ignore pas, ne les réinvente pas.` : ""}
 
 ---
 
-RÈGLES DE RÉDACTION :
+STRUCTURE OBLIGATOIRE — 8 PARTIES :
 
-1. INTRODUCTION (150-200 mots)
-- Accroche qui capte immédiatement l'attention (question, stat, problème).
-- Reformule le besoin réel de l'utilisateur (pas le mot-clé littéral).
-- Annonce clairement ce que l'article va apporter.
-- Ton : expert mais accessible, comme un collègue senior qui explique.
+PARTIE 1 — INTRO IMPACT (150-200 mots)
+- Commence par un PROBLÈME RÉEL que le lecteur vit concrètement.
+- Formule une PROMESSE FORTE (ce qu'il va obtenir en lisant).
+- Annonce précisément ce que l'article va lui apprendre.
+- Accroche : question percutante, stat chiffrée, ou constat direct.
+- Ton : expert accessible, comme un collègue senior qui partage son expérience.
 
-2. FEATURED SNIPPET
-${snip ? "- Le featured snippet a été pré-généré. Intègre-le TEL QUEL dans le contenu à l'emplacement indiqué. Ne le régénère pas." : "- Crée un bloc featured snippet : H2 sous forme de question + réponse directe en 40-60 mots. Si guide → <ol> avec 4-8 étapes. Si comparatif → <table>. Si définition → commencer par \"[Sujet] est...\"."}
+PARTIE 2 — DONNÉES CONCRÈTES
+- Chiffres réels, budgets, coûts, estimations de marché.
+- Statistiques sourcées et crédibles (études, rapports).
+- Données qui apportent une valeur immédiate au lecteur.
+- Contexte chiffré du secteur "${industry ?? "e-commerce"}".
+- Aucun chiffre inventé — si tu n'as pas de donnée précise, donne des fourchettes réalistes.
 
-3. CONTENU PRINCIPAL (1200-1800 mots)
-${editPlan ? "- Suis le plan éditorial section par section. Chaque section doit couvrir les points listés et inclure les exemples suggérés." : `- 4 à 6 sections H2 bien structurées avec H3 si nécessaire.
-- Exemples concrets liés au secteur "${industry ?? "e-commerce"}".`}
-- Paragraphes courts (3-4 lignes max). Aucun mur de texte.
-- Listes à puces pour la lisibilité quand pertinent.
-- Chiffres, données, statistiques pour la crédibilité.
-- Chaque section apporte une valeur UNIQUE — aucune répétition entre sections.
-- Transitions naturelles entre sections.
+PARTIE 3 — EXEMPLES RÉELS
+- Cas concrets et scénarios réalistes liés au secteur.
+- Résultats mesurables (avant/après, ROI, gains).
+- Situations dans lesquelles le lecteur se reconnaît.
+- Au moins 2-3 exemples détaillés, pas des généralités.
 
-4. FAQ (3-4 questions)
-- Questions réellement posées par l'audience cible.
-- Réponses directes : 40-60 mots chacune (optimisées featured snippet).
+PARTIE 4 — STRATÉGIE ACTIONNABLE
+- Étapes concrètes numérotées que le lecteur peut suivre immédiatement.
+- Méthodes précises avec des outils, des techniques, des paramètres.
+- Conseils que même un expert trouverait utiles.
+- Chaque étape doit être exécutable, pas théorique.
+
+PARTIE 5 — ERREURS À ÉVITER
+- 3 à 5 erreurs fréquentes avec explication de POURQUOI c'est un piège.
+- Mauvaises pratiques courantes dans le secteur.
+- Ce que font les débutants vs ce que font les experts.
+- Conséquences concrètes de chaque erreur.
+
+PARTIE 6 — OUTIL OU SIMULATION
+- Un calcul simple, une projection chiffrée ou un exemple de simulation.
+- Le lecteur doit pouvoir appliquer ce calcul à sa propre situation.
+- Formule ou méthode reproductible.
+- Résultat concret qui donne envie d'agir.
+
+PARTIE 7 — FAQ (3-4 questions)
+- Questions RÉELLEMENT posées par l'audience cible.
+- Réponses directes : 40-60 mots chacune (optimisées featured snippet / position 0).
+- Hn optimisés, mots-clés naturels, richesse sémantique.
 - Ne PAS répéter le contenu des sections précédentes.
 
-5. CONCLUSION (100-150 mots)
-- Résumé synthétique des points clés.
-- Call-to-action fort et naturel.
-- Aucune répétition mot-à-mot du contenu.
+PARTIE 8 — CONCLUSION + CTA INTELLIGENT (100-150 mots)
+- Résumé percutant des points clés (pas de répétition mot-à-mot).
+- Lien naturel avec ce que Rankpill / "${businessName}" peut apporter.
+- Call-to-action fort qui pousse à l'action concrète.
 
-6. MAILLAGE INTERNE
+---
+
+FEATURED SNIPPET
+${snip ? "- Le featured snippet a été pré-généré. Intègre-le TEL QUEL dans le contenu à l'emplacement indiqué. Ne le régénère pas." : "- Crée un bloc featured snippet : H2 sous forme de question + réponse directe en 40-60 mots. Si guide → <ol> avec 4-8 étapes. Si comparatif → <table>. Si définition → commencer par \"[Sujet] est...\"."}
+
+MAILLAGE INTERNE
 ${cocoonPos ? "- Les liens sortants obligatoires sont définis ci-dessus. Intègre-les naturellement dans le texte avec les ancres recommandées." : "- Propose 2 à 4 liens internes avec ancrage naturel."}
 
-7. IMAGE
+IMAGE
 - Génère une requête Pexels précise (3-5 mots-clés en anglais).
 
-8. MÉTA DONNÉES
+MÉTA DONNÉES
 - title SEO : optimisé CTR, 50-60 caractères, contient le mot-clé.
 - meta_description : 150-160 caractères, incitative, naturelle.
 
@@ -244,12 +276,14 @@ ${cocoonPos ? "- Les liens sortants obligatoires sont définis ci-dessus. Intèg
 
 QUALITÉ — RÈGLES ABSOLUES :
 
-- Écrit par un humain expert, PAS par une IA. Aucune formule générique ("il est important de noter", "dans le monde actuel", "en conclusion").
+- Écrit par un humain expert, PAS par une IA. INTERDITES : "il est important de noter", "dans le monde actuel", "en conclusion", "il convient de", "force est de constater", "il est essentiel de".
+- Style : humain, fluide, expert, pédagogique. Alterner phrases courtes et développées.
 - Aucune sur-optimisation. Densité mot-clé principal < 2%.
-- Aucun contenu de remplissage. Chaque phrase apporte de la valeur.
-- Varier la longueur des phrases. Alterner phrases courtes et développées.
-- Utiliser la voix active. Être direct et concret.
-- Les exemples doivent être spécifiques et crédibles, pas génériques.
+- Aucun contenu de remplissage. Chaque phrase apporte de la valeur CONCRÈTE.
+- Les exemples doivent être SPÉCIFIQUES et crédibles, pas génériques.
+- Voix active. Direct. Concret. Pas de conditionnel excessif.
+- Aucune répétition inutile entre sections.
+- Longueur totale : 1500-2200 mots de contenu riche.
 
 ---
 
