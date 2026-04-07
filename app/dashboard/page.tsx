@@ -260,7 +260,11 @@ export default function Dashboard() {
       if (json.error) throw new Error(json.error);
       setRoadmapRecord(json.roadmap);
       setTutorialStep(prev => {
-        if (prev === 3) { localStorage.setItem("rankpill_onboarding", "4"); return 4; }
+        if (prev === 3) {
+          localStorage.setItem("rankpill_onboarding", "4");
+          setShowCompletionPopup(true);
+          return 4;
+        }
         return prev;
       });
     } catch { /* ignore */ } finally {
@@ -688,7 +692,46 @@ export default function Dashboard() {
           </div>
         )}
 
-        {loading && <div className="text-center text-gray-600 py-24 text-sm">Chargement du dashboard...</div>}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-32 gap-6 animate-fade-in-up">
+            {/* Pilule animée */}
+            <div className="relative">
+              <div
+                className="relative overflow-hidden"
+                style={{
+                  width: 36, height: 68, borderRadius: 18,
+                  background: "linear-gradient(160deg, #1a0a00, #0d0d0d 40%, #1a0500)",
+                  border: "1.5px solid rgba(249,115,22,0.4)",
+                  boxShadow: "0 0 30px rgba(249,115,22,0.2), 0 0 60px rgba(249,115,22,0.08)",
+                  animation: "float 2s ease-in-out infinite",
+                }}
+              >
+                <div className="absolute top-1.5 left-1.5 right-1.5" style={{ height: 26, borderRadius: "14px 14px 3px 3px", background: "linear-gradient(170deg, #ff8c00, #f97316, #ea580c)", boxShadow: "0 4px 12px rgba(249,115,22,0.4)" }} />
+                <div className="absolute bottom-1.5 left-1.5 right-1.5" style={{ height: 26, borderRadius: "3px 3px 14px 14px", background: "linear-gradient(170deg, #1c0a00, #0d0500)", border: "1px solid rgba(249,115,22,0.12)" }} />
+                <div className="absolute left-1.5 right-1.5 top-1/2 -translate-y-1/2 h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.5), transparent)" }} />
+              </div>
+              <div className="absolute inset-0 rounded-full animate-ping opacity-15" style={{ background: "rgba(249,115,22,0.3)", animationDuration: "2s" }} />
+            </div>
+            {/* Barre de progression */}
+            <div className="w-48 h-1 rounded-full overflow-hidden" style={{ background: "rgba(249,115,22,0.1)" }}>
+              <div
+                className="h-full rounded-full relative overflow-hidden"
+                style={{
+                  background: "linear-gradient(90deg, #f97316, #ef4444, #f97316)",
+                  animation: "loadingBar 1.8s ease-in-out infinite",
+                }}
+              />
+            </div>
+            <p className="text-gray-500 text-xs font-medium tracking-wide uppercase">Chargement du dashboard</p>
+            <style>{`
+              @keyframes loadingBar {
+                0% { width: 0%; margin-left: 0%; }
+                50% { width: 60%; margin-left: 20%; }
+                100% { width: 0%; margin-left: 100%; }
+              }
+            `}</style>
+          </div>
+        )}
 
         {!loading && data && (
           <>
