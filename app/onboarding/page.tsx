@@ -102,12 +102,12 @@ const SHOPIFY_TUTORIAL = {
     { num: "01", title: "Ouvrez le Dev Dashboard", detail: "Dans votre admin Shopify, allez dans :", path: ["Paramètres", "Applications", "Développer des applications dans le Dev Dashboard"] },
     { num: "02", title: "Créez une nouvelle app", detail: "Sur le Dev Dashboard (dev.shopify.com), cliquez sur \"Create an app\". Donnez-lui le nom :", code: "RankPill" },
     { num: "03", title: "Configurez l'API Admin", detail: "Dans votre app, allez dans \"Configuration\" puis \"Admin API integration\". Activez les permissions :", permissions: true },
-    { num: "04", title: "Créez une version", detail: "Allez dans \"Versions\" → \"Créer une version\". Validez la création." },
-    { num: "05", title: "Installez l'app sur votre boutique", detail: "Dans la section \"Installations\", cliquez sur \"Installer l'application\" et confirmez sur votre boutique." },
-    { num: "06", title: "Récupérez le token Admin API", detail: "Après l'installation, allez dans \"Configuration\" → \"Admin API integration\". Le jeton d'accès apparait. Copiez-le :", code: "Jeton d'accès à l'API Admin (shpat_...)" },
-    { num: "07", title: "Collez le token dans le champ", detail: "Revenez ici et collez le token dans le champ \"Clé API Admin Shopify\" à gauche." },
+    { num: "04", title: "Créez une version et installez", detail: "Allez dans \"Versions\" → \"Créer une version\". Puis dans \"Installations\" → \"Installer l'application\" sur votre boutique." },
+    { num: "05", title: "Copiez le Secret de l'app", detail: "Dans votre app, allez dans \"Paramètres\" → \"Identifiants\". Cliquez sur l'icone oeil pour révéler le Secret, puis copiez-le :", code: "Secret (clé secrète de l'app)" },
+    { num: "06", title: "Trouvez votre URL .myshopify.com", detail: "Dans votre admin Shopify → Paramètres → Domaines. Repérez l'URL qui se termine par .myshopify.com (ex: maboutique.myshopify.com)." },
+    { num: "07", title: "Remplissez les champs à gauche", detail: "Collez le Secret dans \"Clé API Admin Shopify\". Entrez votre URL .myshopify.com dans le champ dédié. Votre domaine principal (ex: maboutique.fr) va dans \"Domaine principal\"." },
   ],
-  warning: "Attention : le token commence par shpat_. Ne confondez pas avec le Client ID ou le Secret (dans \"Paramètres\" de l'app) — ce ne sont PAS les bons identifiants. Le token Admin API se trouve dans \"Configuration\" → \"Admin API integration\" après installation.",
+  warning: "Le Secret se trouve dans \"Paramètres\" → \"Identifiants\" de votre app sur le Dev Dashboard. Ne confondez pas avec le Client ID (l'identifiant public) — c'est le Secret qu'il faut copier.",
 };
 
 const WIX_TUTORIAL = {
