@@ -3,6 +3,155 @@ import { aiCall, aiCallStream, parseAiJson } from "@/lib/ai-router";
 import { rateLimit } from "@/lib/rate-limit";
 import { shopifyFetch } from "@/lib/shopify";
 
+// ── SERP Analysis — scrape + analyse concurrentielle ──────────────────────────
+
+type SerpResult = {
+  title: string;
+  url: string;
+  headings: string[];
+  summary: string;
+  wordCount: number;
+};
+
+type SerpAnalysis = {
+  serp_patterns: string;
+  weaknesses: string[];
+  opportunities: string[];
+  differentiation_strategy: string;
+  content_upgrades: string[];
+  enhanced_structure: string[];
+};
+
+async function scrapeSerpPage(url: string): Promise<SerpResult | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+    const h2Matches = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)].slice(0, 8);
+    const h3Matches = [...html.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi)].slice(0, 6);
+
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+      .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return {
+      title: titleMatch?.[1]?.trim() ?? "",
+      url,
+      headings: [
+        ...h2Matches.map(m => m[1].replace(/<[^>]+>/g, "").trim()),
+        ...h3Matches.map(m => m[1].replace(/<[^>]+>/g, "").trim()),
+      ].filter(Boolean),
+      summary: text.slice(0, 800),
+      wordCount: text.split(/\s+/).filter(Boolean).length,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchGoogleSerpUrls(keyword: string, lang: string): Promise<string[]> {
+  try {
+    const query = encodeURIComponent(keyword);
+    const hl = lang === "fr" ? "fr" : lang === "es" ? "es" : lang === "de" ? "de" : "en";
+    const res = await fetch(
+      `https://www.google.com/search?q=${query}&hl=${hl}&num=8&gl=${hl}`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept-Language": `${hl},en;q=0.9`,
+        },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    if (!res.ok) return [];
+    const html = await res.text();
+    // Extract organic result URLs from Google SERP
+    const urls = [...html.matchAll(/href="\/url\?q=([^&"]+)/g)]
+      .map(m => decodeURIComponent(m[1]))
+      .filter(u => u.startsWith("http") && !u.includes("google.") && !u.includes("youtube.") && !u.includes("wikipedia."));
+    // Fallback: try extracting from <a href="https://..." patterns
+    if (urls.length < 3) {
+      const directUrls = [...html.matchAll(/<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>/g)]
+        .map(m => m[1])
+        .filter(u => !u.includes("google.") && !u.includes("youtube.") && !u.includes("accounts.") && !u.includes("support.google"));
+      return [...new Set([...urls, ...directUrls])].slice(0, 5);
+    }
+    return urls.slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
+async function analyzeSERP(keyword: string, language: string, industry: string): Promise<SerpAnalysis | null> {
+  try {
+    // 1. Scrape Google SERP top results
+    const urls = await fetchGoogleSerpUrls(keyword, language);
+    if (urls.length === 0) return null;
+
+    // 2. Scrape each result page
+    const scraped = (await Promise.all(urls.map(u => scrapeSerpPage(u)))).filter((r): r is SerpResult => r !== null);
+    if (scraped.length === 0) return null;
+
+    // 3. IA analysis
+    const serpInput = scraped.map(r => ({
+      title: r.title,
+      headings: r.headings.slice(0, 6),
+      summary: r.summary.slice(0, 400),
+      wordCount: r.wordCount,
+    }));
+
+    const result = await aiCall(
+      { task: "content_audit" },
+      {
+        messages: [{
+          role: "user",
+          content: `Tu es un expert SEO senior spécialisé en analyse SERP et reverse engineering SEO.
+
+KEYWORD : "${keyword}"
+SECTEUR : "${industry}"
+
+RÉSULTATS GOOGLE TOP ${scraped.length} :
+${JSON.stringify(serpInput, null, 2)}
+
+MISSION : Analyse ces résultats et identifie comment créer un contenu SUPÉRIEUR.
+
+PARTIE 1 — PATTERNS SERP : Structure commune, angles utilisés, types de contenus dominants.
+PARTIE 2 — FAIBLESSES : Manque de données, contenu générique, absence d'exemples, contenu non actionnable.
+PARTIE 3 — OPPORTUNITÉS : Angles non exploités, infos absentes, besoins non couverts.
+PARTIE 4 — STRATÉGIE DE DIFFÉRENCIATION : Angle unique, promesse plus forte, positionnement supérieur.
+PARTIE 5 — AMÉLIORATIONS : Données chiffrées, exemples concrets, simulateurs, conseils avancés à ajouter.
+PARTIE 6 — STRUCTURE AMÉLIORÉE : Sections nouvelles, logique plus avancée que la concurrence.
+
+RETOURNE : JSON brut uniquement.
+{
+  "serp_patterns": "description des patterns communs en 2-3 phrases",
+  "weaknesses": ["faiblesse 1", "faiblesse 2", ...],
+  "opportunities": ["opportunité 1", "opportunité 2", ...],
+  "differentiation_strategy": "stratégie en 2-3 phrases",
+  "content_upgrades": ["amélioration 1", "amélioration 2", ...],
+  "enhanced_structure": ["section H2 recommandée 1", "section H2 recommandée 2", ...]
+}`,
+        }],
+      }
+    );
+
+    return parseAiJson<SerpAnalysis>(result.text) ?? null;
+  } catch (err) {
+    console.error("[SERP analysis]", err);
+    return null;
+  }
+}
+
 async function extractStyleGuide(samples: string[]): Promise<string> {
   try {
     const result = await aiCall(
@@ -96,6 +245,12 @@ export async function POST(request: Request) {
       // DA optionnelle, on continue sans
     }
 
+    // ── Analyse SERP concurrentielle (en parallèle) ─────────────────────────
+    let serpAnalysis: SerpAnalysis | null = null;
+    try {
+      serpAnalysis = await analyzeSERP(keyword, language, industry ?? "e-commerce");
+    } catch { /* SERP analysis optionnelle */ }
+
     const otherKeywords = (allKeywords ?? []).filter((k: string) => k !== keyword).slice(0, 5);
     const internalLinksContext = otherKeywords.length > 0
       ? `\n\nSecondary keywords to mention naturally for internal linking: ${otherKeywords.join(", ")}`
@@ -182,6 +337,18 @@ IMPORTANT : Suis ce plan section par section. Chaque section doit couvrir les po
       : "";
 
     // Determine if we have pre-generated data (enriched mode) or not (legacy mode)
+    const serpContext = serpAnalysis
+      ? `\n\nANALYSE SERP CONCURRENTIELLE (résultats Google analysés pour "${keyword}") :
+Patterns SERP : ${serpAnalysis.serp_patterns}
+Faiblesses concurrents : ${serpAnalysis.weaknesses.join(" | ")}
+Opportunités identifiées : ${serpAnalysis.opportunities.join(" | ")}
+Stratégie de différenciation : ${serpAnalysis.differentiation_strategy}
+Améliorations obligatoires : ${serpAnalysis.content_upgrades.join(" | ")}
+Structure améliorée recommandée : ${serpAnalysis.enhanced_structure.join(" → ")}
+
+IMPORTANT : Utilise cette analyse pour créer un contenu SUPÉRIEUR à la concurrence. Exploite les faiblesses identifiées, couvre les opportunités manquées, et applique la stratégie de différenciation. Ton article doit être objectivement meilleur que tout ce qui existe actuellement sur ce mot-clé.`
+      : "";
+
     const hasPreGenData = !!(struct || editPlan || snip || kwStrat);
 
     const systemPrompt = `Tu es un expert SEO senior ET un rédacteur professionnel (10+ ans d'expérience). Tu es spécialisé dans :
@@ -196,7 +363,7 @@ Tu travailles pour Rankpill. Chaque article que tu produis doit être MEILLEUR q
 
 LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
 
-MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}${keywordContext}${structureContext}${snippetContext}${editorialContext}
+MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}${keywordContext}${structureContext}${snippetContext}${editorialContext}${serpContext}
 
 ---
 
