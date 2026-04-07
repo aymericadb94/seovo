@@ -36,6 +36,13 @@ export async function POST(request: Request) {
         return Response.json({ ok: false, reason: "Clé API Shopify manquante" }, { status: 400 });
       }
       const baseUrl = siteUrl.replace(/\/$/, "");
+      // Shopify Admin API requires the .myshopify.com domain
+      if (!baseUrl.includes(".myshopify.com")) {
+        return Response.json({
+          ok: false,
+          reason: "L'URL doit être au format https://nom-boutique.myshopify.com (pas votre domaine custom)",
+        });
+      }
       const res = await fetch(`${baseUrl}/admin/api/2024-01/shop.json`, {
         headers: { "X-Shopify-Access-Token": shopifyApiKey },
       });
@@ -46,7 +53,7 @@ export async function POST(request: Request) {
         return Response.json({ ok: false, reason: "Clé API invalide ou permissions insuffisantes" });
       }
       if (res.status === 404) {
-        return Response.json({ ok: false, reason: "Boutique Shopify introuvable — vérifiez l'URL" });
+        return Response.json({ ok: false, reason: "Boutique Shopify introuvable — vérifiez l'URL (.myshopify.com)" });
       }
       return Response.json({ ok: false, reason: `Erreur ${res.status} — vérifiez l'URL et la clé API` });
     }

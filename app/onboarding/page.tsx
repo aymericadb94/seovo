@@ -434,7 +434,7 @@ export default function OnboardingPage() {
     if (step === 1) {
       if (!form.cms || !form.site_url.trim()) return false;
       if (form.cms === "wordpress") return form.wp_username.trim() && form.wp_app_password.trim();
-      if (form.cms === "shopify") return form.shopify_api_key.trim();
+      if (form.cms === "shopify") return form.shopify_api_key.trim() && form.site_url.includes(".myshopify.com");
       if (form.cms === "wix") return form.wix_api_key.trim() && form.wix_site_id.trim();
       if (form.cms === "custom") return form.custom_api_url.trim();
     }
@@ -762,6 +762,9 @@ export default function OnboardingPage() {
                         placeholder={form.cms === "shopify" ? "https://maboutique.myshopify.com" : "https://votresite.com"}
                         className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] transition-all"
                       />
+                      {form.cms === "shopify" && form.site_url.trim() && !form.site_url.includes(".myshopify.com") && (
+                        <p className="mt-1.5 text-xs text-orange-400">Utilisez votre URL Shopify : https://nom-boutique.myshopify.com (pas votre domaine custom)</p>
+                      )}
                     </div>
 
                     {form.cms === "wordpress" && (

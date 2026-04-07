@@ -270,9 +270,12 @@ export default function SettingsPage() {
                   type="url"
                   value={config.site_url}
                   onChange={(e) => update("site_url", e.target.value)}
-                  placeholder="https://votresite.com"
+                  placeholder={config.cms === "shopify" ? "https://nom-boutique.myshopify.com" : "https://votresite.com"}
                   className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors"
                 />
+                {config.cms === "shopify" && config.site_url.trim() && !config.site_url.includes(".myshopify.com") && (
+                  <p className="mt-1.5 text-xs text-orange-400">Utilisez votre URL Shopify : https://nom-boutique.myshopify.com (pas votre domaine custom)</p>
+                )}
               </div>
               {config.cms === "wordpress" && (
                 <>
