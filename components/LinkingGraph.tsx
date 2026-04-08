@@ -640,6 +640,22 @@ export default function LinkingGraph() {
         </div>
       )}
 
+      {/* ── Relaunch banner (when data seems stale) ────────────────────── */}
+      {data && (data.existing_links ?? []).length === 0 && data.page_profiles.every(p => p.incoming === 0) && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)" }}>
+          <span className="text-orange-400 text-sm">⚠️</span>
+          <span className="text-orange-300 text-xs font-medium flex-1">Les données semblent obsolètes — relancez l{"'"}analyse pour détecter les vrais liens entre vos pages.</span>
+          <button
+            onClick={() => { runAnalysis(); }}
+            disabled={loading}
+            className="shrink-0 px-4 py-2 rounded-lg text-xs font-black text-white transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 4px 16px rgba(249,115,22,0.3)" }}
+          >
+            {loading ? "Analyse en cours..." : "🔄 Relancer l'analyse"}
+          </button>
+        </div>
+      )}
+
       {/* ── Filters ──────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
         {([
@@ -696,9 +712,14 @@ export default function LinkingGraph() {
           <button
             onClick={() => { runAnalysis(); }}
             disabled={loading}
-            className="px-3 py-1.5 rounded-full text-xs font-bold bg-white/[0.04] text-gray-500 border border-white/[0.06] hover:text-gray-300 transition-all disabled:opacity-50"
+            className="px-4 py-1.5 rounded-full text-xs font-bold transition-all disabled:opacity-50"
+            style={{
+              background: "linear-gradient(135deg, rgba(249,115,22,0.15), rgba(239,68,68,0.15))",
+              border: "1px solid rgba(249,115,22,0.3)",
+              color: "#fb923c",
+            }}
           >
-            {loading ? "Analyse..." : "Relancer"}
+            {loading ? "⏳ Analyse..." : "🔄 Relancer l'analyse"}
           </button>
         </div>
       </div>
