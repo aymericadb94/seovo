@@ -40,7 +40,7 @@ async function testAiStep(
   try {
     const result = await aiCall(
       { task },
-      { messages: [{ role: "user", content: prompt }], max_tokens: 2000 }
+      { messages: [{ role: "user", content: prompt }], max_tokens: 4096 }
     );
     const duration = Date.now() - start;
 
