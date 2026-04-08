@@ -120,11 +120,29 @@ export async function analyzeLinking(
 
   // 2. Build GSC lookup
   const gscByQuery = new Map(gscQueries.map(q => [q.query.toLowerCase(), q]));
-  const gscByUrl = new Map<string, GSCQuery[]>();
-  // We don't have page-level GSC here, so we match by keyword
+
+  // Debug: log data shapes to understand matching failures
+  console.log(`[linking] CMS posts: ${cmsPosts.length}, Publications: ${publications.length}, Cocoon clusters: ${cocoon.clusters.length}`);
+  if (cmsPosts.length > 0) {
+    console.log(`[linking] Sample CMS URL: "${cmsPosts[0].url}"`);
+  }
+  if (publications.length > 0) {
+    const pub0 = publications[0];
+    console.log(`[linking] Sample pub: keyword="${pub0.keyword}", wp_url="${pub0.wordpress_url}"`);
+  }
+  if (cocoon.clusters.length > 0) {
+    const c0 = cocoon.clusters[0];
+    console.log(`[linking] Sample cluster: "${c0.name}", pillar_kw="${c0.pillar.keyword}", pillar_url="${c0.pillar.url}", supports=${c0.support_pages.length}`);
+  }
 
   // 3. Build page profiles
   const profiles = buildPageProfiles(cmsPosts, publications, cocoon, gscByQuery, siteUrl);
+
+  // Debug: log matching results
+  const matched = profiles.filter(p => p.cluster !== null);
+  const withKeyword = profiles.filter(p => p.keyword !== "");
+  const withIncoming = profiles.filter(p => p.incoming_internal > 0);
+  console.log(`[linking] Profiles: ${profiles.length} total, ${matched.length} in cluster, ${withKeyword.length} with keyword, ${withIncoming.length} with incoming links`);
 
   // 4. Analyze cluster strengths
   const clusterStrengths = analyzeClusterStrengths(cocoon, profiles, gscByQuery);
@@ -172,19 +190,21 @@ function buildPageProfiles(
   const allUrls = cmsPosts.map(p => p.url);
 
   for (const post of cmsPosts) {
-    const pub = publications.find(p => p.wordpress_url && urlsMatch(p.wordpress_url, post.url));
+    // Match publication by URL, then fallback by title similarity
+    const pub = publications.find(p => p.wordpress_url && urlsMatch(p.wordpress_url, post.url))
+      ?? publications.find(p => p.title && post.title && p.title.toLowerCase() === post.title.toLowerCase());
     const keyword = pub?.keyword ?? "";
 
-    // Find cluster membership
+    // Find cluster membership — try URL, keyword, and title matching
     let role: PageLinkProfile["role"] = "unknown";
     let clusterName: string | null = null;
     for (const cluster of cocoon.clusters) {
-      if (matchesPage(cluster.pillar, post.url, keyword)) {
+      if (matchesPage(cluster.pillar, post.url, keyword, post.title)) {
         role = "pillar";
         clusterName = cluster.name;
         break;
       }
-      if (cluster.support_pages.some(sp => matchesPage(sp, post.url, keyword))) {
+      if (cluster.support_pages.some(sp => matchesPage(sp, post.url, keyword, post.title))) {
         role = "support";
         clusterName = cluster.name;
         break;
@@ -825,12 +845,21 @@ function urlsMatch(a: string, b: string): boolean {
 }
 
 function matchesPage(
-  cocoonPage: { keyword: string; url?: string },
+  cocoonPage: { keyword: string; title?: string; url?: string },
   postUrl: string,
-  postKeyword: string
+  postKeyword: string,
+  postTitle?: string
 ): boolean {
+  // 1. URL match (exact or slug)
   if (cocoonPage.url && urlsMatch(cocoonPage.url, postUrl)) return true;
+  // 2. Keyword match
   if (postKeyword && cocoonPage.keyword.toLowerCase() === postKeyword.toLowerCase()) return true;
+  // 3. Title match (cocoon title vs CMS post title)
+  if (postTitle && cocoonPage.title && cocoonPage.title.toLowerCase() === postTitle.toLowerCase()) return true;
+  // 4. Keyword appears in post title (fuzzy)
+  if (postTitle && cocoonPage.keyword && postTitle.toLowerCase().includes(cocoonPage.keyword.toLowerCase())) return true;
+  // 5. Post keyword appears in cocoon page title
+  if (postKeyword && cocoonPage.title && cocoonPage.title.toLowerCase().includes(postKeyword.toLowerCase())) return true;
   return false;
 }
 
