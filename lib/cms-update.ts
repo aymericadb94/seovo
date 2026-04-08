@@ -748,25 +748,77 @@ async function wixUpdatePostContent(
       return { success: false, post_id: postId, url: "", error: "Aucun lien trouvé dans le HTML modifié" };
     }
 
-    // Wix Blog v3: published posts must be edited via draft workflow
-    // Step 1: Create a draft from the published post
-    const createDraftRes = await fetch(
-      `https://www.wixapis.com/blog/v3/draft-posts/create-from-post/${postId}`,
+    // Wix Blog v3: published posts are read-only → use draft workflow
+    // Strategy A: Try to revert published post to draft
+    // Strategy B: Check if a draft already exists for this post
+    // Strategy C: Try PATCH directly on the post (some Wix versions allow it)
+
+    let draftId: string | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let draftData: any = null;
+
+    // Strategy A: POST /revert/{postId}
+    const revertRes = await fetch(
+      `https://www.wixapis.com/blog/v3/draft-posts/revert/${postId}`,
       { method: "POST", headers: hdrs }
     );
-    if (!createDraftRes.ok) {
-      const errText = (await createDraftRes.text()).slice(0, 300);
-      return { success: false, post_id: postId, url: "", error: `Wix create draft failed (${createDraftRes.status}): ${errText}` };
+    if (revertRes.ok) {
+      draftData = await revertRes.json();
+      draftId = draftData?.draftPost?.id ?? null;
     }
-    const draftData = await createDraftRes.json() as { draftPost: { id: string; richContent?: { nodes?: WixRichNode[] } } };
-    const draftId = draftData.draftPost?.id;
+
+    // Strategy B: List drafts and find one matching this postId
     if (!draftId) {
-      return { success: false, post_id: postId, url: "", error: "Wix: pas de draftId retourné" };
+      const listRes = await fetch(
+        `https://www.wixapis.com/blog/v3/draft-posts?paging.limit=100&fieldsets=CONTENT`,
+        { headers: hdrs }
+      );
+      if (listRes.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const listData = await listRes.json() as { draftPosts?: any[] };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const match = listData.draftPosts?.find((d: any) => d.postId === postId || d.id === postId);
+        if (match) {
+          draftId = match.id;
+          draftData = { draftPost: match };
+        }
+      }
+    }
+
+    // Strategy C: Try direct PATCH on published post as last resort
+    if (!draftId) {
+      const newNodes: WixRichNode[] = allLinksInHtml.map(link => ({
+        type: "PARAGRAPH",
+        paragraphData: {},
+        nodes: [
+          { type: "TEXT", textData: { text: "À lire aussi : ", decorations: [] } },
+          { type: "TEXT", textData: { text: link.text, decorations: [{ type: "LINK", linkData: { link: { url: link.url } } }] } },
+        ],
+      }));
+
+      // Try PATCH /posts/{postId}
+      const directRes = await fetch(
+        `https://www.wixapis.com/blog/v3/posts/${postId}`,
+        {
+          method: "PATCH",
+          headers: hdrs,
+          body: JSON.stringify({ post: { richContent: { nodes: newNodes } }, fieldMask: ["richContent"] }),
+        }
+      );
+      if (directRes.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await directRes.json() as any;
+        const url = data.post?.url ? `${data.post.url.base}${data.post.url.path}` : "";
+        return { success: true, post_id: data.post?.id ?? postId, url };
+      }
+
+      const aText = await revertRes.text().catch(() => "");
+      return { success: false, post_id: postId, url: "", error: `Wix: impossible de créer un brouillon (revert=${revertRes.status}, direct PATCH=${directRes.status}). revert body: ${aText.slice(0, 200)}` };
     }
 
     // Step 2: Get existing links from the draft to avoid duplicates
     const existingLinks = new Set<string>();
-    const existingRc = draftData.draftPost?.richContent;
+    const existingRc = draftData?.draftPost?.richContent as { nodes?: WixRichNode[] } | undefined;
     function collectLinks(nodes: WixRichNode[]) {
       for (const n of nodes) {
         if (n.textData?.decorations) {
@@ -805,7 +857,7 @@ async function wixUpdatePostContent(
       {
         method: "PATCH",
         headers: hdrs,
-        body: JSON.stringify({ draftPost: { richContent: { nodes: updatedNodes } } }),
+        body: JSON.stringify({ draftPost: { richContent: { nodes: updatedNodes } }, fieldMask: ["richContent"] }),
       }
     );
     if (!updateDraftRes.ok) {
