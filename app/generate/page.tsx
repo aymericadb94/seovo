@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { LOCALES, localeFlags, localeNames, type Locale } from "@/lib/i18n/translations";
+import SeoPage from "@/components/SeoPage";
 
 type SiteConfig = {
   business_name: string;
@@ -379,6 +380,9 @@ export default function GeneratePage() {
         content_structure: localStructure ?? undefined,
         featured_snippet: localSnippet ?? undefined,
         editorial_plan: localEditorial ?? undefined,
+        // Activer le moteur SEO intelligent v2
+        engine: true,
+        intent_analysis: localIntent ?? undefined,
       }),
     });
 
@@ -401,7 +405,7 @@ export default function GeneratePage() {
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
             try {
-              const event = JSON.parse(line.slice(6)) as { type: string; text?: string; error?: string; stop_reason?: string };
+              const event = JSON.parse(line.slice(6)) as { type: string; text?: string; error?: string; stop_reason?: string; decisions?: unknown[]; context_hash?: string };
               if (event.type === "delta" && event.text) {
                 fullText += event.text;
                 setStreamText(fullText);
@@ -410,6 +414,9 @@ export default function GeneratePage() {
                 if (event.stop_reason === "max_tokens") {
                   console.warn("[generate] Response truncated (max_tokens hit)");
                 }
+              } else if (event.type === "engine_meta") {
+                // Métadonnées du moteur SEO v2 — log pour debug
+                console.log("[engine v2]", event.decisions?.length, "blocs décidés, hash:", event.context_hash);
               } else if (event.type === "error") {
                 throw new Error(event.error || "Erreur de génération");
               }
@@ -1464,173 +1471,8 @@ export default function GeneratePage() {
             </div>
 
             {generated.structured ? (
-              /* ── Rendu structuré moderne ── */
-              <div className="flex flex-col gap-5">
-
-                {/* HERO */}
-                <div
-                  className="rounded-2xl overflow-hidden relative"
-                  style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.08) 0%, rgba(239,68,68,0.05) 50%, rgba(0,0,0,0.4) 100%)", border: "1px solid rgba(249,115,22,0.15)" }}
-                >
-                  <div className="h-1 w-full" style={{ background: "linear-gradient(90deg, #f97316, #ef4444, #f97316)" }} />
-                  <div className="px-8 py-10 md:px-12 md:py-14">
-                    <h1 className="text-3xl md:text-4xl font-black text-white leading-tight mb-3">
-                      {generated.structured.hero.title}
-                    </h1>
-                    {generated.structured.hero.subtitle && (
-                      <p className="text-lg text-gray-300 font-medium mb-4">{generated.structured.hero.subtitle}</p>
-                    )}
-                    {generated.structured.hero.promise && (
-                      <p className="text-sm text-gray-400 leading-relaxed max-w-2xl">{generated.structured.hero.promise}</p>
-                    )}
-                    {generated.structured.hero.cta && (
-                      <button className="mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-sm shadow-lg shadow-orange-500/20">
-                        {generated.structured.hero.cta}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* QUICK ANSWER (Featured Snippet) */}
-                {generated.structured.quick_answer && (
-                  <div className="bg-white/[0.03] border border-orange-500/20 rounded-2xl px-6 py-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-1.5 h-6 rounded-full bg-orange-500" />
-                      <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Réponse rapide</p>
-                    </div>
-                    <p className="text-gray-200 text-sm leading-relaxed">{generated.structured.quick_answer}</p>
-                  </div>
-                )}
-
-                {/* KEY STATS */}
-                {generated.structured.key_stats.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                    {generated.structured.key_stats.map((stat, i) => (
-                      <div
-                        key={i}
-                        className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-4 text-center"
-                      >
-                        <p className="text-2xl font-black text-orange-400 mb-1">{stat.value}</p>
-                        <p className="text-gray-400 text-xs leading-snug">{stat.label}</p>
-                        {stat.source && <p className="text-gray-600 text-[10px] mt-1">{stat.source}</p>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* SIMULATION */}
-                {generated.structured.simulation.title && (
-                  <div
-                    className="rounded-2xl overflow-hidden"
-                    style={{ background: "rgba(59,130,246,0.04)", border: "1px solid rgba(59,130,246,0.15)" }}
-                  >
-                    <div className="px-6 py-5">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-blue-400">📊</span>
-                        <p className="text-sm font-black text-blue-400 uppercase tracking-wide">{generated.structured.simulation.title}</p>
-                      </div>
-                      <div
-                        className="prose-article text-sm text-gray-300 mb-3"
-                        dangerouslySetInnerHTML={{ __html: generated.structured.simulation.scenario }}
-                      />
-                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-3">
-                        <p className="text-blue-300 font-bold text-sm">{generated.structured.simulation.result}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* SECTIONS (contenu principal) */}
-                {generated.structured.sections.map((section, i) => (
-                  <div key={i} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl px-6 py-6 md:px-8">
-                    <h2 className="text-xl font-black text-white mb-4">{section.title}</h2>
-                    <div
-                      className="prose-article text-sm text-gray-300 leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: section.content }}
-                    />
-                    {section.tip && (
-                      <div className="mt-4 bg-orange-500/5 border border-orange-500/15 rounded-xl px-4 py-3">
-                        <p className="text-orange-300 text-xs"><strong>💡 Astuce</strong> — {section.tip}</p>
-                      </div>
-                    )}
-                    {section.example && (
-                      <div className="mt-3 bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3">
-                        <p className="text-gray-400 text-xs italic">Exemple : {section.example}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* INSIGHTS */}
-                {generated.structured.insights.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {generated.structured.insights.map((insight, i) => {
-                      const styles = {
-                        tip: { bg: "rgba(249,115,22,0.05)", border: "rgba(249,115,22,0.15)", icon: "💡", color: "text-orange-300" },
-                        warning: { bg: "rgba(239,68,68,0.05)", border: "rgba(239,68,68,0.15)", icon: "⚠️", color: "text-red-300" },
-                        pro: { bg: "rgba(168,85,247,0.05)", border: "rgba(168,85,247,0.15)", icon: "🔥", color: "text-purple-300" },
-                      };
-                      const s = styles[insight.type];
-                      return (
-                        <div key={i} className="rounded-xl px-4 py-3" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
-                          <p className={`text-xs leading-relaxed ${s.color}`}>
-                            <span className="mr-1.5">{s.icon}</span>{insight.text}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* MISTAKES */}
-                {generated.structured.mistakes.length > 0 && (
-                  <div className="bg-red-500/[0.03] border border-red-500/15 rounded-2xl px-6 py-5">
-                    <p className="text-sm font-black text-red-400 uppercase tracking-wider mb-4">Erreurs à éviter</p>
-                    <div className="space-y-3">
-                      {generated.structured.mistakes.map((m, i) => (
-                        <div key={i} className="flex gap-3">
-                          <span className="text-red-500 font-black text-sm mt-0.5">✕</span>
-                          <div>
-                            <p className="text-white font-bold text-sm">{m.title}</p>
-                            <p className="text-gray-400 text-xs mt-0.5">{m.why}</p>
-                            <p className="text-red-400/70 text-xs mt-0.5 italic">{m.consequence}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* FAQ */}
-                {generated.structured.faq.length > 0 && (
-                  <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl px-6 py-5">
-                    <p className="text-sm font-black text-white uppercase tracking-wider mb-4">Questions fréquentes</p>
-                    <div className="space-y-4">
-                      {generated.structured.faq.map((q, i) => (
-                        <div key={i} className="border-b border-white/[0.05] pb-3 last:border-0 last:pb-0">
-                          <p className="text-white font-bold text-sm mb-1">{q.question}</p>
-                          <p className="text-gray-400 text-xs leading-relaxed">{q.answer}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* CTA FINAL */}
-                {generated.structured.cta.text && (
-                  <div
-                    className="rounded-2xl text-center px-8 py-8"
-                    style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.08), rgba(239,68,68,0.06))", border: "1px solid rgba(249,115,22,0.15)" }}
-                  >
-                    <p className="text-gray-300 text-sm leading-relaxed mb-4 max-w-lg mx-auto">{generated.structured.cta.text}</p>
-                    {generated.structured.cta.button_text && (
-                      <button className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-sm shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-[0.98] transition-transform">
-                        {generated.structured.cta.button_text}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
+              /* ── Rendu structuré via composant SeoPage ── */
+              <SeoPage data={generated.structured} title={generated.title} />
             ) : (
               /* ── Fallback : ancien rendu HTML brut ── */
               <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-8 md:p-12">

@@ -2,6 +2,12 @@ import { createClient } from "@/lib/supabase/server";
 import { aiCall, aiCallStream, parseAiJson } from "@/lib/ai-router";
 import { rateLimit } from "@/lib/rate-limit";
 import { shopifyFetch } from "@/lib/shopify";
+import {
+  buildPageContext,
+  generatePageStream,
+  assembleCmsHtml as engineAssembleCmsHtml,
+  type PageContext,
+} from "@/lib/seo-engine";
 
 // ── SERP Analysis — scrape + analyse concurrentielle ──────────────────────────
 
@@ -305,7 +311,116 @@ export async function POST(request: Request) {
     const limited = rateLimit(user.id, { name: "generate", maxRequests: 10, windowSeconds: 600 });
     if (limited) return limited;
 
-    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position, keyword_strategy, content_structure, featured_snippet, editorial_plan } = await request.json();
+    const body = await request.json();
+    const { keyword, businessName, industry, allKeywords, language = "fr", cocoon_position, keyword_strategy, content_structure, featured_snippet, editorial_plan } = body;
+    const useEngine = body.engine === true;
+    const url = new URL(request.url);
+    const isStream = url.searchParams.get("stream") === "1";
+
+    // ── Mode Engine v2 — moteur SEO intelligent ─────────────────────────────
+    if (useEngine) {
+      // Construire le contexte complet automatiquement
+      const kwStrat = keyword_strategy as { primary_keyword: string; secondary_keywords: string[]; semantic_field: string[]; seo_angle: string } | undefined;
+      const intentData = body.intent_analysis as { intent_type: string; user_intent: string; recommended_content_type: string; angle: string } | undefined;
+
+      // SERP optionnelle en parallèle
+      let serpData: PageContext["serp"] = null;
+      try {
+        const serp = await analyzeSERP(keyword, language, industry ?? "e-commerce");
+        if (serp) {
+          serpData = {
+            patterns: serp.serp_patterns,
+            weaknesses: serp.weaknesses,
+            opportunities: serp.opportunities,
+            differentiation: serp.differentiation_strategy,
+            content_upgrades: serp.content_upgrades,
+            enhanced_structure: serp.enhanced_structure,
+            avg_word_count: 1500,
+            dominant_format: "guide",
+          };
+        }
+      } catch { /* SERP optionnelle */ }
+
+      const ctx = await buildPageContext(supabase, user.id, {
+        keyword,
+        language,
+        business_name: businessName ?? "",
+        industry: industry ?? "e-commerce",
+        intent: intentData ? {
+          type: intentData.intent_type,
+          user_intent: intentData.user_intent,
+          content_type: intentData.recommended_content_type,
+          angle: intentData.angle,
+        } : undefined,
+        keywords: kwStrat ? {
+          primary: kwStrat.primary_keyword,
+          secondary: kwStrat.secondary_keywords,
+          semantic_field: kwStrat.semantic_field,
+          seo_angle: kwStrat.seo_angle,
+        } : undefined,
+        serp: serpData,
+      });
+
+      if (isStream) {
+        const { stream, decisions, contextHash } = generatePageStream(ctx);
+        // Envelopper le stream pour ajouter les métadonnées moteur à la fin
+        const engineMeta = JSON.stringify({
+          type: "engine_meta",
+          decisions: decisions.filter(d => d.include).map(d => ({ block: d.block_type, reason: d.reason })),
+          context_hash: contextHash,
+        });
+        const encoder = new TextEncoder();
+        const wrappedStream = new ReadableStream({
+          async start(controller) {
+            const reader = stream.getReader();
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                controller.enqueue(value);
+              }
+              // Ajouter les métadonnées moteur comme dernier event
+              controller.enqueue(encoder.encode(`data: ${engineMeta}\n\n`));
+            } finally {
+              controller.close();
+            }
+          },
+        });
+        return new Response(wrappedStream, {
+          headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
+        });
+      }
+
+      // Mode non-streaming
+      const { generatePageSync } = await import("@/lib/seo-engine");
+      const page = await generatePageSync(ctx);
+      if (!page) return Response.json({ error: "Impossible de générer la page" }, { status: 500 });
+
+      return Response.json({
+        title: page.title,
+        content: engineAssembleCmsHtml(page),
+        meta_description: page.meta_description,
+        cover_image_query: page.pexels_query,
+        cover_alt_text: page.cover_alt_text,
+        structured: {
+          hero: page.blocks.find(b => b.type === "hero")?.data,
+          quick_answer: (page.blocks.find(b => b.type === "quick_answer")?.data as { answer: string } | undefined)?.answer,
+          key_stats: (page.blocks.find(b => b.type === "key_stats")?.data as { stats: unknown[] } | undefined)?.stats ?? [],
+          simulation: page.blocks.find(b => b.type === "simulation")?.data,
+          sections: page.blocks.filter(b => b.type === "section").map(b => b.data),
+          insights: (page.blocks.find(b => b.type === "insight")?.data as { insights: unknown[] } | undefined)?.insights ?? [],
+          mistakes: (page.blocks.find(b => b.type === "mistakes")?.data as { mistakes: unknown[] } | undefined)?.mistakes ?? [],
+          faq: (page.blocks.find(b => b.type === "faq")?.data as { questions: unknown[] } | undefined)?.questions ?? [],
+          cta: page.blocks.find(b => b.type === "cta")?.data,
+          gsc_insight: page.blocks.find(b => b.type === "gsc_insight")?.data,
+          comparison: page.blocks.find(b => b.type === "comparison")?.data,
+          internal_links: page.internal_links,
+        },
+        engine: page.engine,
+      });
+    }
+
+    // ── Mode legacy (prompt direct) ─────────────────────────────────────────
 
     // Récupérer les credentials WP pour analyser la DA du site
     let styleGuide = "";
@@ -595,8 +710,7 @@ HTML autorisé dans les champs content/scenario : <h3>, <p>, <ul>, <ol>, <li>, <
     };
 
     // ── Streaming mode (SSE) ──────────────────────────────────────────────
-    const url = new URL(request.url);
-    if (url.searchParams.get("stream") === "1") {
+    if (isStream) {
       const { stream } = aiCallStream({ task: "content_generation" }, aiParams);
       return new Response(stream, {
         headers: {
