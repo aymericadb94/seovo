@@ -215,6 +215,87 @@ async function fetchStyleGuideShopify(storeUrl: string, apiKey: string): Promise
   }
 }
 
+// ── Assembler le HTML structuré pour publication CMS ─────────────────────────
+
+type StructuredPageForCms = {
+  hero: { title: string; subtitle: string; promise: string; cta: string | null };
+  quick_answer: string;
+  key_stats: { value: string; label: string; source?: string }[];
+  simulation: { title: string; scenario: string; result: string };
+  sections: { title: string; content: string; tip?: string; example?: string }[];
+  insights: { type: "tip" | "warning" | "pro"; text: string }[];
+  mistakes: { title: string; why: string; consequence: string }[];
+  faq: { question: string; answer: string }[];
+  cta: { text: string; button_text: string; button_url: string | null };
+};
+
+function assembleCmsHtml(page: StructuredPageForCms): string {
+  const parts: string[] = [];
+
+  // Hero
+  parts.push(`<p><strong>${page.hero.subtitle}</strong></p>`);
+  parts.push(`<p>${page.hero.promise}</p>`);
+
+  // Quick answer (featured snippet)
+  parts.push(`<h2>En bref</h2>`);
+  parts.push(`<p>${page.quick_answer}</p>`);
+
+  // Key stats
+  if (page.key_stats.length > 0) {
+    parts.push(`<h2>Chiffres clés</h2>`);
+    parts.push(`<ul>`);
+    for (const stat of page.key_stats) {
+      parts.push(`<li><strong>${stat.value}</strong> — ${stat.label}${stat.source ? ` <em>(${stat.source})</em>` : ""}</li>`);
+    }
+    parts.push(`</ul>`);
+  }
+
+  // Simulation
+  parts.push(`<h2>${page.simulation.title}</h2>`);
+  parts.push(page.simulation.scenario);
+  parts.push(`<p><strong>${page.simulation.result}</strong></p>`);
+
+  // Main sections
+  for (const section of page.sections) {
+    parts.push(`<h2>${section.title}</h2>`);
+    parts.push(section.content);
+    if (section.tip) parts.push(`<p><strong>💡 Astuce :</strong> ${section.tip}</p>`);
+    if (section.example) parts.push(`<p><em>Exemple : ${section.example}</em></p>`);
+  }
+
+  // Insights
+  if (page.insights.length > 0) {
+    const icons = { tip: "💡", warning: "⚠️", pro: "🔥" };
+    for (const insight of page.insights) {
+      parts.push(`<p><strong>${icons[insight.type]}</strong> ${insight.text}</p>`);
+    }
+  }
+
+  // Mistakes
+  if (page.mistakes.length > 0) {
+    parts.push(`<h2>Erreurs à éviter</h2>`);
+    parts.push(`<ul>`);
+    for (const m of page.mistakes) {
+      parts.push(`<li><strong>${m.title}</strong> — ${m.why} <em>${m.consequence}</em></li>`);
+    }
+    parts.push(`</ul>`);
+  }
+
+  // FAQ
+  if (page.faq.length > 0) {
+    parts.push(`<h2>Questions fréquentes</h2>`);
+    for (const q of page.faq) {
+      parts.push(`<h3>${q.question}</h3>`);
+      parts.push(`<p>${q.answer}</p>`);
+    }
+  }
+
+  // CTA
+  parts.push(`<p>${page.cta.text}</p>`);
+
+  return parts.join("\n");
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -351,86 +432,87 @@ IMPORTANT : Utilise cette analyse pour créer un contenu SUPÉRIEUR à la concur
 
     const hasPreGenData = !!(struct || editPlan || snip || kwStrat);
 
-    const systemPrompt = `Tu es un expert SEO senior ET un rédacteur professionnel (10+ ans d'expérience). Tu es spécialisé dans :
-- Contenus SEO à forte valeur qui dominent la SERP
-- Stratégie éditoriale avancée
-- Contenu différenciant et non générique
-- Génération de trafic ET conversion
+    const systemPrompt = `Tu es un expert senior en SEO, UX writing et Product Design. 10+ ans d'expérience. Spécialisé dans :
+- Pages SEO modernes (landing page + outil + article)
+- UX orientée conversion
+- Contenu scannable et visuellement structuré
+- Stratégie différenciante basée sur l'analyse SERP
 
-Tu travailles pour Rankpill. Chaque article que tu produis doit être MEILLEUR que tous les résultats actuels de Google sur le sujet. Tu n'écris JAMAIS de contenu générique, répétitif ou robotique. Tu écris toujours dans la langue spécifiée — c'est non négociable.`;
+Tu travailles pour Rankpill. Tu produis des pages SEO qui donnent envie de lire et d'agir. Pas des articles blog classiques. Tu écris toujours dans la langue spécifiée — non négociable.`;
 
-    const userPrompt = `Tu es un rédacteur SEO senior spécialisé dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
+    const userPrompt = `Tu es un expert SEO/UX senior dans le secteur "${industry ?? "e-commerce"}". Tu travailles pour "${businessName}".
 
-LANGUE : Rédige l'INTÉGRALITÉ de l'article en ${language}. Chaque mot doit être en ${language}.
+LANGUE : Rédige TOUT en ${language}. Chaque mot doit être en ${language}.
 
 MOT-CLÉ PRINCIPAL : "${keyword}"${internalLinksContext}${styleGuideContext}${cocoonContext}${keywordContext}${structureContext}${snippetContext}${editorialContext}${serpContext}
 
 ---
 
-OBJECTIF : Créer un contenu meilleur que tous les résultats Google — concret, utile, différenciant, non générique.
+OBJECTIF : Créer une page SEO MODERNE qui ressemble à une landing page + un outil + un article. Pas un article blog classique. Le résultat doit capter l'attention, être lisible en diagonale, apporter une valeur immédiate, et surpasser tout ce qui existe sur Google.
 
-${hasPreGenData ? `Tu disposes de données pré-analysées (structure SEO, plan éditorial, featured snippet, stratégie de mots-clés, positionnement cocon). SUIS ces données — elles sont le fruit d'une analyse stratégique en amont. Ne les ignore pas, ne les réinvente pas.` : ""}
-
----
-
-STRUCTURE OBLIGATOIRE — 8 PARTIES :
-
-PARTIE 1 — INTRO IMPACT (150-200 mots)
-- Commence par un PROBLÈME RÉEL que le lecteur vit concrètement.
-- Formule une PROMESSE FORTE (ce qu'il va obtenir en lisant).
-- Annonce précisément ce que l'article va lui apprendre.
-- Accroche : question percutante, stat chiffrée, ou constat direct.
-- Ton : expert accessible, comme un collègue senior qui partage son expérience.
-
-PARTIE 2 — DONNÉES CONCRÈTES
-- Chiffres réels, budgets, coûts, estimations de marché.
-- Statistiques sourcées et crédibles (études, rapports).
-- Données qui apportent une valeur immédiate au lecteur.
-- Contexte chiffré du secteur "${industry ?? "e-commerce"}".
-- Aucun chiffre inventé — si tu n'as pas de donnée précise, donne des fourchettes réalistes.
-
-PARTIE 3 — EXEMPLES RÉELS
-- Cas concrets et scénarios réalistes liés au secteur.
-- Résultats mesurables (avant/après, ROI, gains).
-- Situations dans lesquelles le lecteur se reconnaît.
-- Au moins 2-3 exemples détaillés, pas des généralités.
-
-PARTIE 4 — STRATÉGIE ACTIONNABLE
-- Étapes concrètes numérotées que le lecteur peut suivre immédiatement.
-- Méthodes précises avec des outils, des techniques, des paramètres.
-- Conseils que même un expert trouverait utiles.
-- Chaque étape doit être exécutable, pas théorique.
-
-PARTIE 5 — ERREURS À ÉVITER
-- 3 à 5 erreurs fréquentes avec explication de POURQUOI c'est un piège.
-- Mauvaises pratiques courantes dans le secteur.
-- Ce que font les débutants vs ce que font les experts.
-- Conséquences concrètes de chaque erreur.
-
-PARTIE 6 — OUTIL OU SIMULATION
-- Un calcul simple, une projection chiffrée ou un exemple de simulation.
-- Le lecteur doit pouvoir appliquer ce calcul à sa propre situation.
-- Formule ou méthode reproductible.
-- Résultat concret qui donne envie d'agir.
-
-PARTIE 7 — FAQ (3-4 questions)
-- Questions RÉELLEMENT posées par l'audience cible.
-- Réponses directes : 40-60 mots chacune (optimisées featured snippet / position 0).
-- Hn optimisés, mots-clés naturels, richesse sémantique.
-- Ne PAS répéter le contenu des sections précédentes.
-
-PARTIE 8 — CONCLUSION + CTA INTELLIGENT (100-150 mots)
-- Résumé percutant des points clés (pas de répétition mot-à-mot).
-- Lien naturel avec ce que Rankpill / "${businessName}" peut apporter.
-- Call-to-action fort qui pousse à l'action concrète.
+${hasPreGenData ? `Tu disposes de données pré-analysées (structure SEO, plan éditorial, featured snippet, stratégie de mots-clés, positionnement cocon). SUIS ces données.` : ""}
 
 ---
 
-FEATURED SNIPPET
-${snip ? "- Le featured snippet a été pré-généré. Intègre-le TEL QUEL dans le contenu à l'emplacement indiqué. Ne le régénère pas." : "- Crée un bloc featured snippet : H2 sous forme de question + réponse directe en 40-60 mots. Si guide → <ol> avec 4-8 étapes. Si comparatif → <table>. Si définition → commencer par \"[Sujet] est...\"."}
+STRUCTURE OBLIGATOIRE — 9 PARTIES :
+
+PARTIE 1 — HERO (HOOK)
+- Titre puissant orienté bénéfice ou résultat (H1)
+- Sous-titre clair qui précise la promesse
+- Promesse forte en 1 phrase (ce que le lecteur obtient)
+- CTA optionnel
+
+PARTIE 2 — RÉPONSE IMMÉDIATE (Featured Snippet)
+${snip ? "Le featured snippet a été pré-généré. Reprends-le tel quel." : "Réponse claire et directe au mot-clé. 40-60 mots. Compréhension instantanée. Optimisé position 0."}
+
+PARTIE 3 — CHIFFRES CLÉS
+- 3 à 5 statistiques importantes liées au sujet
+- Format court : valeur + label + source optionnelle
+- Chiffres réels, crédibles, sourcés quand possible
+- Impact visuel — pas de paragraphes
+
+PARTIE 4 — SIMULATION / EXEMPLE CONCRET
+- Un exemple concret ou projection chiffrée
+- Calcul rapide que le lecteur peut appliquer à sa situation
+- Scénario avant/après avec résultat mesurable
+- Titre accrocheur pour le bloc
+
+PARTIE 5 — CONTENU PRINCIPAL (3-5 sections)
+Chaque section contient :
+- Un H2 court et percutant
+- Paragraphes courts (2-3 phrases max)
+- Listes à puces pour les éléments clés
+- UNE idée claire par section
+- UN conseil concret
+- UN exemple spécifique
+${cocoonPos ? "Intègre les liens sortants obligatoires naturellement dans ces sections." : ""}
+
+PARTIE 6 — BLOCS INSIGHT (3-5 blocs)
+Chaque bloc a un type et un texte court :
+- "tip" : 💡 Astuce pratique
+- "warning" : ⚠️ Point d'attention
+- "pro" : 🔥 Conseil d'expert avancé
+1-2 phrases max par bloc. Valeur immédiate.
+
+PARTIE 7 — ERREURS À ÉVITER (3-5 erreurs)
+- Titre court de l'erreur
+- Explication en 1-2 phrases de POURQUOI c'est un piège
+- Conséquence concrète
+
+PARTIE 8 — FAQ (3-4 questions)
+- Questions réellement posées par l'audience
+- Réponses directes : 40-60 mots (optimisées position 0)
+- Ne PAS répéter le contenu des sections
+
+PARTIE 9 — CTA FINAL
+- Texte de conclusion court (2-3 phrases)
+- Bouton/action connecté à Rankpill / "${businessName}"
+- Non agressif, utile, naturel
+
+---
 
 MAILLAGE INTERNE
-${cocoonPos ? "- Les liens sortants obligatoires sont définis ci-dessus. Intègre-les naturellement dans le texte avec les ancres recommandées." : "- Propose 2 à 4 liens internes avec ancrage naturel."}
+${cocoonPos ? "Les liens sortants obligatoires sont définis ci-dessus. Intègre-les dans les sections du contenu principal." : "Propose 2 à 4 liens internes avec ancrage naturel."}
 
 IMAGE
 - Génère une requête Pexels précise (3-5 mots-clés en anglais).
@@ -443,32 +525,69 @@ MÉTA DONNÉES
 
 QUALITÉ — RÈGLES ABSOLUES :
 
-- Écrit par un humain expert, PAS par une IA. INTERDITES : "il est important de noter", "dans le monde actuel", "en conclusion", "il convient de", "force est de constater", "il est essentiel de".
-- Style : humain, fluide, expert, pédagogique. Alterner phrases courtes et développées.
-- Aucune sur-optimisation. Densité mot-clé principal < 2%.
-- Aucun contenu de remplissage. Chaque phrase apporte de la valeur CONCRÈTE.
-- Les exemples doivent être SPÉCIFIQUES et crédibles, pas génériques.
-- Voix active. Direct. Concret. Pas de conditionnel excessif.
-- Aucune répétition inutile entre sections.
-- Longueur totale : 1500-2200 mots de contenu riche.
+- Aucun bloc de texte long. Tout est scannable.
+- Écrit par un humain expert. INTERDITES : "il est important de noter", "dans le monde actuel", "en conclusion", "il convient de", "force est de constater", "il est essentiel de".
+- Style : humain, fluide, direct, pédagogique.
+- Aucune sur-optimisation. Densité mot-clé < 2%.
+- Aucun contenu de remplissage.
+- Voix active. Direct. Concret.
+- Aucune répétition entre sections.
+- Contenu total : 1500-2200 mots.
 
 ---
 
 FORMAT DE SORTIE : JSON valide uniquement, aucun texte avant ou après.
 
 {
-  "title": "Le H1 optimisé",
-  "meta_description": "Meta description de 150-160 caractères",
-  "featured_snippet": "${snip ? "Reprends le featured snippet pré-généré en HTML (h2 + p + liste/table)" : "Le bloc featured snippet en HTML pur"}",
-  "content": "Le contenu HTML complet de l'article (SANS le featured_snippet, qui est séparé)",
-  "internal_links": [
-    { "anchor": "texte d'ancrage naturel", "target": "slug-ou-url-cible" }
+  "title": "H1 SEO optimisé CTR",
+  "meta_description": "150-160 caractères",
+  "hero": {
+    "title": "Titre puissant orienté résultat",
+    "subtitle": "Sous-titre clair et précis",
+    "promise": "Promesse forte en 1 phrase",
+    "cta": "Texte du CTA optionnel ou null"
+  },
+  "quick_answer": "Réponse immédiate 40-60 mots, optimisée featured snippet",
+  "key_stats": [
+    { "value": "85%", "label": "des sites ne...", "source": "Étude X 2024" }
   ],
-  "pexels_query": "3-5 english keywords for stock photo",
-  "cover_alt_text": "Texte alt SEO, 8-12 mots, inclut le mot-clé, dans la langue de l'article"
+  "simulation": {
+    "title": "Titre du bloc simulation",
+    "scenario": "Description du scénario en HTML (<p>, <strong>, <ul>)",
+    "result": "Résultat chiffré ou conclusion"
+  },
+  "sections": [
+    {
+      "title": "H2 court et percutant",
+      "content": "HTML du contenu (<p>, <ul>, <li>, <strong>, <em>)",
+      "tip": "Conseil concret en 1 phrase",
+      "example": "Exemple spécifique en 1-2 phrases"
+    }
+  ],
+  "insights": [
+    { "type": "tip", "text": "Astuce pratique courte" },
+    { "type": "warning", "text": "Point d'attention" },
+    { "type": "pro", "text": "Conseil expert avancé" }
+  ],
+  "mistakes": [
+    { "title": "Erreur courte", "why": "Explication en 1-2 phrases", "consequence": "Impact concret" }
+  ],
+  "faq": [
+    { "question": "Question réelle ?", "answer": "Réponse directe 40-60 mots" }
+  ],
+  "cta": {
+    "text": "Texte de conclusion 2-3 phrases",
+    "button_text": "Texte du bouton CTA",
+    "button_url": null
+  },
+  "internal_links": [
+    { "anchor": "texte d'ancrage", "target": "slug-ou-url" }
+  ],
+  "pexels_query": "3-5 english keywords",
+  "cover_alt_text": "Texte alt SEO 8-12 mots"
 }
 
-HTML autorisé : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. Pas de <html>, <body>, <head>.`;
+HTML autorisé dans les champs content/scenario : <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. Pas de <h2> dans content (le H2 est le champ title). Pas de <html>, <body>, <head>.`;
 
     const aiParams = {
       system: systemPrompt,
@@ -491,27 +610,51 @@ HTML autorisé : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <th
     // ── Non-streaming mode (JSON) ─────────────────────────────────────────
     const aiResult = await aiCall({ task: "content_generation" }, aiParams);
 
-    const parsed = parseAiJson<{
+    type StructuredPage = {
       title: string;
-      content: string;
       meta_description: string;
-      featured_snippet?: string;
+      hero: { title: string; subtitle: string; promise: string; cta: string | null };
+      quick_answer: string;
+      key_stats: { value: string; label: string; source?: string }[];
+      simulation: { title: string; scenario: string; result: string };
+      sections: { title: string; content: string; tip?: string; example?: string }[];
+      insights: { type: "tip" | "warning" | "pro"; text: string }[];
+      mistakes: { title: string; why: string; consequence: string }[];
+      faq: { question: string; answer: string }[];
+      cta: { text: string; button_text: string; button_url: string | null };
       internal_links?: { anchor: string; target: string }[];
       pexels_query?: string;
       cover_alt_text?: string;
-    }>(aiResult.text);
+    };
+
+    const parsed = parseAiJson<StructuredPage>(aiResult.text);
 
     if (!parsed) {
       return Response.json({ error: "Impossible de lire la réponse de Claude" }, { status: 500 });
     }
+
+    // Assembler le HTML pour le CMS (publication WordPress/Shopify)
+    const cmsHtml = assembleCmsHtml(parsed);
+
     return Response.json({
       title: parsed.title,
-      content: parsed.featured_snippet
-        ? parsed.featured_snippet + "\n" + parsed.content
-        : parsed.content,
+      content: cmsHtml,
       meta_description: parsed.meta_description,
       cover_image_query: parsed.pexels_query ?? null,
       cover_alt_text: parsed.cover_alt_text ?? null,
+      // Données structurées pour le preview moderne
+      structured: {
+        hero: parsed.hero,
+        quick_answer: parsed.quick_answer,
+        key_stats: parsed.key_stats,
+        simulation: parsed.simulation,
+        sections: parsed.sections,
+        insights: parsed.insights,
+        mistakes: parsed.mistakes,
+        faq: parsed.faq,
+        cta: parsed.cta,
+        internal_links: parsed.internal_links ?? [],
+      },
     });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : "Erreur inconnue";
