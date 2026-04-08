@@ -735,36 +735,38 @@ async function wixUpdatePostContent(
   apiKey: string, siteId: string, postId: string, newHtml: string
 ): Promise<UpdateResult> {
   try {
-    // 1. Fetch existing post with richContent
-    const getRes = await fetch(
-      `https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=CONTENT`,
-      { headers: wixHeaders(apiKey, siteId) }
-    );
-    if (!getRes.ok) {
-      return { success: false, post_id: postId, url: "", error: `Wix GET failed: ${(await getRes.text()).slice(0, 200)}` };
-    }
-    const getJson = await getRes.json() as { post: Record<string, unknown> };
-    const existingRc = getJson.post?.richContent as { nodes?: WixRichNode[] } | undefined;
+    const hdrs = wixHeaders(apiKey, siteId);
 
-    // 2. Extract "À lire aussi" links from the new HTML (these were appended by injectLinks)
-    const linkRegex = /<p>À lire aussi\s*:\s*<a\s+href="([^"]+)"[^>]*>([^<]+)<\/a><\/p>/gi;
-    const newLinks: { url: string; text: string }[] = [];
-    let linkMatch;
-    while ((linkMatch = linkRegex.exec(newHtml)) !== null) {
-      newLinks.push({ url: linkMatch[1], text: linkMatch[2] });
-    }
-
-    // Also extract any <a> tags that were injected inline (wrapped around existing text)
-    // Compare with existing richContent's links to find new ones
+    // Extract new links from the modified HTML
     const allLinksInHtml: { url: string; text: string }[] = [];
     const allLinkRegex = /<a\s+href="([^"]+)"[^>]*>([^<]+)<\/a>/gi;
     let allMatch;
     while ((allMatch = allLinkRegex.exec(newHtml)) !== null) {
       allLinksInHtml.push({ url: allMatch[1], text: allMatch[2] });
     }
+    if (allLinksInHtml.length === 0) {
+      return { success: false, post_id: postId, url: "", error: "Aucun lien trouvé dans le HTML modifié" };
+    }
 
-    // Get existing links from richContent for comparison
+    // Wix Blog v3: published posts must be edited via draft workflow
+    // Step 1: Create a draft from the published post
+    const createDraftRes = await fetch(
+      `https://www.wixapis.com/blog/v3/draft-posts/create-from-post/${postId}`,
+      { method: "POST", headers: hdrs }
+    );
+    if (!createDraftRes.ok) {
+      const errText = (await createDraftRes.text()).slice(0, 300);
+      return { success: false, post_id: postId, url: "", error: `Wix create draft failed (${createDraftRes.status}): ${errText}` };
+    }
+    const draftData = await createDraftRes.json() as { draftPost: { id: string; richContent?: { nodes?: WixRichNode[] } } };
+    const draftId = draftData.draftPost?.id;
+    if (!draftId) {
+      return { success: false, post_id: postId, url: "", error: "Wix: pas de draftId retourné" };
+    }
+
+    // Step 2: Get existing links from the draft to avoid duplicates
     const existingLinks = new Set<string>();
+    const existingRc = draftData.draftPost?.richContent;
     function collectLinks(nodes: WixRichNode[]) {
       for (const n of nodes) {
         if (n.textData?.decorations) {
@@ -778,59 +780,51 @@ async function wixUpdatePostContent(
     }
     if (existingRc?.nodes) collectLinks(existingRc.nodes);
 
-    // Find truly new links (not in existing richContent)
     const linksToAdd = allLinksInHtml.filter(l => !existingLinks.has(l.url));
-
     if (linksToAdd.length === 0) {
-      return { success: false, post_id: postId, url: "", error: "Aucun nouveau lien à ajouter" };
+      return { success: false, post_id: postId, url: "", error: "Liens déjà présents dans l'article" };
     }
 
-    // 3. Build new richContent nodes for the links
+    // Step 3: Build new Rich Content nodes
     const newNodes: WixRichNode[] = linksToAdd.map(link => ({
       type: "PARAGRAPH",
       paragraphData: {},
       nodes: [
-        {
-          type: "TEXT",
-          textData: {
-            text: "À lire aussi : ",
-            decorations: [],
-          },
-        },
-        {
-          type: "TEXT",
-          textData: {
-            text: link.text,
-            decorations: [{
-              type: "LINK",
-              linkData: { link: { url: link.url } },
-            }],
-          },
-        },
+        { type: "TEXT", textData: { text: "À lire aussi : ", decorations: [] } },
+        { type: "TEXT", textData: { text: link.text, decorations: [{ type: "LINK", linkData: { link: { url: link.url } } }] } },
       ],
     }));
 
-    // 4. Append to existing richContent
-    const updatedRc = existingRc?.nodes
-      ? { nodes: [...existingRc.nodes, ...newNodes] }
-      : { nodes: newNodes };
+    // Step 4: Update the draft with appended richContent
+    const updatedNodes = existingRc?.nodes
+      ? [...existingRc.nodes, ...newNodes]
+      : newNodes;
 
-    // 5. PATCH with richContent
-    const patchRes = await fetch(
-      `https://www.wixapis.com/blog/v3/posts/${postId}`,
+    const updateDraftRes = await fetch(
+      `https://www.wixapis.com/blog/v3/draft-posts/${draftId}`,
       {
         method: "PATCH",
-        headers: wixHeaders(apiKey, siteId),
-        body: JSON.stringify({ post: { richContent: updatedRc } }),
+        headers: hdrs,
+        body: JSON.stringify({ draftPost: { richContent: { nodes: updatedNodes } } }),
       }
     );
-    if (!patchRes.ok) {
-      const errText = (await patchRes.text()).slice(0, 300);
-      return { success: false, post_id: postId, url: "", error: `Wix PATCH richContent failed (${patchRes.status}): ${errText}` };
+    if (!updateDraftRes.ok) {
+      const errText = (await updateDraftRes.text()).slice(0, 300);
+      return { success: false, post_id: postId, url: "", error: `Wix update draft failed (${updateDraftRes.status}): ${errText}` };
     }
-    const patchJson = await patchRes.json() as { post: { id: string; url?: { base: string; path: string } } };
-    const url = patchJson.post.url ? `${patchJson.post.url.base}${patchJson.post.url.path}` : "";
-    return { success: true, post_id: patchJson.post.id, url };
+
+    // Step 5: Publish the draft
+    const publishRes = await fetch(
+      `https://www.wixapis.com/blog/v3/draft-posts/${draftId}/publish`,
+      { method: "POST", headers: hdrs }
+    );
+    if (!publishRes.ok) {
+      const errText = (await publishRes.text()).slice(0, 300);
+      return { success: false, post_id: postId, url: "", error: `Wix publish draft failed (${publishRes.status}): ${errText}` };
+    }
+    const pubData = await publishRes.json() as { post?: { id: string; url?: { base: string; path: string } } };
+    const url = pubData.post?.url ? `${pubData.post.url.base}${pubData.post.url.path}` : "";
+    return { success: true, post_id: pubData.post?.id ?? postId, url };
   } catch (err) {
     return { success: false, post_id: postId, url: "", error: `Wix update error: ${err instanceof Error ? err.message : "Unknown"}` };
   }
