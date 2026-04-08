@@ -549,13 +549,233 @@ export default function LinkingGraph() {
     return items;
   }, [data]);
 
+  // ── Analysis animation (canvas network) ───────────────────────────────────
+  const analysisCanvasRef = useRef<HTMLCanvasElement>(null);
+  const analysisFrameRef = useRef<number>(0);
+  const [analysisPhase, setAnalysisPhase] = useState("");
+
+  useEffect(() => {
+    if (!loading) { analysisFrameRef.current = 0; return; }
+
+    // Cycle through analysis phases
+    const phases = [
+      "Scan des pages CMS...",
+      "Extraction des liens existants...",
+      "Analyse des clusters sémantiques...",
+      "Détection des pages orphelines...",
+      "Calcul du score de maillage...",
+      "Génération des suggestions...",
+      "Finalisation de l'analyse...",
+    ];
+    let phaseIdx = 0;
+    setAnalysisPhase(phases[0]);
+    const phaseTimer = setInterval(() => {
+      phaseIdx = (phaseIdx + 1) % phases.length;
+      setAnalysisPhase(phases[phaseIdx]);
+    }, 2800);
+
+    // Canvas animation
+    const canvas = analysisCanvasRef.current;
+    if (!canvas) { return () => clearInterval(phaseTimer); }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) { return () => clearInterval(phaseTimer); }
+
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.parentElement?.offsetWidth ?? 800;
+    const H = 420;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.scale(dpr, dpr);
+
+    // Generate nodes
+    type ANode = { x: number; y: number; vx: number; vy: number; r: number; phase: number; connected: boolean; pulse: number; color: string };
+    const nodeCount = 28;
+    const nodes: ANode[] = [];
+    const colors = ["#f97316", "#ef4444", "#fb923c", "#f59e0b", "#ec4899", "#3b82f6", "#22c55e", "#a855f7"];
+    for (let i = 0; i < nodeCount; i++) {
+      const connected = Math.random() > 0.35;
+      nodes.push({
+        x: 60 + Math.random() * (W - 120),
+        y: 40 + Math.random() * (H - 80),
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
+        r: connected ? 6 + Math.random() * 6 : 3 + Math.random() * 3,
+        phase: Math.random() * Math.PI * 2,
+        connected,
+        pulse: 0,
+        color: connected ? colors[i % colors.length] : "#4b5563",
+      });
+    }
+
+    // Generate edges (will animate in)
+    type AEdge = { a: number; b: number; progress: number; delay: number; color: string };
+    const edges: AEdge[] = [];
+    const connectedIdxs = nodes.map((n, i) => n.connected ? i : -1).filter(i => i >= 0);
+    for (let i = 0; i < connectedIdxs.length; i++) {
+      for (let j = i + 1; j < connectedIdxs.length; j++) {
+        const ni = nodes[connectedIdxs[i]], nj = nodes[connectedIdxs[j]];
+        const dist = Math.hypot(ni.x - nj.x, ni.y - nj.y);
+        if (dist < 220 && Math.random() > 0.4) {
+          edges.push({
+            a: connectedIdxs[i], b: connectedIdxs[j],
+            progress: 0,
+            delay: 0.5 + Math.random() * 3,
+            color: ni.color,
+          });
+        }
+      }
+    }
+
+    let t = 0;
+    function draw() {
+      if (!ctx) return;
+      t += 0.016;
+      ctx.clearRect(0, 0, W, H);
+
+      // Move nodes gently
+      for (const n of nodes) {
+        n.x += n.vx;
+        n.y += n.vy;
+        if (n.x < 30 || n.x > W - 30) n.vx *= -1;
+        if (n.y < 30 || n.y > H - 30) n.vy *= -1;
+        n.pulse = Math.sin(t * 2 + n.phase) * 0.5 + 0.5;
+      }
+
+      // Draw edges with animated progress
+      for (const e of edges) {
+        if (t < e.delay) continue;
+        e.progress = Math.min(1, (t - e.delay) * 0.5);
+        const na = nodes[e.a], nb = nodes[e.b];
+
+        // Curved line
+        const mx = (na.x + nb.x) / 2 + Math.sin(t * 0.5 + e.delay) * 15;
+        const my = (na.y + nb.y) / 2 + Math.cos(t * 0.3 + e.delay) * 10;
+
+        ctx.beginPath();
+        ctx.moveTo(na.x, na.y);
+        ctx.quadraticCurveTo(mx, my, na.x + (nb.x - na.x) * e.progress, na.y + (nb.y - na.y) * e.progress);
+        ctx.strokeStyle = e.color + Math.round(30 + e.progress * 40).toString(16).padStart(2, "0");
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Traveling particle on complete edges
+        if (e.progress >= 1) {
+          const pt = (t * 0.4 + e.delay) % 1;
+          const px = na.x + (nb.x - na.x) * pt;
+          const py = na.y + (nb.y - na.y) * pt;
+          ctx.beginPath();
+          ctx.arc(px, py, 2, 0, Math.PI * 2);
+          ctx.fillStyle = e.color;
+          ctx.fill();
+        }
+      }
+
+      // Draw nodes as pills
+      for (const n of nodes) {
+        const pw = n.r * 2.5;
+        const ph = n.r * 1.2;
+        const radius = ph / 2;
+        const glow = n.connected ? n.pulse * 0.6 + 0.2 : 0;
+
+        // Glow
+        if (glow > 0) {
+          ctx.shadowColor = n.color;
+          ctx.shadowBlur = 12 * glow;
+        }
+
+        // Pill shape
+        ctx.beginPath();
+        ctx.moveTo(n.x - pw / 2 + radius, n.y - ph / 2);
+        ctx.lineTo(n.x + pw / 2 - radius, n.y - ph / 2);
+        ctx.arc(n.x + pw / 2 - radius, n.y, radius, -Math.PI / 2, Math.PI / 2);
+        ctx.lineTo(n.x - pw / 2 + radius, n.y + ph / 2);
+        ctx.arc(n.x - pw / 2 + radius, n.y, radius, Math.PI / 2, -Math.PI / 2);
+        ctx.closePath();
+
+        if (n.connected) {
+          const grad = ctx.createLinearGradient(n.x - pw / 2, n.y, n.x + pw / 2, n.y);
+          grad.addColorStop(0, n.color);
+          grad.addColorStop(1, n.color + "99");
+          ctx.fillStyle = grad;
+        } else {
+          ctx.fillStyle = "#374151";
+        }
+        ctx.fill();
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+
+        // Inner shine
+        if (n.connected) {
+          ctx.beginPath();
+          ctx.moveTo(n.x - pw / 4, n.y - ph / 4);
+          ctx.lineTo(n.x + pw / 4, n.y - ph / 4);
+          ctx.arc(n.x + pw / 4, n.y - ph / 8, ph / 6, -Math.PI / 2, Math.PI / 2);
+          ctx.lineTo(n.x - pw / 4, n.y + ph / 12);
+          ctx.arc(n.x - pw / 4, n.y - ph / 8, ph / 6, Math.PI / 2, -Math.PI / 2);
+          ctx.closePath();
+          ctx.fillStyle = "rgba(255,255,255,0.15)";
+          ctx.fill();
+        }
+      }
+
+      // Central scan ring
+      const ringR = 60 + Math.sin(t * 1.5) * 20;
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, ringR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(249,115,22,${0.06 + Math.sin(t * 2) * 0.04})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Expanding scan wave
+      const waveR = ((t * 40) % 250);
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, waveR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(249,115,22,${Math.max(0, 0.15 - waveR / 2000)})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      analysisFrameRef.current = requestAnimationFrame(draw);
+    }
+
+    analysisFrameRef.current = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(analysisFrameRef.current);
+      clearInterval(phaseTimer);
+    };
+  }, [loading]);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading && !data) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="w-12 h-12 rounded-full animate-spin mb-4" style={{ border: "3px solid rgba(249,115,22,0.1)", borderTopColor: "#f97316" }} />
-        <p className="text-gray-400 text-sm">Chargement du maillage...</p>
+      <div className="relative rounded-2xl overflow-hidden" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <canvas ref={analysisCanvasRef} className="w-full" style={{ height: 420 }} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+          <div className="relative mb-6">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.2)", backdropFilter: "blur(12px)" }}>
+              <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 animate-pulse">
+                <circle cx="5" cy="12" r="2" stroke="#f97316" strokeWidth="1.5" />
+                <circle cx="19" cy="6" r="2" stroke="#f97316" strokeWidth="1.5" />
+                <circle cx="19" cy="18" r="2" stroke="#f97316" strokeWidth="1.5" />
+                <path d="M7 12h8m-3-4l3 4-3 4" stroke="#f97316" strokeWidth="1.5" />
+              </svg>
+            </div>
+            <div className="absolute -inset-3 rounded-3xl animate-ping" style={{ border: "1px solid rgba(249,115,22,0.15)" }} />
+          </div>
+          <p className="text-white font-black text-sm mb-2 tracking-wide" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.8)" }}>Analyse du maillage en cours</p>
+          <p className="text-orange-400/80 text-xs font-medium animate-pulse" style={{ textShadow: "0 2px 8px rgba(0,0,0,0.8)" }}>{analysisPhase}</p>
+          <div className="mt-4 w-48 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+            <div className="h-full rounded-full animate-[indeterminate_2s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, #f97316, transparent)", width: "40%" }} />
+          </div>
+        </div>
+        <style jsx>{`
+          @keyframes indeterminate {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(350%); }
+          }
+        `}</style>
       </div>
     );
   }
@@ -732,6 +952,36 @@ export default function LinkingGraph() {
           className="flex-1 relative rounded-2xl overflow-hidden"
           style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.06)" }}
         >
+          {/* Re-analysis overlay */}
+          {loading && data && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}>
+              <canvas ref={analysisCanvasRef} className="absolute inset-0 w-full h-full opacity-40" />
+              <div className="relative z-10 flex flex-col items-center">
+                <div className="relative mb-5">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.25)", backdropFilter: "blur(12px)" }}>
+                    <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 animate-pulse">
+                      <circle cx="5" cy="12" r="2" stroke="#f97316" strokeWidth="1.5" />
+                      <circle cx="19" cy="6" r="2" stroke="#f97316" strokeWidth="1.5" />
+                      <circle cx="19" cy="18" r="2" stroke="#f97316" strokeWidth="1.5" />
+                      <path d="M7 12h8m-3-4l3 4-3 4" stroke="#f97316" strokeWidth="1.5" />
+                    </svg>
+                  </div>
+                  <div className="absolute -inset-2 rounded-2xl animate-ping" style={{ border: "1px solid rgba(249,115,22,0.12)" }} />
+                </div>
+                <p className="text-white font-black text-sm mb-1.5 tracking-wide">Re-analyse en cours</p>
+                <p className="text-orange-400/70 text-xs font-medium animate-pulse">{analysisPhase}</p>
+                <div className="mt-3 w-40 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                  <div className="h-full rounded-full animate-[indeterminate_2s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, #f97316, transparent)", width: "40%" }} />
+                </div>
+              </div>
+              <style jsx>{`
+                @keyframes indeterminate {
+                  0% { transform: translateX(-100%); }
+                  100% { transform: translateX(350%); }
+                }
+              `}</style>
+            </div>
+          )}
           {/* Legend */}
           <div className="absolute top-3 left-3 z-10 flex flex-col gap-2 bg-black/50 backdrop-blur-sm rounded-xl px-3 py-2.5 border border-white/[0.06]">
             <div className="flex items-center gap-2.5">
