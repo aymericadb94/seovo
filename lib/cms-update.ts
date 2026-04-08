@@ -751,11 +751,10 @@ export function injectLinks(
     // Don't self-link
     if (link.target_url === pageUrl) continue;
 
-    const anchor = link.anchor;
-    if (!anchor || anchor.length < 3) continue;
+    const anchor = link.anchor?.trim();
+    if (!anchor || anchor.length < 2) continue;
 
-    // Check if anchor exists in content (outside of existing <a> tags)
-    // Build a regex that matches the anchor text NOT inside <a>...</a>
+    // Strategy 1: Find exact anchor text in content (outside <a> tags)
     const escapedAnchor = anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(
       `(?<![<][^>]*)(\\b${escapedAnchor}\\b)(?![^<]*<\\/a>)`,
@@ -763,20 +762,71 @@ export function injectLinks(
     );
 
     const match = result.match(regex);
-    if (!match || match.index === undefined) continue;
+    if (match && match.index !== undefined) {
+      // Verify not inside an existing <a> tag
+      const before = result.slice(0, match.index);
+      const lastOpenA = before.lastIndexOf("<a ");
+      const lastCloseA = before.lastIndexOf("</a>");
+      if (lastOpenA <= lastCloseA) {
+        const replacement = `<a href="${link.target_url}" title="${link.target_title}">${match[0]}</a>`;
+        result = result.slice(0, match.index) + replacement + result.slice(match.index + match[0].length);
+        injected++;
+        injectedLinks.push(link);
+        continue;
+      }
+    }
 
-    // Verify the match is not inside an existing <a> tag
-    const before = result.slice(0, match.index);
-    const lastOpenA = before.lastIndexOf("<a ");
-    const lastCloseA = before.lastIndexOf("</a>");
-    if (lastOpenA > lastCloseA) continue; // Inside an <a> tag
+    // Strategy 2: Find partial match — try first 2-3 words of anchor
+    const anchorWords = anchor.split(/\s+/);
+    let partialInjected = false;
+    for (const len of [3, 2]) {
+      if (anchorWords.length < len) continue;
+      const partial = anchorWords.slice(0, len).join(" ");
+      if (partial.length < 3) continue;
+      const escapedPartial = partial.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const partialRegex = new RegExp(
+        `(?<![<][^>]*)(\\b${escapedPartial}\\b)(?![^<]*<\\/a>)`,
+        "i"
+      );
+      const partialMatch = result.match(partialRegex);
+      if (partialMatch && partialMatch.index !== undefined) {
+        const before = result.slice(0, partialMatch.index);
+        const lastOpenA = before.lastIndexOf("<a ");
+        const lastCloseA = before.lastIndexOf("</a>");
+        if (lastOpenA <= lastCloseA) {
+          const replacement = `<a href="${link.target_url}" title="${link.target_title}">${partialMatch[0]}</a>`;
+          result = result.slice(0, partialMatch.index) + replacement + result.slice(partialMatch.index + partialMatch[0].length);
+          injected++;
+          injectedLinks.push(link);
+          partialInjected = true;
+          break;
+        }
+      }
+    }
+    if (partialInjected) continue;
 
-    // Inject the link (replace only first occurrence)
-    const replacement = `<a href="${link.target_url}" title="${link.target_title}">${match[0]}</a>`;
-    result = result.slice(0, match.index) + replacement + result.slice(match.index + match[0].length);
+    // Strategy 3: Append a contextual link paragraph before the last </p>
+    // Find the last </p> that is NOT inside the last section (avoid conclusion clutter)
+    const pClosePositions: number[] = [];
+    const pCloseRegex = /<\/p>/gi;
+    let pMatch;
+    while ((pMatch = pCloseRegex.exec(result)) !== null) {
+      pClosePositions.push(pMatch.index);
+    }
+    // Insert before the 2nd-to-last </p> if possible, otherwise last
+    const insertIdx = pClosePositions.length >= 3
+      ? pClosePositions[pClosePositions.length - 2]
+      : pClosePositions.length >= 1
+        ? pClosePositions[pClosePositions.length - 1]
+        : -1;
 
-    injected++;
-    injectedLinks.push(link);
+    if (insertIdx >= 0) {
+      const linkHtml = `</p>\n<p>À lire aussi : <a href="${link.target_url}" title="${link.target_title}">${anchor}</a></p>\n<p`;
+      // Replace </p> at insertIdx with the injected block
+      result = result.slice(0, insertIdx) + linkHtml + result.slice(insertIdx + 4);
+      injected++;
+      injectedLinks.push(link);
+    }
   }
 
   return { html: result, injected, injectedLinks };

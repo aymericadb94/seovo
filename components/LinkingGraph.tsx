@@ -239,8 +239,10 @@ export default function LinkingGraph() {
       } else if (json.result) {
         setApplyResult(json.result);
         setSelectedSuggestionIds(new Set());
-        // Re-run analysis to refresh the graph
-        runAnalysis();
+        // Re-run analysis only if links were applied
+        if ((json.result.applied?.length ?? 0) > 0) {
+          setTimeout(() => runAnalysis(), 2000);
+        }
       }
     } catch {
       setApplyResult({ applied: [], skipped: [], errors: ["Erreur lors de l'application"] });
@@ -278,8 +280,10 @@ export default function LinkingGraph() {
           newApplied.add(`${a.from_title}|${a.to_title}|${a.anchor}`);
         }
         setAppliedLinks(newApplied);
-        // Refresh graph after a delay
-        setTimeout(() => runAnalysis(), 1500);
+        // Refresh graph only if links were actually applied
+        if (ok > 0) {
+          setTimeout(() => runAnalysis(), 2000);
+        }
       } else {
         setNodeApplyResult({ ok: 0, fail: suggestions.length });
       }
