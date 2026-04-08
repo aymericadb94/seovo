@@ -45,7 +45,7 @@ export async function GET() {
     const cmsPosts = await listCmsPosts(creds, 10); // Only 10 for debug
 
     // Extract <a> tags from first 3 posts
-    const linksInContent: { post_title: string; post_url: string; hrefs: string[] }[] = [];
+    const linksInContent: { post_title: string; post_url: string; hrefs: string[]; content_preview: string; content_length: number }[] = [];
     for (const post of cmsPosts.slice(0, 3)) {
       const regex = /<a[^>]+href=["']([^"']+)["']/gi;
       const hrefs: string[] = [];
