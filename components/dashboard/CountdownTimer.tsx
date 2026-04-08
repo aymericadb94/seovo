@@ -18,13 +18,14 @@ export default function CountdownTimer({ targetIso }: { targetIso: string | null
       if (!targetIso) { setTime({ h: 0, m: 0, s: 0, ms: 0 }); return; }
       const diff = new Date(targetIso).getTime() - Date.now();
       if (diff <= 0) { setTime({ h: 0, m: 0, s: 0, ms: 0 }); return; }
+      const totalH = Math.floor(diff / 3600000);
       const s = Math.floor((diff % 60000) / 1000);
       if (s !== prevSec.current) {
         prevSec.current = s;
         setGlow(true);
         setTimeout(() => setGlow(false), 180);
       }
-      setTime({ h: Math.floor(diff / 3600000), m: Math.floor((diff % 3600000) / 60000), s, ms: diff });
+      setTime({ h: Math.min(totalH, 23), m: Math.floor((diff % 3600000) / 60000), s, ms: diff });
     }
     calc();
     const id = setInterval(calc, 250);
@@ -32,10 +33,11 @@ export default function CountdownTimer({ targetIso }: { targetIso: string | null
   }, [targetIso]);
 
   const hasTime = time.ms > 0 && targetIso;
-  const CYCLE_MS = 24 * 60 * 60 * 1000;
+  // Use the actual initial duration for progress, fallback to 24h
+  const total = totalDurationRef.current > 0 ? totalDurationRef.current : 24 * 60 * 60 * 1000;
   const remaining = time.ms;
-  const elapsed = CYCLE_MS - remaining;
-  const progress = hasTime ? Math.max(2, Math.min(98, (elapsed / CYCLE_MS) * 100)) : 0;
+  const elapsed = total - remaining;
+  const progress = hasTime ? Math.max(2, Math.min(98, (elapsed / total) * 100)) : 0;
 
   return (
     <div className="flex flex-col gap-4 w-full">

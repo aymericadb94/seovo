@@ -170,28 +170,11 @@ export async function GET() {
 
     // ── Prochaine publication ────────────────────────────────────────────────
     // Prochaine publication à 12h00 heure de Paris = 11h00 UTC
-    const lastPub = pubs[0] ? new Date(pubs[0].published_at) : null;
-    let nextDate: Date;
-    if (lastPub) {
-      // Depuis la dernière pub, planifier J+1 à 11h UTC
-      nextDate = new Date(lastPub);
+    // Toujours le prochain créneau 11h UTC depuis maintenant (max ~24h)
+    const nextDate = new Date(now);
+    nextDate.setUTCHours(11, 0, 0, 0);
+    if (nextDate.getTime() <= now.getTime()) {
       nextDate.setDate(nextDate.getDate() + 1);
-      nextDate.setUTCHours(11, 0, 0, 0);
-      // Si déjà passé (ex : pub très ancienne), avancer au prochain 11h UTC
-      if (nextDate.getTime() <= now.getTime()) {
-        nextDate = new Date(now);
-        nextDate.setUTCHours(11, 0, 0, 0);
-        if (nextDate.getTime() <= now.getTime()) {
-          nextDate.setDate(nextDate.getDate() + 1);
-        }
-      }
-    } else {
-      // Aucune pub : prochain 11h UTC (aujourd'hui si pas encore passé, sinon demain)
-      nextDate = new Date(now);
-      nextDate.setUTCHours(11, 0, 0, 0);
-      if (nextDate.getTime() <= now.getTime()) {
-        nextDate.setDate(nextDate.getDate() + 1);
-      }
     }
     const nextPublicationAt: string = nextDate.toISOString();
 
