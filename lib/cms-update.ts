@@ -207,6 +207,30 @@ function wixHeaders(apiKey: string, siteId: string) {
   return { "Content-Type": "application/json", Authorization: apiKey, "wix-site-id": siteId };
 }
 
+/**
+ * Wix Blog v3 returns content as Draft.js blocks, not richContent.
+ * Each block: { key, type, text, entityRanges, inlineStyleRanges, data }
+ * Entity map contains links: { type: "LINK", data: { url: "..." } }
+ */
+type WixDraftBlock = {
+  key: string;
+  type: string;         // "unstyled", "header-two", "header-three", "unordered-list-item", "ordered-list-item"
+  text: string;
+  entityRanges?: { offset: number; length: number; key: number }[];
+  inlineStyleRanges?: { offset: number; length: number; style: string }[];
+  data?: Record<string, unknown>;
+};
+
+type WixDraftEntity = {
+  type: string;         // "LINK", "IMAGE", etc.
+  data?: { url?: string; href?: string; target?: string };
+};
+
+type WixContentBlock = {
+  blocks: WixDraftBlock[];
+  entityMap?: Record<string, WixDraftEntity>;
+};
+
 async function wixListPosts(
   apiKey: string,
   siteId: string,
@@ -224,6 +248,7 @@ async function wixListPosts(
         id: string;
         title: string;
         slug?: string;
+        content?: WixDraftBlock[] | WixContentBlock;
         richContent?: { nodes: WixRichNode[] };
         url?: { base: string; path: string };
         excerpt?: string;
@@ -241,8 +266,19 @@ async function wixListPosts(
         postUrl = `${base}/post/${p.slug}`;
       }
 
-      // Convert richContent to basic HTML for link extraction
-      const html = wixRichContentToHtml(p.richContent?.nodes ?? []);
+      // Convert content to HTML — try Draft.js blocks first, then richContent
+      let html = "";
+      if (p.content) {
+        // content can be an array of blocks or { blocks, entityMap }
+        if (Array.isArray(p.content)) {
+          html = wixDraftBlocksToHtml(p.content, {});
+        } else if (p.content.blocks) {
+          html = wixDraftBlocksToHtml(p.content.blocks, p.content.entityMap ?? {});
+        }
+      }
+      if (!html && p.richContent?.nodes?.length) {
+        html = wixRichContentToHtml(p.richContent.nodes);
+      }
 
       return {
         id: p.id,
@@ -256,6 +292,61 @@ async function wixListPosts(
   } catch {
     return [];
   }
+}
+
+/** Convert Wix Draft.js blocks to HTML */
+function wixDraftBlocksToHtml(blocks: WixDraftBlock[], entityMap: Record<string, WixDraftEntity>): string {
+  let html = "";
+
+  for (const block of blocks) {
+    // Build text with entity links inserted
+    let text = block.text;
+    if (block.entityRanges?.length && entityMap) {
+      // Process entities in reverse order to preserve offsets
+      const sortedRanges = [...block.entityRanges].sort((a, b) => b.offset - a.offset);
+      for (const range of sortedRanges) {
+        const entity = entityMap[String(range.key)];
+        if (entity?.type === "LINK") {
+          const url = entity.data?.url || entity.data?.href || "";
+          if (url) {
+            const anchor = text.slice(range.offset, range.offset + range.length);
+            text = text.slice(0, range.offset) + `<a href="${url}">${anchor}</a>` + text.slice(range.offset + range.length);
+          }
+        }
+      }
+    }
+
+    // Wrap in appropriate HTML tag
+    switch (block.type) {
+      case "header-one":
+        html += `<h1>${text}</h1>`;
+        break;
+      case "header-two":
+        html += `<h2>${text}</h2>`;
+        break;
+      case "header-three":
+        html += `<h3>${text}</h3>`;
+        break;
+      case "header-four":
+        html += `<h4>${text}</h4>`;
+        break;
+      case "unordered-list-item":
+        html += `<li>${text}</li>`;
+        break;
+      case "ordered-list-item":
+        html += `<li>${text}</li>`;
+        break;
+      case "blockquote":
+        html += `<blockquote>${text}</blockquote>`;
+        break;
+      default:
+        // "unstyled" and others → paragraph
+        if (text.trim()) html += `<p>${text}</p>`;
+        break;
+    }
+  }
+
+  return html;
 }
 
 /**
