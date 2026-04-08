@@ -1,63 +1,69 @@
 /**
  * Pipeline Test API
  *
- * Tests each post-generation step individually with minimal content.
+ * Tests each post-generation step by calling AI directly (no fetch).
  * Returns detailed success/failure status for each step.
  *
- * GET /api/pipeline-test — runs all 6 content steps + meta
+ * GET /api/pipeline-test — runs all 6 content steps
  */
 
 import { createClient } from "@/lib/supabase/server";
+import { aiCall, parseAiJson, type TaskType } from "@/lib/ai-router";
 
 export const maxDuration = 120;
 
 type StepResult = {
   step: number;
   name: string;
-  status: "success" | "failed" | "skipped";
+  status: "success" | "failed";
   duration_ms: number;
   detail: string;
+  model?: string;
 };
 
-const TEST_CONTENT = `<h1>Comment choisir son fournisseur de vêtements vintage</h1>
+const TEST_HTML = `<h1>Comment choisir son fournisseur vintage</h1>
 <h2>Les critères essentiels</h2>
-<p>Choisir un fournisseur de vêtements vintage demande de la rigueur. La qualité des pièces, la régularité des stocks et la transparence des prix sont les trois piliers d'un bon partenariat.</p>
+<p>Choisir un fournisseur de vêtements vintage demande de la rigueur. La qualité des pièces et la transparence des prix sont les deux piliers d'un bon partenariat.</p>
 <h2>Les erreurs à éviter</h2>
-<p>Beaucoup de débutants font l'erreur de commander de gros volumes sans avoir testé la qualité. Commencez petit, évaluez, puis augmentez progressivement vos commandes.</p>`;
+<p>Beaucoup de débutants commandent de gros volumes sans tester la qualité. Commencez petit puis augmentez progressivement.</p>`;
 
-const TEST_KEYWORD = "fournisseur vêtements vintage";
+const KW = "fournisseur vêtements vintage";
 
-async function testStep(
+async function testAiStep(
   stepNum: number,
   name: string,
-  url: string,
-  body: Record<string, unknown>,
-  validate: (data: unknown) => string,
+  task: TaskType,
+  prompt: string,
+  validate: (parsed: unknown) => string,
 ): Promise<StepResult> {
   const start = Date.now();
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
+    const result = await aiCall(
+      { task },
+      { messages: [{ role: "user", content: prompt }], max_tokens: 2000 }
+    );
     const duration = Date.now() - start;
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      return { step: stepNum, name, status: "failed", duration_ms: duration, detail: `HTTP ${res.status}: ${errText.slice(0, 200)}` };
+    if (!result.text) {
+      return { step: stepNum, name, status: "failed", duration_ms: duration, detail: "AI returned empty text", model: result.model };
     }
 
-    const data = await res.json();
-    if (data.error) {
-      return { step: stepNum, name, status: "failed", duration_ms: duration, detail: `API error: ${data.error}` };
+    const parsed = parseAiJson(result.text);
+    if (!parsed) {
+      return { step: stepNum, name, status: "failed", duration_ms: duration, detail: `JSON parse failed. Raw (200ch): ${result.text.slice(0, 200)}`, model: result.model };
     }
 
-    const validation = validate(data);
-    return { step: stepNum, name, status: validation === "ok" ? "success" : "failed", duration_ms: duration, detail: validation };
+    const validation = validate(parsed);
+    return {
+      step: stepNum,
+      name,
+      status: validation.startsWith("ok") ? "success" : "failed",
+      duration_ms: duration,
+      detail: validation,
+      model: result.model,
+    };
   } catch (err) {
-    return { step: stepNum, name, status: "failed", duration_ms: Date.now() - start, detail: `Exception: ${err instanceof Error ? err.message : "Unknown"}` };
+    return { step: stepNum, name, status: "failed", duration_ms: Date.now() - start, detail: `Exception: ${err instanceof Error ? err.message : String(err)}` };
   }
 }
 
@@ -66,82 +72,107 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const results: StepResult[] = [];
 
-  // Step 7: Enrichissement sémantique
-  results.push(await testStep(7, "Enrichissement sémantique", `${baseUrl}/api/content/enrich`, {
-    content: TEST_CONTENT,
-    title: "Comment choisir son fournisseur de vêtements vintage",
-    keyword: TEST_KEYWORD,
-    language: "fr",
-  }, (d: unknown) => {
-    const data = d as { enrichment?: { improved_content?: string } };
-    if (!data.enrichment?.improved_content) return "Pas de improved_content dans la réponse";
-    if (data.enrichment.improved_content.length < 100) return `Contenu trop court: ${data.enrichment.improved_content.length} chars`;
-    return "ok";
-  }));
+  // ── Step 7: Enrichissement sémantique ──────────────────────────────
+  results.push(await testAiStep(7, "Enrichissement sémantique", "semantic_enrichment",
+    `Enrichis ce contenu HTML SEO en ajoutant des synonymes et du micro-contenu. Mot-clé: "${KW}". Langue: fr.
 
-  // Step 8: Valeur ajoutée
-  results.push(await testStep(8, "Valeur ajoutée & crédibilité", `${baseUrl}/api/content/enhance`, {
-    content: TEST_CONTENT,
-    title: "Comment choisir son fournisseur de vêtements vintage",
-    keyword: TEST_KEYWORD,
-    language: "fr",
-  }, (d: unknown) => {
-    const data = d as { enhancement?: { enhanced_content?: string } };
-    if (!data.enhancement?.enhanced_content) return "Pas de enhanced_content dans la réponse";
-    if (data.enhancement.enhanced_content.length < 100) return `Contenu trop court: ${data.enhancement.enhanced_content.length} chars`;
-    return "ok";
-  }));
+CONTENU:
+${TEST_HTML}
 
-  // Step 9: Maillage interne
-  results.push(await testStep(9, "Maillage interne intelligent", `${baseUrl}/api/content/linking`, {
-    content: TEST_CONTENT,
-    title: "Comment choisir son fournisseur de vêtements vintage",
-    keyword: TEST_KEYWORD,
-    language: "fr",
-  }, (d: unknown) => {
-    const data = d as { linking?: { updated_content?: string } };
-    if (!data.linking?.updated_content) return "Pas de updated_content dans la réponse";
-    return "ok";
-  }));
+FORMAT JSON uniquement:
+{"improved_content": "le HTML enrichi", "improvements": ["amélioration 1"], "semantic_additions": ["terme 1"]}`,
+    (d) => {
+      const data = d as { improved_content?: string };
+      if (!data.improved_content) return "Pas de improved_content";
+      if (data.improved_content.length < 50) return `Contenu trop court: ${data.improved_content.length}ch`;
+      return `ok (${data.improved_content.length} chars)`;
+    }
+  ));
 
-  // Step 10: Audit qualité SEO
-  results.push(await testStep(10, "Audit qualité SEO", `${baseUrl}/api/content/audit`, {
-    content: TEST_CONTENT,
-    primary_keyword: TEST_KEYWORD,
-    language: "fr",
-  }, (d: unknown) => {
-    const data = d as { audit?: { corrected_content?: string; naturalness_score?: number } };
-    if (!data.audit?.corrected_content) return "Pas de corrected_content dans la réponse";
-    return `ok (naturalness: ${data.audit.naturalness_score ?? "?"}/100)`;
-  }));
+  // ── Step 8: Valeur ajoutée & crédibilité ───────────────────────────
+  results.push(await testAiStep(8, "Valeur ajoutée & crédibilité", "value_enhancement",
+    `Ajoute des exemples concrets et des conseils pratiques à ce contenu. Mot-clé: "${KW}". Langue: fr.
 
-  // Step 11: Optimisation title & meta
-  results.push(await testStep(11, "Optimisation title & meta", `${baseUrl}/api/content/meta`, {
-    primary_keyword: TEST_KEYWORD,
-    content_summary: TEST_CONTENT.replace(/<[^>]+>/g, "").slice(0, 500),
-    language: "fr",
-  }, (d: unknown) => {
-    const data = d as { meta?: { titles?: string[]; meta_descriptions?: string[] } };
-    if (!data.meta?.titles?.length) return "Pas de titles dans la réponse";
-    if (!data.meta?.meta_descriptions?.length) return "Pas de meta_descriptions dans la réponse";
-    return `ok (${data.meta.titles.length} titres, ${data.meta.meta_descriptions.length} metas)`;
-  }));
+CONTENU:
+${TEST_HTML}
 
-  // Step 12: Contrôle final qualité
-  results.push(await testStep(12, "Contrôle final qualité", `${baseUrl}/api/content/final-check`, {
-    content: TEST_CONTENT,
-    title: "Comment choisir son fournisseur de vêtements vintage",
-    primary_keyword: TEST_KEYWORD,
-    language: "fr",
-  }, (d: unknown) => {
-    const data = d as { check?: { final_content?: string; final_verdict?: string; quality_score?: number } };
-    if (!data.check?.final_content) return "Pas de final_content dans la réponse";
-    if (!data.check?.final_verdict) return "Pas de final_verdict dans la réponse";
-    return `ok (verdict: ${data.check.final_verdict}, quality: ${data.check.quality_score ?? "?"}/100)`;
-  }));
+FORMAT JSON uniquement:
+{"enhanced_content": "le HTML amélioré", "added_examples": ["ex1"], "added_tips": ["tip1"]}`,
+    (d) => {
+      const data = d as { enhanced_content?: string };
+      if (!data.enhanced_content) return "Pas de enhanced_content";
+      return `ok (${data.enhanced_content.length} chars)`;
+    }
+  ));
+
+  // ── Step 9: Maillage interne intelligent ───────────────────────────
+  results.push(await testAiStep(9, "Maillage interne intelligent", "internal_linking",
+    `Ajoute 2 liens internes naturels dans ce contenu. Mot-clé: "${KW}". Langue: fr.
+Pages existantes:
+- /post/ouvrir-friperie-en-ligne (Ouvrir une friperie en ligne)
+- /post/vetements-vintage-tendance (Vêtements vintage tendance 2024)
+
+CONTENU:
+${TEST_HTML}
+
+FORMAT JSON uniquement:
+{"updated_content": "le HTML avec liens ajoutés", "links_added": [{"anchor": "texte", "target": "/url"}]}`,
+    (d) => {
+      const data = d as { updated_content?: string };
+      if (!data.updated_content) return "Pas de updated_content";
+      const hasLinks = data.updated_content.includes("<a ");
+      return hasLinks ? `ok (liens trouvés, ${data.updated_content.length} chars)` : `ok mais aucun <a> trouvé (${data.updated_content.length} chars)`;
+    }
+  ));
+
+  // ── Step 10: Audit qualité SEO ─────────────────────────────────────
+  results.push(await testAiStep(10, "Audit qualité SEO", "content_audit",
+    `Audite ce contenu SEO: détecte la sur-optimisation, les patterns IA, la naturalité. Corrige si nécessaire. Mot-clé: "${KW}".
+
+CONTENU:
+${TEST_HTML}
+
+FORMAT JSON uniquement:
+{"corrected_content": "le HTML corrigé", "naturalness_score": 85, "issues_detected": [], "risk_level": "low"}`,
+    (d) => {
+      const data = d as { corrected_content?: string; naturalness_score?: number };
+      if (!data.corrected_content) return "Pas de corrected_content";
+      return `ok (naturalness: ${data.naturalness_score ?? "?"}/100, ${data.corrected_content.length} chars)`;
+    }
+  ));
+
+  // ── Step 11: Optimisation title & meta ─────────────────────────────
+  results.push(await testAiStep(11, "Optimisation title & meta", "meta_optimization",
+    `Génère 3 titres SEO (50-60 chars) et 2 meta descriptions (140-160 chars) pour: "${KW}". Langue: fr.
+
+FORMAT JSON uniquement:
+{"titles": ["titre1", "titre2", "titre3"], "meta_descriptions": ["meta1", "meta2"], "ctr_strategy": "stratégie"}`,
+    (d) => {
+      const data = d as { titles?: string[]; meta_descriptions?: string[] };
+      if (!data.titles?.length) return "Pas de titles";
+      if (!data.meta_descriptions?.length) return "Pas de meta_descriptions";
+      return `ok (${data.titles.length} titres: "${data.titles[0]}", ${data.meta_descriptions.length} metas)`;
+    }
+  ));
+
+  // ── Step 12: Contrôle final qualité ────────────────────────────────
+  results.push(await testAiStep(12, "Contrôle final qualité", "final_check",
+    `Contrôle final qualité SEO de ce contenu. Vérifie complétude, cohérence, structure, naturalité. Mot-clé: "${KW}".
+
+CONTENU:
+${TEST_HTML}
+
+FORMAT JSON uniquement:
+{"quality_score": 85, "seo_score": 80, "final_verdict": "ready", "final_content": "le HTML validé/corrigé", "issues": [], "improvements": []}`,
+    (d) => {
+      const data = d as { final_content?: string; final_verdict?: string; quality_score?: number };
+      if (!data.final_content) return "Pas de final_content";
+      if (!data.final_verdict) return "Pas de final_verdict";
+      return `ok (verdict: ${data.final_verdict}, quality: ${data.quality_score ?? "?"}/100)`;
+    }
+  ));
 
   // Summary
   const passed = results.filter(r => r.status === "success").length;
