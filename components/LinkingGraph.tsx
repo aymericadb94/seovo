@@ -129,7 +129,7 @@ export default function LinkingGraph() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 
-  // Pré-calculer les voisins pour l'effet de focus (existing + suggestions)
+  // Pré-calculer les voisins pour l'effet de focus (existing + suggestions si actives)
   const neighborMap = useMemo(() => {
     const map = new Map<string, Set<string>>();
     if (!data) return map;
@@ -139,10 +139,12 @@ export default function LinkingGraph() {
       map.get(a)!.add(b);
       map.get(b)!.add(a);
     };
-    data.suggestions.forEach(s => addPair(s.from_url, s.to_url));
+    if (showSuggestions) {
+      data.suggestions.forEach(s => addPair(s.from_url, s.to_url));
+    }
     (data.existing_links ?? []).forEach(l => addPair(l.from_url, l.to_url));
     return map;
-  }, [data]);
+  }, [data, showSuggestions]);
 
   // ── Load data ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -154,7 +156,7 @@ export default function LinkingGraph() {
       if (containerRef.current) {
         setDimensions({
           width: containerRef.current.offsetWidth,
-          height: Math.max(450, Math.min(600, window.innerHeight * 0.55)),
+          height: Math.max(500, Math.min(700, window.innerHeight * 0.65)),
         });
       }
     }
@@ -162,6 +164,15 @@ export default function LinkingGraph() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // ── Configure d3 forces for better spacing ──────────────────────────────
+  useEffect(() => {
+    const fg = graphRef.current;
+    if (!fg || !data) return;
+    fg.d3Force("charge")?.strength(-350).distanceMax(500);
+    fg.d3Force("link")?.distance(100);
+    fg.d3Force("center")?.strength(0.04);
+  }, [data]);
 
   async function loadData() {
     setLoading(true);
@@ -272,11 +283,11 @@ export default function LinkingGraph() {
       const palette = cIdx >= 0 ? CLUSTER_COLORS[cIdx] : ORPHAN_COLOR;
       const isOrphan = p.role === "orphan" || p.incoming === 0;
 
-      // Size based on importance
-      let size = 5;
-      if (p.role === "pillar") size = 12;
-      else if (p.link_score > 60) size = 8;
-      else if (isOrphan) size = 4;
+      // Size based on importance (larger for readability)
+      let size = 7;
+      if (p.role === "pillar") size = 14;
+      else if (p.link_score > 60) size = 10;
+      else if (isOrphan) size = 5;
 
       return {
         id: p.url,
@@ -310,20 +321,21 @@ export default function LinkingGraph() {
       });
     });
 
-    // Suggestion links (dashed, dimmer)
-    const existingPairs = new Set(existingLinks.map(l => `${l.from_url}|${l.to_url}`));
-    data.suggestions.forEach((s, i) => {
-      // Skip suggestions that duplicate existing links
-      if (existingPairs.has(`${s.from_url}|${s.to_url}`)) return;
-      allLinks.push({
-        source: s.from_url,
-        target: s.to_url,
-        weight: s.priority === "haute" ? 1.5 : 1,
-        type: "suggestion",
-        color: "rgba(255,255,255,0.08)",
-        curvature: 0.15 + (i % 3) * 0.05,
+    // Suggestion links (dashed, dimmer) — only show when panel is open
+    if (showSuggestions) {
+      const existingPairs = new Set(existingLinks.map(l => `${l.from_url}|${l.to_url}`));
+      data.suggestions.forEach((s, i) => {
+        if (existingPairs.has(`${s.from_url}|${s.to_url}`)) return;
+        allLinks.push({
+          source: s.from_url,
+          target: s.to_url,
+          weight: s.priority === "haute" ? 1.5 : 1,
+          type: "suggestion",
+          color: "rgba(255,255,255,0.08)",
+          curvature: 0.15 + (i % 3) * 0.05,
+        });
       });
-    });
+    }
 
     // Filter
     let filteredNodes = allNodes;
@@ -347,7 +359,7 @@ export default function LinkingGraph() {
     filteredLinks = filteredLinks.filter(l => nodeIds.has(l.source as string) && nodeIds.has(l.target as string));
 
     return { nodes: filteredNodes, links: filteredLinks };
-  }, [data, filter, selectedCluster, clusterNames]);
+  }, [data, filter, selectedCluster, clusterNames, showSuggestions]);
 
   // ── Pill drawing helper ───────────────────────────────────────────────────
   const drawPill = useCallback((
@@ -408,9 +420,9 @@ export default function LinkingGraph() {
     const isLinked = node.incoming > 0 || node.outgoing > 0;
     const isPillar = role === "pillar";
 
-    // Pill dimensions — based on importance
-    const pillH = isPillar ? 14 : isLinked ? 10 : 8;
-    const pillW = isPillar ? size * 3.8 : isLinked ? size * 3 : size * 2.5;
+    // Pill dimensions — based on importance (larger for readability)
+    const pillH = isPillar ? 18 : isLinked ? 13 : 10;
+    const pillW = isPillar ? size * 4.5 : isLinked ? size * 3.5 : size * 2.8;
 
     // Animation pulse for linked pages
     const t = frameRef.current * 0.03;
@@ -473,22 +485,27 @@ export default function LinkingGraph() {
       ctx.fill();
     }
 
-    // ── Label ──
-    if (isHighlighted || (isNeighbor && activeNode) || isPillar) {
-      ctx.font = `${isHighlighted ? "bold " : ""}${isHighlighted ? 11 : 9}px Inter, system-ui, sans-serif`;
+    // ── Label — only show on hover/selected/neighbor to avoid clutter ──
+    const showLabel = isHighlighted || (isNeighbor && !!activeNode);
+    if (showLabel) {
+      const fontSize = isHighlighted ? 12 : 10;
+      ctx.font = `${isHighlighted ? "bold " : ""}${fontSize}px Inter, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
 
-      // Text shadow for readability
-      if (isHighlighted) {
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillText(node.label, x + 0.5, y + pillH / 2 + 4.5);
-      }
+      const labelY = y + pillH / 2 + 5;
 
-      ctx.fillStyle = isHighlighted ? "#fff"
-        : isNeighbor ? "rgba(255,255,255,0.8)"
-        : isLinked ? "rgba(249,115,22,0.6)" : "rgba(255,255,255,0.45)";
-      ctx.fillText(node.label, x, y + pillH / 2 + 4);
+      // Background pill behind text for readability
+      const textWidth = ctx.measureText(node.label).width;
+      const padX = 6, padY = 2;
+      const bgR = (fontSize + padY * 2) / 2;
+      ctx.fillStyle = "rgba(0,0,0,0.75)";
+      ctx.beginPath();
+      ctx.roundRect(x - textWidth / 2 - padX, labelY - padY, textWidth + padX * 2, fontSize + padY * 2, bgR);
+      ctx.fill();
+
+      ctx.fillStyle = isHighlighted ? "#fff" : "rgba(255,255,255,0.85)";
+      ctx.fillText(node.label, x, labelY);
     }
 
     ctx.globalAlpha = 1;
@@ -1128,10 +1145,14 @@ export default function LinkingGraph() {
               }
             }}
             onNodeClick={(node) => setSelectedNode(prev => prev?.id === (node as GraphNode).id ? null : node as GraphNode)}
-            d3AlphaDecay={0.04}
-            d3VelocityDecay={0.35}
-            cooldownTicks={80}
-            onEngineStop={() => graphRef.current?.zoomToFit(400, 40)}
+            d3AlphaDecay={0.025}
+            d3VelocityDecay={0.3}
+            cooldownTicks={120}
+            d3AlphaMin={0.005}
+            warmupTicks={30}
+            onEngineStop={() => graphRef.current?.zoomToFit(500, 60)}
+            minZoom={0.3}
+            maxZoom={5}
             enableZoomInteraction={true}
             enablePanInteraction={true}
           />
