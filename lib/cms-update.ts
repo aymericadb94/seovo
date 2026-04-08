@@ -210,28 +210,93 @@ function wixHeaders(apiKey: string, siteId: string) {
 async function wixListPosts(
   apiKey: string,
   siteId: string,
-  limit: number = 50
+  limit: number = 50,
+  siteUrl?: string,
 ): Promise<(CmsPost & { wix_id: string })[]> {
   try {
     const res = await fetch(
-      `https://www.wixapis.com/blog/v3/posts?paging.limit=${limit}&fieldsets=CONTENT`,
+      `https://www.wixapis.com/blog/v3/posts?paging.limit=${limit}&fieldsets=CONTENT&fieldsets=URL`,
       { headers: wixHeaders(apiKey, siteId) }
     );
     if (!res.ok) return [];
+    type WixNode = { type: string; nodes?: WixNode[]; textData?: { text: string }; linkData?: { link?: { url?: string } }; paragraphData?: unknown };
     const data = await res.json() as {
-      posts: { id: string; title: string; richContent?: { nodes: unknown[] }; url?: { base: string; path: string }; excerpt?: string }[];
+      posts: {
+        id: string;
+        title: string;
+        slug?: string;
+        richContent?: { nodes: WixNode[] };
+        url?: { base: string; path: string };
+        excerpt?: string;
+      }[];
     };
-    return (data.posts ?? []).map(p => ({
-      id: p.id,
-      wix_id: p.id,
-      title: p.title,
-      content: JSON.stringify(p.richContent ?? {}),
-      url: p.url ? `${p.url.base}${p.url.path}` : "",
-      excerpt: p.excerpt ?? "",
-    }));
+
+    const base = siteUrl?.replace(/\/$/, "") ?? "";
+
+    return (data.posts ?? []).map(p => {
+      // Build URL: prefer url.base+path, fallback to site_url/post/slug
+      let postUrl = "";
+      if (p.url?.base && p.url?.path) {
+        postUrl = `${p.url.base}${p.url.path}`;
+      } else if (p.slug) {
+        postUrl = `${base}/post/${p.slug}`;
+      }
+
+      // Convert richContent to basic HTML for link extraction
+      const html = wixRichContentToHtml(p.richContent?.nodes ?? []);
+
+      return {
+        id: p.id,
+        wix_id: p.id,
+        title: p.title,
+        content: html,
+        url: postUrl,
+        excerpt: p.excerpt ?? "",
+      };
+    });
   } catch {
     return [];
   }
+}
+
+/** Convert Wix richContent nodes to basic HTML (paragraphs, headings, links) */
+function wixRichContentToHtml(nodes: { type: string; nodes?: unknown[]; textData?: { text: string }; linkData?: { link?: { url?: string } }; headingData?: { level: number }; paragraphData?: unknown }[]): string {
+  let html = "";
+  for (const node of nodes) {
+    if (node.type === "HEADING") {
+      const level = (node as { headingData?: { level: number } }).headingData?.level ?? 2;
+      const inner = wixInlineToHtml((node.nodes ?? []) as { type: string; textData?: { text: string }; linkData?: { link?: { url?: string } } }[]);
+      html += `<h${level}>${inner}</h${level}>`;
+    } else if (node.type === "PARAGRAPH") {
+      const inner = wixInlineToHtml((node.nodes ?? []) as { type: string; textData?: { text: string }; linkData?: { link?: { url?: string } } }[]);
+      if (inner.trim()) html += `<p>${inner}</p>`;
+    } else if (node.type === "BULLETED_LIST" || node.type === "ORDERED_LIST") {
+      const tag = node.type === "ORDERED_LIST" ? "ol" : "ul";
+      const items = (node.nodes ?? []) as { type: string; nodes?: unknown[] }[];
+      html += `<${tag}>`;
+      for (const item of items) {
+        const inner = wixRichContentToHtml((item.nodes ?? []) as typeof nodes);
+        html += `<li>${inner}</li>`;
+      }
+      html += `</${tag}>`;
+    }
+  }
+  return html;
+}
+
+function wixInlineToHtml(nodes: { type: string; textData?: { text: string }; linkData?: { link?: { url?: string } } }[]): string {
+  let result = "";
+  for (const n of nodes) {
+    if (n.type === "TEXT") {
+      result += n.textData?.text ?? "";
+    } else if (n.type === "LINK" || n.linkData?.link?.url) {
+      // For link nodes, recurse into children for text, wrap in <a>
+      const href = n.linkData?.link?.url ?? "";
+      const inner = wixInlineToHtml((n as { nodes?: typeof nodes }).nodes ?? []);
+      result += href ? `<a href="${href}">${inner || href}</a>` : inner;
+    }
+  }
+  return result;
 }
 
 async function wixUpdatePost(
@@ -279,7 +344,7 @@ export async function listCmsPosts(creds: CmsCredentials, limit: number = 50): P
       return shopifyListArticles(creds.shopify_store_url || creds.site_url, creds.shopify_api_key, limit, creds.site_url);
     case "wix":
       if (!creds.wix_api_key || !creds.wix_site_id) return [];
-      return wixListPosts(creds.wix_api_key, creds.wix_site_id, limit);
+      return wixListPosts(creds.wix_api_key, creds.wix_site_id, limit, creds.site_url);
     default:
       return []; // Custom API: no read capability
   }
