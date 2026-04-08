@@ -16,6 +16,21 @@ import { logger } from "@/lib/logger";
 
 type Publication = { title: string; keyword: string; wordpress_url: string | null };
 
+type ExistingPage = {
+  title: string;
+  url: string;
+  keyword: string;
+  cluster: string | null;
+  summary: string;
+};
+
+type CocoonCluster = {
+  name: string;
+  pillar: { title: string; keyword: string; url?: string };
+  pages?: { keyword: string; role?: string }[];
+  support_pages?: { title: string; keyword: string; url?: string }[];
+};
+
 export type LinkingResult = {
   outgoing: { content: string; links_added: number };
   retroactive: { updated_pages: { title: string; url: string; links_added: number }[]; errors: string[] };
@@ -23,21 +38,94 @@ export type LinkingResult = {
 
 // ── Outgoing: links FROM new article TO existing pages ─────────────────────
 
+/**
+ * Insère 2-4 liens internes FROM le nouvel article TO les pages existantes.
+ *
+ * Utilise le contexte cocoon (cluster, pilier) pour prioriser :
+ * 1. Pages du même cluster
+ * 2. Forte pertinence sémantique
+ * 3. Liens naturels et non forcés
+ */
 export async function addOutgoingLinks(
   content: string,
   keyword: string,
   title: string,
   publications: Publication[],
-  language: string = "fr"
+  language: string = "fr",
+  cocoonData?: { clusters?: CocoonCluster[] } | null,
 ): Promise<{ content: string; links_added: number }> {
-  // Build target pages (published with URLs, not the current article)
-  const targets = publications
+  // Build target pages with cluster info and summaries
+  const targets: ExistingPage[] = publications
     .filter(p => p.wordpress_url && p.keyword?.toLowerCase() !== keyword.toLowerCase())
-    .map(p => ({ title: p.title, keyword: p.keyword, url: p.wordpress_url! }));
+    .map(p => {
+      // Find cluster for this page
+      let cluster: string | null = null;
+      if (cocoonData?.clusters) {
+        for (const c of cocoonData.clusters) {
+          const allKws = [
+            c.pillar?.keyword,
+            ...(c.support_pages?.map(sp => sp.keyword) ?? []),
+            ...(c.pages?.map(pg => pg.keyword) ?? []),
+          ].filter(Boolean);
+          if (allKws.some(k => k?.toLowerCase() === p.keyword?.toLowerCase())) {
+            cluster = c.name;
+            break;
+          }
+        }
+      }
+      return {
+        title: p.title,
+        url: p.wordpress_url!,
+        keyword: p.keyword,
+        cluster,
+        summary: `Article sur "${p.keyword}"`,
+      };
+    });
 
   if (targets.length === 0) {
     return { content, links_added: 0 };
   }
+
+  // Find current page's cluster
+  let currentCluster: string | null = null;
+  let currentPageType = "support";
+  let pillarPage: ExistingPage | null = null;
+
+  if (cocoonData?.clusters) {
+    for (const c of cocoonData.clusters) {
+      const isPillar = c.pillar?.keyword?.toLowerCase() === keyword.toLowerCase();
+      const allKws = [
+        c.pillar?.keyword,
+        ...(c.support_pages?.map(sp => sp.keyword) ?? []),
+        ...(c.pages?.map(pg => pg.keyword) ?? []),
+      ].filter(Boolean);
+
+      if (isPillar || allKws.some(k => k?.toLowerCase() === keyword.toLowerCase())) {
+        currentCluster = c.name;
+        currentPageType = isPillar ? "pillar" : "support";
+        // Find pillar as target
+        if (!isPillar) {
+          pillarPage = targets.find(t => t.keyword?.toLowerCase() === c.pillar?.keyword?.toLowerCase()) ?? null;
+        }
+        break;
+      }
+    }
+  }
+
+  // Sort targets: same cluster first, then by relevance
+  const sortedTargets = [...targets].sort((a, b) => {
+    const aCluster = a.cluster === currentCluster ? 1 : 0;
+    const bCluster = b.cluster === currentCluster ? 1 : 0;
+    return bCluster - aCluster;
+  });
+
+  // Build existing pages list for the prompt
+  const pagesForPrompt = sortedTargets.slice(0, 15).map((p, i) => ({
+    title: p.title,
+    url: p.url,
+    summary: p.summary,
+    cluster: p.cluster ?? "non classé",
+  }));
 
   try {
     const aiResult = await aiCall(
@@ -45,36 +133,71 @@ export async function addOutgoingLinks(
       {
         messages: [{
           role: "user",
-          content: `Tu es un expert SEO. Insère 2-4 liens internes naturels dans cet article.
+          content: `Tu es un expert SEO senior spécialisé en maillage interne intelligent.
 
-ARTICLE : "${title}" (mot-clé : "${keyword}")
+Ta mission : créer un maillage interne RÉEL et CONNECTÉ pour cette page.
+
 LANGUE : ${language}
 
-PAGES CIBLES DISPONIBLES :
-${targets.slice(0, 15).map((p, i) => `${i + 1}. "${p.title}" (${p.keyword}) → ${p.url}`).join("\n")}
+PAGE EN COURS DE GÉNÉRATION :
+{
+  "title": "${title}",
+  "keyword": "${keyword}",
+  "cluster": ${currentCluster ? `"${currentCluster}"` : "null"},
+  "page_type": "${currentPageType}"
+}
+
+PAGES EXISTANTES SUR LE SITE :
+${JSON.stringify(pagesForPrompt, null, 2)}
+
+${pillarPage ? `⚠️ LIEN OBLIGATOIRE : cette page est un support du cluster "${currentCluster}". Un lien vers le pilier "${pillarPage.title}" (${pillarPage.url}) est REQUIS.` : ""}
+
+RÈGLES STRICTES :
+- Sélectionner 2 à 4 pages maximum
+- Prioriser : même cluster > forte pertinence sémantique > complémentarité
+- Éviter les pages non pertinentes (clusters sans rapport)
+- Éviter le spam de liens
+
+POUR CHAQUE LIEN :
+- Ancre naturelle de 2-5 mots intégrée dans une phrase EXISTANTE
+- Jamais le mot-clé exact de la page cible
+- Max 1 lien par paragraphe
+- Pas de lien dans l'intro (premier <p>) ni la conclusion (dernier <p>)
+- Format HTML : <a href="URL">ancre</a>
+
+INTERDIT :
+- Forcer des liens là où c'est artificiel
+- Créer des ancres type "cliquez ici" ou "en savoir plus"
+- Sur-optimiser (pas d'ancres bourrées de mots-clés)
+- Ajouter du texte qui n'existe pas dans l'original
+- Modifier la structure HTML (H2, H3, listes intacts)
 
 CONTENU HTML :
 ${content.slice(0, 10000)}
 
-RÈGLES :
-- Insère les liens DANS des phrases existantes (pas de phrases ajoutées)
-- Ancres naturelles de 2-5 mots, jamais le mot-clé exact de la cible
-- Max 1 lien par paragraphe
-- Pas de lien dans l'intro ou la conclusion
-- URLs RÉELLES de la liste uniquement
-
-FORMAT JSON :
+FORMAT DE SORTIE : JSON uniquement.
 {
-  "updated_content": "Le HTML avec les liens <a href='url' title='titre'>ancre</a> insérés",
-  "links_count": 3
+  "updated_content": "Le HTML complet avec les liens <a> insérés naturellement",
+  "links_added": [
+    {
+      "target_url": "URL exacte de la page cible",
+      "anchor": "texte d'ancre utilisé",
+      "placement_instruction": "section et phrase où le lien est inséré"
+    }
+  ]
 }`
         }],
       }
     );
 
-    const parsed = parseAiJson<{ updated_content: string; links_count: number }>(aiResult.text);
+    const parsed = parseAiJson<{
+      updated_content: string;
+      links_added: { target_url: string; anchor: string; placement_instruction: string }[];
+    }>(aiResult.text);
+
     if (parsed?.updated_content) {
-      return { content: parsed.updated_content, links_added: parsed.links_count ?? 0 };
+      const count = parsed.links_added?.length ?? 0;
+      return { content: parsed.updated_content, links_added: count };
     }
   } catch (err) {
     logger.warn("Outgoing linking failed", { context: "linking-engine", error: err });

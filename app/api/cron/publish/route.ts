@@ -494,17 +494,20 @@ export async function GET(request: Request) {
           const { title, meta_description, cover_image_query, cover_alt_text } = generated;
 
           // ── Maillage sortant : liens FROM nouvel article TO pages existantes ──
-          const { data: existingPubs } = await supabase
-            .from("publications")
-            .select("title, keyword, wordpress_url")
-            .eq("site_id", site.id);
+          const [{ data: existingPubs }, { data: cocoonRow }] = await Promise.all([
+            supabase.from("publications").select("title, keyword, wordpress_url").eq("site_id", site.id),
+            supabase.from("semantic_cocoons").select("data").eq("user_id", site.user_id).maybeSingle(),
+          ]);
+
+          const cocoonData = cocoonRow?.data as { clusters?: { name: string; pillar: { title: string; keyword: string; url?: string }; pages?: { keyword: string; role?: string }[]; support_pages?: { title: string; keyword: string; url?: string }[] }[] } | null;
 
           const { content: linkedContent, links_added: outgoingLinks } = await addOutgoingLinks(
             generated.content,
             keyword,
             title,
             existingPubs ?? [],
-            language
+            language,
+            cocoonData,
           );
           const content = linkedContent;
           if (outgoingLinks > 0) {
