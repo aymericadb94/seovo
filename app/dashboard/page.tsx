@@ -55,6 +55,7 @@ type DashboardData = {
     keyword: string;
     url: string;
     published_at: string;
+    page_type: "article" | "page";
   }[];
 };
 
@@ -74,6 +75,7 @@ export default function Dashboard() {
   const [indexationLoading, setIndexationLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [pubFilter, setPubFilter] = useState<"all" | "articles" | "pages" | "indexed" | "not_indexed">("all");
 
   // ── Tutorial (0=score, 1=cocon, 2=potentiel, 3=roadmap, 4=libre) ─────────────
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
@@ -338,7 +340,10 @@ export default function Dashboard() {
       const res = await fetch("/api/publications/sync", { method: "POST" });
       const json = await res.json();
       if (json.synced > 0) {
-        setSyncResult(`${json.synced} article(s) synchronisé(s)`);
+        const parts: string[] = [];
+        if (json.articles_count > 0) parts.push(`${json.articles_count} article(s)`);
+        if (json.pages_count > 0) parts.push(`${json.pages_count} page(s)`);
+        setSyncResult(`${parts.join(" + ")} synchronisé(s)`);
         loadData();
       } else {
         setSyncResult(json.message || "Déjà synchronisé");
@@ -1991,7 +1996,7 @@ export default function Dashboard() {
 
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden animate-fade-in-up delay-300">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
-                    <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Tous les articles publiés</p>
+                    <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Toutes les pages du site</p>
                     <div className="flex items-center gap-3">
                       <button onClick={syncPublications} disabled={syncing} className="group flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-blue-500/40 text-gray-400 hover:text-blue-400 transition-all disabled:opacity-40">
                         {syncing ? (<><span className="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" /> Sync...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/></svg>Synchroniser</>)}
@@ -2010,55 +2015,100 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {data.recentPublications.length === 0 ? (
-                    <div className="text-center py-16">
-                      <p className="text-white font-bold mb-2">Aucun article pour l'instant</p>
-                      <p className="text-gray-500 text-sm mb-5">Lancez la publication ou générez manuellement</p>
-                      <button onClick={() => handleManualPublish()} className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-6 py-2.5 rounded-lg text-sm uppercase tracking-wide">
-                        Lancer la publication maintenant
+                  {/* Filtres */}
+                  <div className="flex items-center gap-2 px-6 py-3 border-b border-white/[0.06]">
+                    {([
+                      { key: "all", label: "Toutes", count: data.recentPublications.length },
+                      { key: "articles", label: "Articles", count: data.recentPublications.filter(p => p.page_type === "article").length },
+                      { key: "pages", label: "Pages", count: data.recentPublications.filter(p => p.page_type === "page").length },
+                      { key: "indexed", label: "Indexees", count: data.recentPublications.filter(p => p.url && indexationResults[p.url]?.indexed === true).length },
+                      { key: "not_indexed", label: "Non indexees", count: data.recentPublications.filter(p => p.url && indexationResults[p.url]?.indexed === false).length },
+                    ] as { key: typeof pubFilter; label: string; count: number }[]).map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setPubFilter(f.key)}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
+                          pubFilter === f.key
+                            ? "border-orange-500/50 bg-orange-500/10 text-orange-400"
+                            : "border-white/10 text-gray-500 hover:text-gray-300 hover:border-white/20"
+                        }`}
+                      >
+                        {f.label} <span className="ml-1 opacity-60">{f.count}</span>
                       </button>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-white/[0.05]">
-                            <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Titre</th>
-                            <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Mot-clé</th>
-                            <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Date</th>
-                            <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Statut</th>
-                            <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Indexation</th>
-                            <th className="px-6 py-3" />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.recentPublications.map((pub, i) => {
-                            const idx = pub.url ? indexationResults[pub.url] : null;
-                            return (
-                              <tr key={pub.id} className={`border-b border-white/[0.04] hover:bg-white/[0.03] transition-all animate-fade-in-up ${i === data.recentPublications.length - 1 ? "border-b-0" : ""}`} style={{animationDelay: `${i * 60}ms`}}>
-                                <td className="px-6 py-4 text-white font-medium max-w-xs truncate text-sm">{pub.title}</td>
-                                <td className="px-6 py-4"><span className="bg-orange-500/10 text-orange-400 text-xs font-bold px-2.5 py-1 rounded-full">{pub.keyword}</span></td>
-                                <td className="px-6 py-4 text-gray-500 text-sm whitespace-nowrap">{new Date(pub.published_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}</td>
-                                <td className="px-6 py-4"><span className="flex items-center gap-1.5 text-xs font-bold text-green-400"><span className="w-1.5 h-1.5 bg-green-400 rounded-full" />Publié</span></td>
-                                <td className="px-6 py-4">
-                                  {!idx ? (<span className="text-gray-700 text-xs">—</span>) : idx.indexed === true ? (
-                                    <span className="flex items-center gap-1.5 text-xs font-bold text-green-400"><span className="w-1.5 h-1.5 bg-green-400 rounded-full" /> Indexé</span>
-                                  ) : idx.indexed === false ? (
-                                    <span className="flex items-center gap-1.5 text-xs font-bold text-red-400"><span className="w-1.5 h-1.5 bg-red-400 rounded-full" /> Non indexé</span>
-                                  ) : (
-                                    <span className="text-gray-500 text-xs">Inconnu</span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                  {pub.url && <a href={pub.url} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors">Voir →</a>}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                    ))}
+                  </div>
+
+                  {(() => {
+                    const filtered = data.recentPublications.filter(pub => {
+                      if (pubFilter === "articles") return pub.page_type === "article";
+                      if (pubFilter === "pages") return pub.page_type === "page";
+                      if (pubFilter === "indexed") return pub.url && indexationResults[pub.url]?.indexed === true;
+                      if (pubFilter === "not_indexed") return pub.url && indexationResults[pub.url]?.indexed === false;
+                      return true;
+                    });
+
+                    return filtered.length === 0 ? (
+                      <div className="text-center py-16">
+                        <p className="text-white font-bold mb-2">{pubFilter === "all" ? "Aucune page pour l\u2019instant" : "Aucun r\u00e9sultat pour ce filtre"}</p>
+                        <p className="text-gray-500 text-sm mb-5">{pubFilter === "all" ? "Synchronisez votre CMS ou g\u00e9n\u00e9rez un article" : "Essayez un autre filtre ou synchronisez votre CMS"}</p>
+                        {pubFilter === "all" && (
+                          <button onClick={() => handleManualPublish()} className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-6 py-2.5 rounded-lg text-sm uppercase tracking-wide">
+                            Lancer la publication maintenant
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-white/[0.05]">
+                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Titre</th>
+                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Type</th>
+                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Mot-cl\u00e9</th>
+                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Date</th>
+                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Indexation</th>
+                              <th className="px-6 py-3" />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filtered.map((pub, i) => {
+                              const idx = pub.url ? indexationResults[pub.url] : null;
+                              return (
+                                <tr key={pub.id} className={`border-b border-white/[0.04] hover:bg-white/[0.03] transition-all animate-fade-in-up ${i === filtered.length - 1 ? "border-b-0" : ""}`} style={{animationDelay: `${i * 40}ms`}}>
+                                  <td className="px-6 py-4 text-white font-medium max-w-xs truncate text-sm">{pub.title}</td>
+                                  <td className="px-6 py-4">
+                                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${pub.page_type === "page" ? "bg-blue-500/10 text-blue-400" : "bg-orange-500/10 text-orange-400"}`}>
+                                      {pub.page_type === "page" ? "Page" : "Article"}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    {pub.keyword && pub.keyword !== "__page__" ? (
+                                      <span className="bg-orange-500/10 text-orange-400 text-xs font-bold px-2.5 py-1 rounded-full">{pub.keyword}</span>
+                                    ) : (
+                                      <span className="text-gray-700 text-xs">\u2014</span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 text-gray-500 text-sm whitespace-nowrap">{new Date(pub.published_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                                  <td className="px-6 py-4">
+                                    {!idx ? (<span className="text-gray-700 text-xs">\u2014</span>) : idx.indexed === true ? (
+                                      <span className="flex items-center gap-1.5 text-xs font-bold text-green-400"><span className="w-1.5 h-1.5 bg-green-400 rounded-full" /> Index\u00e9</span>
+                                    ) : idx.indexed === false ? (
+                                      <span className="flex items-center gap-1.5 text-xs font-bold text-red-400"><span className="w-1.5 h-1.5 bg-red-400 rounded-full" /> Non index\u00e9</span>
+                                    ) : (
+                                      <span className="text-gray-500 text-xs">Inconnu</span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    {pub.url && <a href={pub.url} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors">Voir \u2192</a>}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}

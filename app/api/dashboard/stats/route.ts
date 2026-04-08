@@ -219,12 +219,13 @@ export async function GET() {
     }
 
     // ── Publications récentes (pour la table) ────────────────────────────────
-    const recentPublications = pubs.slice(0, 20).map(p => ({
+    const recentPublications = pubs.map(p => ({
       id: p.id,
       title: p.title,
       keyword: p.keyword,
       url: p.wordpress_url,
       published_at: p.published_at,
+      page_type: p.keyword === "__page__" ? "page" : "article",
     }));
 
     return Response.json({

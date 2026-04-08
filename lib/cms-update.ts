@@ -28,12 +28,15 @@ export type CmsCredentials = {
   custom_api_key?: string;
 };
 
+export type CmsPageType = "article" | "page";
+
 export type CmsPost = {
   id: string | number;
   title: string;
   content: string;
   url: string;
   excerpt?: string;
+  page_type?: CmsPageType;
 };
 
 export type UpdateResult = {
@@ -149,6 +152,53 @@ async function wpListPosts(
   }
 }
 
+async function wpListPages(
+  siteUrl: string,
+  auth: string,
+  limit: number = 100
+): Promise<CmsPost[]> {
+  try {
+    const allPages: CmsPost[] = [];
+    const perPage = Math.min(limit, 100);
+    const pages = Math.ceil(limit / perPage);
+
+    for (let page = 1; page <= pages; page++) {
+      const remaining = limit - allPages.length;
+      if (remaining <= 0) break;
+      const count = Math.min(perPage, remaining);
+
+      const res = await fetch(
+        `${siteUrl}/wp-json/wp/v2/pages?per_page=${count}&page=${page}&orderby=date&order=desc&_fields=id,title,content,link,excerpt`,
+        { headers: { Authorization: auth, "ngrok-skip-browser-warning": "true" } }
+      );
+      if (!res.ok) break;
+      const items = await res.json() as {
+        id: number;
+        title: { rendered: string };
+        content: { rendered: string };
+        link: string;
+        excerpt: { rendered: string };
+      }[];
+
+      if (items.length === 0) break;
+      allPages.push(...items.map(p => ({
+        id: p.id,
+        title: p.title.rendered,
+        content: p.content.rendered,
+        url: p.link,
+        excerpt: p.excerpt.rendered,
+        page_type: "page" as CmsPageType,
+      })));
+
+      if (items.length < count) break;
+    }
+
+    return allPages;
+  } catch {
+    return [];
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // SHOPIFY
 // ══════════════════════════════════════════════════════════════════════════════
@@ -212,6 +262,31 @@ async function shopifyUpdateArticle(
     return { success: true, post_id: data.article.id, url: `${publicBase}/blogs/news/${data.article.handle}` };
   } catch (err) {
     return { success: false, post_id: articleId, url: "", error: err instanceof Error ? err.message : "Unknown" };
+  }
+}
+
+async function shopifyListPages(
+  storeUrl: string,
+  apiKey: string,
+  limit: number = 50,
+  publicUrl?: string
+): Promise<CmsPost[]> {
+  const publicBase = (publicUrl ?? storeUrl).replace(/\/$/, "");
+  try {
+    const res = await shopifyFetch(storeUrl, apiKey, `pages.json?limit=${limit}&fields=id,title,body_html,handle`);
+    if (!res.ok) return [];
+    const data = await res.json() as {
+      pages: { id: number; title: string; body_html: string; handle: string }[];
+    };
+    return (data.pages ?? []).map(p => ({
+      id: p.id,
+      title: p.title,
+      content: p.body_html ?? "",
+      url: `${publicBase}/pages/${p.handle}`,
+      page_type: "page" as CmsPageType,
+    }));
+  } catch {
+    return [];
   }
 }
 
@@ -335,6 +410,51 @@ async function wixListPosts(
         excerpt,
       };
     });
+  } catch {
+    return [];
+  }
+}
+
+async function wixListStaticPages(
+  apiKey: string,
+  siteId: string,
+  siteUrl?: string,
+): Promise<CmsPost[]> {
+  try {
+    const base = siteUrl?.replace(/\/$/, "") ?? "";
+    const hdrs = wixHeaders(apiKey, siteId);
+    // Wix Site Pages — query all site pages (non-blog)
+    const res = await fetch(
+      "https://www.wixapis.com/site-properties/v4/properties",
+      { headers: hdrs }
+    );
+    if (!res.ok) {
+      // Fallback: use sitemap to discover pages
+      const sitemapRes = await fetch(`${base}/sitemap.xml`);
+      if (!sitemapRes.ok) return [];
+      const sitemapText = await sitemapRes.text();
+      const urlMatches = [...sitemapText.matchAll(/<loc>([^<]+)<\/loc>/g)];
+      const blogPattern = /\/post\//;
+      const pages: CmsPost[] = [];
+      for (const match of urlMatches) {
+        const url = match[1];
+        if (blogPattern.test(url)) continue; // Skip blog posts
+        // Extract page title from URL slug
+        const slug = url.replace(/\/$/, "").split("/").pop() ?? "";
+        const title = slug
+          .replace(/[-_]/g, " ")
+          .replace(/\b\w/g, c => c.toUpperCase()) || "Page";
+        pages.push({
+          id: `page-${slug}`,
+          title,
+          content: "",
+          url,
+          page_type: "page",
+        });
+      }
+      return pages;
+    }
+    return [];
   } catch {
     return [];
   }
@@ -517,6 +637,32 @@ export async function listCmsPosts(creds: CmsCredentials, limit: number = 50): P
     default:
       return []; // Custom API: no read capability
   }
+}
+
+/**
+ * List ALL CMS content: blog posts + static pages.
+ * Each item has page_type: "article" | "page".
+ */
+export async function listAllCmsContent(creds: CmsCredentials, limit: number = 200): Promise<CmsPost[]> {
+  const posts = (await listCmsPosts(creds, limit)).map(p => ({ ...p, page_type: (p.page_type ?? "article") as CmsPageType }));
+
+  let pages: CmsPost[] = [];
+  switch (creds.cms) {
+    case "wordpress":
+      if (creds.wp_username && creds.wp_app_password)
+        pages = await wpListPages(creds.site_url, wpAuth(creds.wp_username, creds.wp_app_password), limit);
+      break;
+    case "shopify":
+      if (creds.shopify_api_key)
+        pages = await shopifyListPages(creds.shopify_store_url || creds.site_url, creds.shopify_api_key, limit, creds.site_url);
+      break;
+    case "wix":
+      if (creds.wix_api_key && creds.wix_site_id)
+        pages = await wixListStaticPages(creds.wix_api_key, creds.wix_site_id, creds.site_url);
+      break;
+  }
+
+  return [...posts, ...pages];
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

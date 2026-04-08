@@ -1,12 +1,12 @@
 /**
  * Sync Publications API
  *
- * Scans CMS for published articles and syncs them to the publications table.
- * Articles already in the DB (matched by URL) are skipped.
+ * Scans CMS for ALL content (blog posts + static pages) and syncs them
+ * to the publications table. Items already in the DB (matched by URL) are skipped.
  */
 
 import { createClient } from "@/lib/supabase/server";
-import { listCmsPosts, type CmsCredentials } from "@/lib/cms-update";
+import { listAllCmsContent, type CmsCredentials } from "@/lib/cms-update";
 
 export async function POST() {
   try {
@@ -35,8 +35,8 @@ export async function POST() {
       custom_api_key: site.custom_api_key,
     };
 
-    // Fetch all CMS posts
-    const cmsPosts = await listCmsPosts(creds, 200);
+    // Fetch ALL CMS content (posts + pages)
+    const allContent = await listAllCmsContent(creds, 300);
 
     // Fetch existing publications
     const { data: existing } = await supabase
@@ -47,23 +47,23 @@ export async function POST() {
     const existingUrls = new Set((existing ?? []).map(p => p.wordpress_url?.replace(/\/$/, "").toLowerCase()));
     const existingTitles = new Set((existing ?? []).map(p => p.title?.toLowerCase()));
 
-    // Find missing publications
-    const toSync = cmsPosts.filter(p => {
+    // Find missing content
+    const toSync = allContent.filter(p => {
       const normUrl = p.url.replace(/\/$/, "").toLowerCase();
       const normTitle = p.title.toLowerCase();
       return !existingUrls.has(normUrl) && !existingTitles.has(normTitle);
     });
 
     if (toSync.length === 0) {
-      return Response.json({ synced: 0, message: "Tous les articles sont déjà synchronisés" });
+      return Response.json({ synced: 0, message: "Tous les contenus sont déjà synchronisés" });
     }
 
-    // Insert missing publications
+    // Insert missing content
     const rows = toSync.map(p => ({
       site_id: site.id,
       user_id: user.id,
       title: p.title,
-      keyword: "",
+      keyword: p.page_type === "page" ? "__page__" : "",
       wordpress_url: p.url,
       published_at: new Date().toISOString(),
     }));
@@ -73,7 +73,15 @@ export async function POST() {
       return Response.json({ error: `Erreur d'insertion: ${insertError.message}` }, { status: 500 });
     }
 
-    return Response.json({ synced: toSync.length, articles: toSync.map(p => p.title) });
+    const articles = toSync.filter(p => p.page_type === "article").length;
+    const pages = toSync.filter(p => p.page_type === "page").length;
+
+    return Response.json({
+      synced: toSync.length,
+      articles_count: articles,
+      pages_count: pages,
+      items: toSync.map(p => ({ title: p.title, type: p.page_type ?? "article" })),
+    });
   } catch (err: unknown) {
     return Response.json({ error: err instanceof Error ? err.message : "Erreur inconnue" }, { status: 500 });
   }
