@@ -76,7 +76,14 @@ export async function POST(request: Request) {
 
     for (const s of suggestions) {
       const normalizedFrom = s.from_url.replace(/\/$/, "").toLowerCase();
-      const post = cmsPosts.find(p => p.url.replace(/\/$/, "").toLowerCase() === normalizedFrom);
+      const fromSlug = normalizedFrom.split("/").filter(Boolean).pop() ?? "";
+      const post = cmsPosts.find(p => {
+        const pNorm = p.url.replace(/\/$/, "").toLowerCase();
+        if (pNorm === normalizedFrom) return true;
+        // Fuzzy: compare last path segment (slug)
+        const pSlug = pNorm.split("/").filter(Boolean).pop() ?? "";
+        return pSlug.length > 3 && pSlug === fromSlug;
+      });
       if (!post) continue;
 
       if (!bySource.has(normalizedFrom)) {

@@ -520,17 +520,22 @@ async function generateSuggestions(
 
   // ── Rule 5: Orphan rescue ─────────────────────────────────────────────
   const orphans = profiles.filter(p => p.role === "orphan" || p.incoming_internal === 0);
-  for (const orphan of orphans.slice(0, 3)) {
-    // Find closest cluster by keyword similarity
-    const bestSource = profiles
+  for (const orphan of orphans) {
+    // Find best source pages (same cluster first, then high-traffic)
+    const bestSources = profiles
       .filter(p =>
         p.url !== orphan.url &&
         p.outgoing_internal < 5 &&
         p.content_word_count > 400 &&
         !usedPairs.has(`${p.url}|${orphan.url}`)
       )
-      .sort((a, b) => b.clicks - a.clicks)[0];
+      .sort((a, b) => {
+        const sameClusterA = a.cluster === orphan.cluster && orphan.cluster !== null ? 100 : 0;
+        const sameClusterB = b.cluster === orphan.cluster && orphan.cluster !== null ? 100 : 0;
+        return (sameClusterB + b.clicks) - (sameClusterA + a.clicks);
+      });
 
+    const bestSource = bestSources[0];
     if (!bestSource) continue;
 
     const anchor = generateAnchor(orphan.keyword, orphan.title, "orphan_rescue", usedPairs);
@@ -547,6 +552,60 @@ async function generateSuggestions(
       risk_score: 10,
     });
     usedPairs.add(`${bestSource.url}|${orphan.url}`);
+  }
+
+  // ── Rule 6: Minimum 2 liens entrants par page ──────────────────────────
+  // Compte les liens entrants actuels + ceux déjà proposés dans suggestions
+  const incomingFromSuggestions = new Map<string, number>();
+  for (const s of suggestions) {
+    incomingFromSuggestions.set(s.to_url, (incomingFromSuggestions.get(s.to_url) ?? 0) + 1);
+  }
+
+  const MIN_INCOMING = 2;
+  const underlinkedPages = profiles
+    .filter(p => {
+      const totalIncoming = p.incoming_internal + (incomingFromSuggestions.get(p.url) ?? 0);
+      return totalIncoming < MIN_INCOMING;
+    })
+    .sort((a, b) => a.incoming_internal - b.incoming_internal);
+
+  for (const target of underlinkedPages) {
+    const totalIncoming = target.incoming_internal + (incomingFromSuggestions.get(target.url) ?? 0);
+    const needed = MIN_INCOMING - totalIncoming;
+
+    for (let i = 0; i < needed; i++) {
+      const source = profiles
+        .filter(p =>
+          p.url !== target.url &&
+          p.outgoing_internal < 6 &&
+          p.content_word_count > 300 &&
+          !usedPairs.has(`${p.url}|${target.url}`)
+        )
+        .sort((a, b) => {
+          // Prefer same cluster, then pages with fewer outgoing links
+          const sameClusterA = a.cluster === target.cluster && target.cluster !== null ? 50 : 0;
+          const sameClusterB = b.cluster === target.cluster && target.cluster !== null ? 50 : 0;
+          return (sameClusterB - b.outgoing_internal) - (sameClusterA - a.outgoing_internal);
+        })[0];
+
+      if (!source) break;
+
+      const anchor = generateAnchor(target.keyword, target.title, "min_incoming", usedPairs);
+      suggestions.push({
+        from_url: source.url,
+        from_title: source.title,
+        to_url: target.url,
+        to_title: target.title,
+        anchor,
+        placement: "body",
+        objective: "seo",
+        priority: "moyenne",
+        justification: `Garantir le minimum de ${MIN_INCOMING} liens entrants — page n'en a que ${target.incoming_internal}`,
+        risk_score: 15,
+      });
+      usedPairs.add(`${source.url}|${target.url}`);
+      incomingFromSuggestions.set(target.url, (incomingFromSuggestions.get(target.url) ?? 0) + 1);
+    }
   }
 
   // Sort by priority then risk

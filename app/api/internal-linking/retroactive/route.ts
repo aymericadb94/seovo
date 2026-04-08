@@ -69,12 +69,34 @@ export async function POST(request: Request) {
       return Response.json({ result: { updated_pages: [], skipped: 0, errors: ["Aucun article CMS trouvé"] } });
     }
 
+    // Fetch cocoon for cluster context
+    const { data: cocoonRow } = await supabase
+      .from("semantic_cocoons")
+      .select("data")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    type CocoonCluster = { name: string; pillar: { keyword: string }; support_pages?: { keyword: string }[]; pages?: { keyword: string }[] };
+    const cocoonData = cocoonRow?.data as { clusters?: CocoonCluster[] } | null;
+
+    // Find the cluster of the new page
+    let newPageCluster: string | null = null;
+    if (cocoonData?.clusters) {
+      for (const c of cocoonData.clusters) {
+        const allKws = [c.pillar?.keyword, ...(c.support_pages?.map(sp => sp.keyword) ?? []), ...(c.pages?.map(pg => pg.keyword) ?? [])].filter(Boolean);
+        if (allKws.some(k => k?.toLowerCase() === keyword.toLowerCase())) {
+          newPageCluster = c.name;
+          break;
+        }
+      }
+    }
+
     // Filter: only articles that DON'T already link to the new page
     const normalizedNewUrl = url.replace(/\/$/, "").toLowerCase();
     const candidates = cmsPosts.filter(p => {
       const postUrl = p.url.replace(/\/$/, "").toLowerCase();
-      if (postUrl === normalizedNewUrl) return false; // Skip the new page itself
-      if (p.content.toLowerCase().includes(normalizedNewUrl)) return false; // Already links to it
+      if (postUrl === normalizedNewUrl) return false;
+      if (p.content.toLowerCase().includes(normalizedNewUrl)) return false;
       return true;
     });
 
@@ -82,41 +104,64 @@ export async function POST(request: Request) {
       return Response.json({ result: { updated_pages: [], skipped: cmsPosts.length, errors: [] } });
     }
 
-    // Ask AI to find the best articles + anchor texts for retroactive links
-    const candidateSummaries = candidates.slice(0, 20).map((p, i) =>
-      `${i + 1}. [ID:${p.id}] "${p.title}" — ${p.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200)}`
-    ).join("\n");
+    // Build candidate summaries with cluster info
+    const candidateSummaries = candidates.slice(0, 20).map((p, i) => {
+      let cluster = "non classé";
+      if (cocoonData?.clusters) {
+        for (const c of cocoonData.clusters) {
+          const allKws = [c.pillar?.keyword, ...(c.support_pages?.map(sp => sp.keyword) ?? []), ...(c.pages?.map(pg => pg.keyword) ?? [])].filter(Boolean);
+          const postText = p.title.toLowerCase();
+          if (allKws.some(k => postText.includes(k?.toLowerCase() ?? ""))) {
+            cluster = c.name;
+            break;
+          }
+        }
+      }
+      const summary = p.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+      return `${i + 1}. [ID:${p.id}] "${p.title}" (cluster: ${cluster}) — ${summary}`;
+    }).join("\n");
 
     const aiResult = await aiCall(
       { task: "retroactive_linking" },
       {
         messages: [{
           role: "user",
-          content: `Tu es un expert SEO senior spécialisé en maillage interne.
+          content: `Tu es un expert SEO spécialisé en optimisation de maillage interne.
 
-MISSION : Trouver dans quels articles existants il serait naturel et stratégique d'insérer un lien vers une NOUVELLE page publiée.
+MISSION : Améliorer le maillage du site en trouvant les meilleurs articles existants où insérer un lien vers une NOUVELLE page publiée.
 
 NOUVELLE PAGE :
 - Titre : "${title}"
 - Mot-clé : "${keyword}"
 - URL : ${url}
+- Cluster : ${newPageCluster ?? "non classé"}
 
 ARTICLES EXISTANTS (candidats) :
 ${candidateSummaries}
 
-RÈGLES :
-1. Sélectionne 2-5 articles maximum parmi les candidats.
-2. Ne sélectionne que ceux où le sujet de la nouvelle page est naturellement mentionné ou pertinent.
-3. Pour chaque article sélectionné, propose une ancre de 2-5 mots qui existe DÉJÀ dans le texte de l'article ou qui pourrait s'y intégrer naturellement.
-4. L'ancre ne doit PAS être le mot-clé exact de la nouvelle page (risque de sur-optimisation).
-5. Priorise les articles thématiquement proches.
+OBJECTIF :
+- Chaque page doit recevoir au moins 2 liens entrants
+- Prioriser le même cluster (${newPageCluster ?? "non classé"})
+- Créer des connexions logiques et sémantiquement pertinentes
+
+RÈGLES STRICTES :
+1. Sélectionner 2-4 articles maximum (pas de spam).
+2. PRIORISER : même cluster > forte pertinence sémantique > complémentarité thématique.
+3. Ancre de 2-5 mots, naturelle, qui existe dans le texte ou s'y intègre fluidement.
+4. L'ancre ne doit PAS être le mot-clé exact "${keyword}" (risque de sur-optimisation).
+5. NE PAS sélectionner d'articles sans rapport sémantique, même s'ils sont dans le même cluster.
+
+INTERDIT :
+- Forcer des liens dans des articles non pertinents
+- Créer des ancres artificielles type "cliquez ici"
+- Sélectionner plus de 4 articles
 
 FORMAT JSON uniquement :
 [
   {
     "post_id": "L'ID de l'article (le nombre après ID:)",
     "anchor": "Le texte d'ancre à utiliser (2-5 mots)",
-    "reason": "Pourquoi ce lien est pertinent (1 phrase)"
+    "reason": "pertinence sémantique — 1 phrase"
   }
 ]
 
