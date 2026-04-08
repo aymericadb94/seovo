@@ -413,6 +413,7 @@ export default function Dashboard() {
       {showRoadmapModal && (
         <RoadmapModal
           roadmapRecord={roadmapRecord}
+          publications={(data?.recentPublications ?? []).map(p => ({ keyword: p.keyword, url: p.url, published_at: p.published_at }))}
           onClose={() => setShowRoadmapModal(false)}
           onGenerate={generateRoadmap}
         />

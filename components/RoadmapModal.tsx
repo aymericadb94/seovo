@@ -50,8 +50,15 @@ type RoadmapRecord = {
   data: RoadmapData;
 };
 
+type Publication = {
+  keyword: string;
+  url: string;
+  published_at: string;
+};
+
 type Props = {
   roadmapRecord: RoadmapRecord | null;
+  publications?: Publication[];
   onClose: () => void;
   onGenerate: () => Promise<void>;
 };
@@ -77,9 +84,9 @@ const objectiveIcons: Record<string, string> = {
   conversion: "💰",
 };
 
-type FilterType = "all" | "pilier" | "cluster" | "support" | "facile" | "moyen" | "difficile";
+type FilterType = "all" | "published" | "todo" | "pilier" | "cluster" | "support" | "facile" | "moyen" | "difficile";
 
-export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Props) {
+export default function RoadmapModal({ roadmapRecord, publications = [], onClose, onGenerate }: Props) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"articles" | "phases" | "strategy">("articles");
@@ -88,9 +95,18 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
 
   const data = roadmapRecord?.data ?? null;
   const articles = data?.articles ?? [];
-  const filtered = filter === "all" ? articles : articles.filter(a =>
-    a.role === filter || a.difficulty === filter
+
+  // Build published keywords set for quick lookup
+  const publishedKeywords = new Set(
+    publications.map(p => p.keyword?.toLowerCase()).filter(Boolean)
   );
+  const getPublication = (keyword: string) =>
+    publications.find(p => p.keyword?.toLowerCase() === keyword?.toLowerCase());
+
+  const filtered = filter === "all" ? articles
+    : filter === "published" ? articles.filter(a => publishedKeywords.has(a.keyword?.toLowerCase()))
+    : filter === "todo" ? articles.filter(a => !publishedKeywords.has(a.keyword?.toLowerCase()))
+    : articles.filter(a => a.role === filter || a.difficulty === filter);
 
   async function handleGenerate() {
     setGenerating(true);
@@ -229,7 +245,7 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
               <div className="p-5">
                 {/* Filters */}
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {(["all", "pilier", "cluster", "support", "facile", "moyen", "difficile"] as FilterType[]).map(f => (
+                  {(["all", "published", "todo", "pilier", "cluster", "support", "facile", "moyen", "difficile"] as FilterType[]).map(f => (
                     <button
                       key={f}
                       onClick={() => setFilter(f)}
@@ -244,7 +260,10 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
                         color: "rgba(255,255,255,0.35)",
                       }}
                     >
-                      {f === "all" ? `Tous (${articles.length})` : f.charAt(0).toUpperCase() + f.slice(1)}
+                      {f === "all" ? `Tous (${articles.length})`
+                        : f === "published" ? `Publiés (${articles.filter(a => publishedKeywords.has(a.keyword?.toLowerCase())).length})`
+                        : f === "todo" ? `À créer (${articles.filter(a => !publishedKeywords.has(a.keyword?.toLowerCase())).length})`
+                        : f.charAt(0).toUpperCase() + f.slice(1)}
                     </button>
                   ))}
                 </div>
@@ -256,25 +275,45 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
                     const conv = conversionConfig[article.conversion] ?? conversionConfig.moyen;
                     const role = roleConfig[article.role] ?? roleConfig.support;
                     const isExpanded = expandedId === article.id;
+                    const isPublished = publishedKeywords.has(article.keyword?.toLowerCase());
+                    const pub = isPublished ? getPublication(article.keyword) : null;
                     return (
                       <div
                         key={article.id}
-                        className="bg-white/3 border border-white/8 rounded-xl overflow-hidden hover:border-white/15 transition-colors cursor-pointer"
+                        className="bg-white/3 border rounded-xl overflow-hidden hover:border-white/15 transition-colors cursor-pointer"
+                        style={{ borderColor: isPublished ? "rgba(34,197,94,0.2)" : "rgba(255,255,255,0.08)" }}
                         onClick={() => setExpandedId(isExpanded ? null : article.id)}
                       >
                         <div className="flex items-center gap-3 p-3">
-                          <span className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-white/40 flex-shrink-0">
-                            {article.id}
+                          <span
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={isPublished
+                              ? { background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)", color: "#22c55e" }
+                              : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.4)" }
+                            }
+                          >
+                            {isPublished ? "✓" : article.id}
                           </span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-medium text-white truncate">{article.title}</span>
                               <span className="text-xs">{objectiveIcons[article.objective]}</span>
+                              {isPublished && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.25)" }}>
+                                  PUBLIÉ
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <span className="text-xs text-white/40">{article.keyword}</span>
                               <span className="text-white/20">·</span>
                               <span className="text-xs" style={{ color: role.color }}>{role.label}</span>
+                              {pub?.published_at && (
+                                <>
+                                  <span className="text-white/20">·</span>
+                                  <span className="text-xs text-green-400/60">{new Date(pub.published_at).toLocaleDateString("fr-FR")}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -292,6 +331,18 @@ export default function RoadmapModal({ roadmapRecord, onClose, onGenerate }: Pro
 
                         {isExpanded && (
                           <div className="px-4 pb-4 pt-1 border-t border-white/8 space-y-3">
+                            {pub?.url && (
+                              <a
+                                href={pub.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-green-300 hover:text-green-200 transition-colors"
+                                style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}
+                              >
+                                Voir l&apos;article publié →
+                              </a>
+                            )}
                             <div>
                               <p className="text-xs text-violet-400 font-medium mb-1">Angle différenciant</p>
                               <p className="text-sm text-white/70">{article.angle}</p>

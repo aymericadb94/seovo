@@ -212,6 +212,32 @@ FORMAT DE SORTIE : JSON uniquement, sans texte avant ou après.
       return Response.json({ error: "Réponse IA non parseable" }, { status: 500 });
     }
 
+    // ── Persist: mark article as published in roadmap data ─────────────────
+    if (roadmapData && roadmapArticles.length > 0) {
+      let updated = false;
+      const updatedArticles = roadmapArticles.map(a => {
+        if (a.keyword?.toLowerCase() === keyword.toLowerCase()) {
+          updated = true;
+          return { ...a, status: "published" as const, published_url: url ?? null, published_at: new Date().toISOString() };
+        }
+        return a;
+      });
+
+      if (updated) {
+        const newData = { ...roadmapData, articles: updatedArticles };
+        const { error: updateErr } = await supabase
+          .from("roadmaps")
+          .update({ data: newData })
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (updateErr) {
+          console.error("[roadmap-integrate] failed to update roadmap:", updateErr.message);
+        }
+      }
+    }
+
     return Response.json({
       integration,
       keyword,
