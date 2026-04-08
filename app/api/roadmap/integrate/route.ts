@@ -212,29 +212,54 @@ FORMAT DE SORTIE : JSON uniquement, sans texte avant ou après.
       return Response.json({ error: "Réponse IA non parseable" }, { status: 500 });
     }
 
-    // ── Persist: mark article as published in roadmap data ─────────────────
+    // ── Persist: mark article as published + save next_actions ──────────────
     if (roadmapData && roadmapArticles.length > 0) {
       let updated = false;
       const updatedArticles = roadmapArticles.map(a => {
         if (a.keyword?.toLowerCase() === keyword.toLowerCase()) {
           updated = true;
-          return { ...a, status: "published" as const, published_url: url ?? null, published_at: new Date().toISOString() };
+          return {
+            ...a,
+            status: "published" as const,
+            published_url: url ?? null,
+            published_at: new Date().toISOString(),
+            seo_role_confirmed: integration.seo_role,
+            traffic_potential: integration.impact.traffic_potential,
+          };
         }
         return a;
       });
 
-      if (updated) {
-        const newData = { ...roadmapData, articles: updatedArticles };
-        const { error: updateErr } = await supabase
-          .from("roadmaps")
-          .update({ data: newData })
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(1);
+      // Merge next_actions and dependencies into roadmap
+      const existingActions = (roadmapData as Record<string, unknown>).pending_actions as { keyword: string; actions: string[]; dependencies: string[]; priority: string; created_at: string }[] ?? [];
+      const newAction = {
+        keyword,
+        actions: integration.next_actions,
+        dependencies: integration.dependencies,
+        priority: integration.priority,
+        created_at: new Date().toISOString(),
+      };
+      // Remove old entry for same keyword if exists, then add new
+      const mergedActions = [
+        ...existingActions.filter(a => a.keyword?.toLowerCase() !== keyword.toLowerCase()),
+        newAction,
+      ].slice(-50); // Keep last 50 entries
 
-        if (updateErr) {
-          console.error("[roadmap-integrate] failed to update roadmap:", updateErr.message);
-        }
+      const newData = {
+        ...roadmapData,
+        articles: updated ? updatedArticles : roadmapArticles,
+        pending_actions: mergedActions,
+      };
+
+      const { error: updateErr } = await supabase
+        .from("roadmaps")
+        .update({ data: newData })
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (updateErr) {
+        console.error("[roadmap-integrate] failed to update roadmap:", updateErr.message);
       }
     }
 

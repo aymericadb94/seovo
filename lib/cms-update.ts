@@ -109,25 +109,41 @@ async function wpListPosts(
   limit: number = 100
 ): Promise<CmsPost[]> {
   try {
-    const res = await fetch(
-      `${siteUrl}/wp-json/wp/v2/posts?per_page=${limit}&orderby=date&order=desc&_fields=id,title,content,link,excerpt`,
-      { headers: { Authorization: auth, "ngrok-skip-browser-warning": "true" } }
-    );
-    if (!res.ok) return [];
-    const posts = await res.json() as {
-      id: number;
-      title: { rendered: string };
-      content: { rendered: string };
-      link: string;
-      excerpt: { rendered: string };
-    }[];
-    return posts.map(p => ({
-      id: p.id,
-      title: p.title.rendered,
-      content: p.content.rendered,
-      url: p.link,
-      excerpt: p.excerpt.rendered,
-    }));
+    const allPosts: CmsPost[] = [];
+    const perPage = Math.min(limit, 100); // WP max is 100
+    const pages = Math.ceil(limit / perPage);
+
+    for (let page = 1; page <= pages; page++) {
+      const remaining = limit - allPosts.length;
+      if (remaining <= 0) break;
+      const count = Math.min(perPage, remaining);
+
+      const res = await fetch(
+        `${siteUrl}/wp-json/wp/v2/posts?per_page=${count}&page=${page}&orderby=date&order=desc&_fields=id,title,content,link,excerpt`,
+        { headers: { Authorization: auth, "ngrok-skip-browser-warning": "true" } }
+      );
+      if (!res.ok) break;
+      const posts = await res.json() as {
+        id: number;
+        title: { rendered: string };
+        content: { rendered: string };
+        link: string;
+        excerpt: { rendered: string };
+      }[];
+
+      if (posts.length === 0) break;
+      allPosts.push(...posts.map(p => ({
+        id: p.id,
+        title: p.title.rendered,
+        content: p.content.rendered,
+        url: p.link,
+        excerpt: p.excerpt.rendered,
+      })));
+
+      if (posts.length < count) break; // No more pages
+    }
+
+    return allPosts;
   } catch {
     return [];
   }
@@ -238,17 +254,29 @@ async function wixListPosts(
   siteUrl?: string,
 ): Promise<(CmsPost & { wix_id: string })[]> {
   try {
-    const res = await fetch(
-      `https://www.wixapis.com/blog/v3/posts?paging.limit=${limit}&fieldsets=CONTENT&fieldsets=URL`,
-      { headers: wixHeaders(apiKey, siteId) }
-    );
-    if (!res.ok) return [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = await res.json() as { posts?: any[] };
-
     const base = siteUrl?.replace(/\/$/, "") ?? "";
+    const hdrs = wixHeaders(apiKey, siteId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const allPosts: any[] = [];
+    const perPage = Math.min(limit, 100); // Wix max is 100
+    let cursor: string | null = null;
 
-    return (data.posts ?? []).map((p: Record<string, unknown>) => {
+    while (allPosts.length < limit) {
+      let url = `https://www.wixapis.com/blog/v3/posts?paging.limit=${perPage}&fieldsets=CONTENT&fieldsets=URL`;
+      if (cursor) url += `&paging.offset=${allPosts.length}`;
+      const res = await fetch(url, { headers: hdrs });
+      if (!res.ok) break;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = await res.json() as { posts?: any[]; metaData?: { cursor?: string; hasNext?: boolean } };
+      const posts = data.posts ?? [];
+      if (posts.length === 0) break;
+      allPosts.push(...posts);
+      // Stop if no more pages
+      if (!data.metaData?.hasNext || posts.length < perPage) break;
+      cursor = data.metaData?.cursor ?? null;
+    }
+
+    return allPosts.slice(0, limit).map((p: Record<string, unknown>) => {
       const title = (p.title as string) ?? "";
       const slug = (p.slug as string) ?? "";
       const excerpt = (p.excerpt as string) ?? "";

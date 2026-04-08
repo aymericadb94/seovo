@@ -63,8 +63,8 @@ export async function POST(request: Request) {
       custom_api_key: site.custom_api_key,
     };
 
-    // Fetch all CMS posts
-    const cmsPosts = await listCmsPosts(creds, 50);
+    // Fetch all CMS posts (increased limit for larger sites)
+    const cmsPosts = await listCmsPosts(creds, 200);
     if (cmsPosts.length === 0) {
       return Response.json({ result: { updated_pages: [], skipped: 0, errors: ["Aucun article CMS trouvé"] } });
     }
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
     }
 
     // Build candidate summaries with cluster info
-    const candidateSummaries = candidates.slice(0, 20).map((p, i) => {
+    const candidateSummaries = candidates.slice(0, 40).map((p, i) => {
       let cluster = "non classé";
       if (cocoonData?.clusters) {
         for (const c of cocoonData.clusters) {
@@ -178,7 +178,7 @@ Si aucun article n'est pertinent, retourne [].`
     // Apply links to CMS
     const result: RetroactiveResult = { updated_pages: [], skipped: 0, errors: [] };
 
-    for (const suggestion of suggestions.slice(0, 5)) {
+    for (const suggestion of suggestions.slice(0, 8)) {
       const post = candidates.find(p => String(p.id) === String(suggestion.post_id));
       if (!post) {
         result.skipped++;

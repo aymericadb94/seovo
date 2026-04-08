@@ -308,6 +308,7 @@ export default function GeneratePage() {
   const [previewMode, setPreviewMode] = useState(false);
   const [status, setStatus] = useState<"idle" | "generating" | "preview" | "publishing" | "done" | "error" | "intent-blocked">("idle");
   const [currentStep, setCurrentStep] = useState(0);
+  const [stepOutcomes, setStepOutcomes] = useState<Record<number, "success" | "skipped" | "failed">>({});
   const [generated, setGenerated] = useState<GeneratedArticle | null>(null);
   const [result, setResult] = useState<{ title: string; url: string; meta?: string } | null>(null);
   const [error, setError] = useState("");
@@ -541,32 +542,60 @@ export default function GeneratePage() {
       // ── Helper : appel agent post-gen avec retry ─────────────
       const kw = localKeywords?.primary_keyword || activeKeyword;
 
+      // Track step outcomes for UI feedback
+      const stepResults: Record<number, "success" | "skipped" | "failed"> = {};
+
       async function callAgent<T>(
         step: number,
         url: string,
         body: Record<string, unknown>,
         extract: (data: T) => string | null,
+        maxRetries: number = 2,
       ): Promise<void> {
         setCurrentStep(step);
-        try {
-          const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          if (!res.ok) {
-            console.warn(`[step ${step}] ${url} → ${res.status}`);
+        let lastError = "";
+
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            if (attempt > 0) {
+              // Exponential backoff: 2s, 4s
+              await new Promise(r => setTimeout(r, 2000 * attempt));
+            }
+
+            const res = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+
+            if (!res.ok) {
+              lastError = `HTTP ${res.status}`;
+              if (res.status >= 500 && attempt < maxRetries) continue; // Retry on server errors
+              stepResults[step] = "failed";
+              console.warn(`[step ${step}] ${url} → ${res.status} (${attempt + 1}/${maxRetries + 1} tentatives)`);
+              return;
+            }
+
+            const data = await res.json() as T;
+            const result = extract(data);
+            if (result) {
+              articleContent = result;
+              stepResults[step] = "success";
+              console.log(`[step ${step}] ${url} → OK`);
+            } else {
+              stepResults[step] = "skipped";
+              console.log(`[step ${step}] ${url} → skipped (no extractable result)`);
+            }
             return;
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : "Unknown";
+            if (attempt < maxRetries) continue; // Retry on network errors
           }
-          const data = await res.json() as T;
-          const result = extract(data);
-          if (result) {
-            articleContent = result;
-            console.log(`[step ${step}] ${url} → OK`);
-          }
-        } catch (err) {
-          console.warn(`[step ${step}] ${url} →`, err);
         }
+
+        // All retries exhausted
+        stepResults[step] = "failed";
+        console.warn(`[step ${step}] ${url} → failed after ${maxRetries + 1} attempts: ${lastError}`);
       }
 
       // ── Step 7: Enrichissement sémantique ───────────────────
@@ -649,32 +678,42 @@ export default function GeneratePage() {
       let optimizedTitle = parsed.title;
       let optimizedMeta = parsed.meta_description ?? "";
 
-      try {
-        const metaRes = await fetch("/api/content/meta", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            primary_keyword: kw,
-            secondary_keywords: localKeywords?.secondary_keywords,
-            content_summary: articleContent.slice(0, 500).replace(/<[^>]+>/g, ""),
-            intent_analysis: localIntent ? {
-              intent_type: localIntent.intent_type,
-              user_intent: localIntent.user_intent,
-              recommended_content_type: localIntent.recommended_content_type,
-              angle: localIntent.angle,
-            } : undefined,
-            seo_angle: localKeywords?.seo_angle,
-            language,
-          }),
-        });
-        if (metaRes.ok) {
-          const metaData = await metaRes.json() as { meta: { titles: string[]; meta_descriptions: string[] } };
-          if (metaData.meta?.titles?.[0]) optimizedTitle = metaData.meta.titles[0];
-          if (metaData.meta?.meta_descriptions?.[0]) optimizedMeta = metaData.meta.meta_descriptions[0];
-          console.log("[step 11] /api/content/meta → OK");
+      for (let attempt = 0; attempt <= 2; attempt++) {
+        try {
+          if (attempt > 0) await new Promise(r => setTimeout(r, 2000 * attempt));
+          const metaRes = await fetch("/api/content/meta", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              primary_keyword: kw,
+              secondary_keywords: localKeywords?.secondary_keywords,
+              content_summary: articleContent.slice(0, 500).replace(/<[^>]+>/g, ""),
+              intent_analysis: localIntent ? {
+                intent_type: localIntent.intent_type,
+                user_intent: localIntent.user_intent,
+                recommended_content_type: localIntent.recommended_content_type,
+                angle: localIntent.angle,
+              } : undefined,
+              seo_angle: localKeywords?.seo_angle,
+              language,
+            }),
+          });
+          if (metaRes.ok) {
+            const metaData = await metaRes.json() as { meta: { titles: string[]; meta_descriptions: string[] } };
+            if (metaData.meta?.titles?.[0]) optimizedTitle = metaData.meta.titles[0];
+            if (metaData.meta?.meta_descriptions?.[0]) optimizedMeta = metaData.meta.meta_descriptions[0];
+            stepResults[11] = "success";
+            break;
+          }
+          if (metaRes.status >= 500 && attempt < 2) continue;
+          stepResults[11] = "failed";
+          break;
+        } catch (err) {
+          if (attempt >= 2) {
+            stepResults[11] = "failed";
+            console.warn("[step 11] /api/content/meta →", err);
+          }
         }
-      } catch (err) {
-        console.warn("[step 11] /api/content/meta →", err);
       }
 
       // ── Step 12: Contrôle final qualité ─────────────────────
@@ -702,6 +741,9 @@ export default function GeneratePage() {
         },
         (d) => d.check?.final_content && d.check.final_verdict !== "rewrite" ? d.check.final_content : null,
       );
+
+      // Persist step outcomes to state for UI display
+      setStepOutcomes({ ...stepResults });
 
       // ── Re-parser les données structurées depuis le HTML post-traité ──
       // Les agents ont modifié articleContent — on reconstruit structuredData
@@ -760,6 +802,7 @@ export default function GeneratePage() {
 
     setStatus("generating");
     setCurrentStep(0);
+    setStepOutcomes({});
     setError("");
     setResult(null);
     setGenerated(null);
@@ -1026,48 +1069,67 @@ export default function GeneratePage() {
 
       setResult({ title: article.title, url: data.url, meta: article.meta_description });
 
-      // ── Step 14: Roadmap integration (non-blocking) ─────────────────
-      setCurrentStep(14);
-      try {
-        await fetch("/api/roadmap/integrate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            keyword: activeKeyword,
-            title: article.title,
-            url: data.url,
-            cocoon_positioning: pos ? {
-              page_type: pos.page_type,
-              seo_role: pos.seo_role,
-              priority: pos.priority,
-              pillar_relation: pos.pillar_relation,
-              risk_level: pos.risk_level,
-            } : undefined,
-          }),
-        });
-      } catch {
-        console.warn("[roadmap-integrate] Non-blocking error, skipping");
-      }
+      setStepOutcomes(prev => ({ ...prev, 13: "success" }));
 
-      // ── Step 15: Retroactive internal linking ──────────────────
-      setCurrentStep(15);
-      try {
-        const retroRes = await fetch("/api/internal-linking/retroactive", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            keyword: activeKeyword,
-            title: article.title,
-            url: data.url,
-          }),
-        });
-        const retroData = await retroRes.json();
-        if (retroData.result?.updated_pages?.length > 0) {
-          console.log(`[retroactive] ${retroData.result.updated_pages.length} pages mises à jour`);
+      // ── Step 14: Roadmap integration (non-blocking, with retry) ─────
+      setCurrentStep(14);
+      let roadmapOk = false;
+      for (let attempt = 0; attempt <= 1; attempt++) {
+        try {
+          if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+          const roadmapRes = await fetch("/api/roadmap/integrate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              keyword: activeKeyword,
+              title: article.title,
+              url: data.url,
+              cocoon_positioning: pos ? {
+                page_type: pos.page_type,
+                seo_role: pos.seo_role,
+                priority: pos.priority,
+                pillar_relation: pos.pillar_relation,
+                risk_level: pos.risk_level,
+              } : undefined,
+            }),
+          });
+          if (roadmapRes.ok) { roadmapOk = true; break; }
+          if (roadmapRes.status >= 500 && attempt < 1) continue;
+        } catch {
+          if (attempt >= 1) console.warn("[roadmap-integrate] failed after retries");
         }
-      } catch {
-        console.warn("[retroactive-linking] Non-blocking error, skipping");
       }
+      setStepOutcomes(prev => ({ ...prev, 14: roadmapOk ? "success" : "failed" }));
+
+      // ── Step 15: Retroactive internal linking (with retry) ──────
+      setCurrentStep(15);
+      let retroOk = false;
+      for (let attempt = 0; attempt <= 1; attempt++) {
+        try {
+          if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+          const retroRes = await fetch("/api/internal-linking/retroactive", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              keyword: activeKeyword,
+              title: article.title,
+              url: data.url,
+            }),
+          });
+          if (retroRes.ok) {
+            const retroData = await retroRes.json();
+            if (retroData.result?.updated_pages?.length > 0) {
+              console.log(`[retroactive] ${retroData.result.updated_pages.length} pages mises à jour`);
+            }
+            retroOk = true;
+            break;
+          }
+          if (retroRes.status >= 500 && attempt < 1) continue;
+        } catch {
+          if (attempt >= 1) console.warn("[retroactive-linking] failed after retries");
+        }
+      }
+      setStepOutcomes(prev => ({ ...prev, 15: retroOk ? "success" : "failed" }));
 
       setStatus("done");
     } catch (err: unknown) {
@@ -1355,17 +1417,27 @@ export default function GeneratePage() {
                 {STEPS.map((step, i) => {
                   const isDone = i < currentStep;
                   const isActive = i === currentStep;
+                  const outcome = stepOutcomes[i]; // "success" | "skipped" | "failed" | undefined
+                  const isFailed = isDone && outcome === "failed";
+                  const isSkipped = isDone && outcome === "skipped";
+
                   return (
                     <div
                       key={step.id}
                       className="flex items-start gap-4 p-4 rounded-xl transition-all duration-500"
                       style={{
-                        background: isDone
+                        background: isFailed
+                          ? "rgba(239,68,68,0.06)"
+                          : isSkipped
+                          ? "rgba(234,179,8,0.06)"
+                          : isDone
                           ? "rgba(249,115,22,0.06)"
                           : isActive
                           ? "rgba(255,255,255,0.04)"
                           : "transparent",
-                        borderLeft: isActive ? "2px solid #f97316" : "2px solid transparent",
+                        borderLeft: isFailed
+                          ? "2px solid rgba(239,68,68,0.5)"
+                          : isActive ? "2px solid #f97316" : "2px solid transparent",
                         opacity: !isDone && !isActive ? 0.35 : 1,
                       }}
                     >
@@ -1373,15 +1445,27 @@ export default function GeneratePage() {
                       <div
                         className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 transition-all duration-500"
                         style={{
-                          background: isDone
+                          background: isFailed
+                            ? "rgba(239,68,68,0.2)"
+                            : isSkipped
+                            ? "rgba(234,179,8,0.2)"
+                            : isDone
                             ? "rgba(249,115,22,0.2)"
                             : isActive
                             ? "rgba(249,115,22,0.1)"
                             : "rgba(255,255,255,0.04)",
-                          color: isDone ? "#f97316" : isActive ? "#fb923c" : "#4b5563",
+                          color: isFailed ? "#ef4444" : isSkipped ? "#eab308" : isDone ? "#f97316" : isActive ? "#fb923c" : "#4b5563",
                         }}
                       >
-                        {isDone ? (
+                        {isFailed ? (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        ) : isSkipped ? (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                            <path d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                          </svg>
+                        ) : isDone ? (
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                             <polyline points="20 6 9 17 4 12"/>
                           </svg>
@@ -1399,21 +1483,21 @@ export default function GeneratePage() {
                       <div className="flex-1 min-w-0">
                         <p
                           className="text-sm font-bold leading-snug transition-colors duration-300"
-                          style={{ color: isDone ? "#fdba74" : isActive ? "white" : "#6b7280" }}
+                          style={{ color: isFailed ? "#fca5a5" : isSkipped ? "#fde047" : isDone ? "#fdba74" : isActive ? "white" : "#6b7280" }}
                         >
                           {step.label}
                         </p>
                         {(isDone || isActive) && (
-                          <p className="text-xs mt-0.5 transition-all duration-300" style={{ color: "rgba(156,163,175,0.6)" }}>
-                            {step.sub}
+                          <p className="text-xs mt-0.5 transition-all duration-300" style={{ color: isFailed ? "rgba(239,68,68,0.6)" : isSkipped ? "rgba(234,179,8,0.5)" : "rgba(156,163,175,0.6)" }}>
+                            {isFailed ? "Échec — contenu précédent conservé" : isSkipped ? "Ignoré — aucun changement applicable" : step.sub}
                           </p>
                         )}
                       </div>
 
-                      {/* Done badge */}
+                      {/* Status badge */}
                       {isDone && (
-                        <span className="text-xs font-bold flex-shrink-0 mt-0.5" style={{ color: "rgba(249,115,22,0.6)" }}>
-                          ✓
+                        <span className="text-xs font-bold flex-shrink-0 mt-0.5" style={{ color: isFailed ? "rgba(239,68,68,0.6)" : isSkipped ? "rgba(234,179,8,0.6)" : "rgba(249,115,22,0.6)" }}>
+                          {isFailed ? "✕" : isSkipped ? "–" : "✓"}
                         </span>
                       )}
                     </div>
