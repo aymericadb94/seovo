@@ -44,7 +44,7 @@ export async function GET() {
 
     const cmsPosts = await listCmsPosts(creds, 10); // Only 10 for debug
 
-    // Fetch raw Wix API response to see richContent structure
+    // Fetch raw Wix API response — show ALL keys to find content field
     let wixRawSample: unknown = null;
     if (site.cms === "wix" && site.wix_api_key && site.wix_site_id) {
       try {
@@ -53,22 +53,24 @@ export async function GET() {
           { headers: { "Content-Type": "application/json", Authorization: site.wix_api_key, "wix-site-id": site.wix_site_id } }
         );
         if (rawRes.ok) {
-          const rawData = await rawRes.json() as { posts?: { richContent?: unknown; url?: unknown; slug?: string; title?: string }[] };
+          const rawData = await rawRes.json() as { posts?: Record<string, unknown>[] };
           const firstPost = rawData.posts?.[0];
           if (firstPost) {
-            const rc = firstPost.richContent as { nodes?: unknown[] } | undefined;
-            wixRawSample = {
-              title: firstPost.title,
-              slug: firstPost.slug,
-              url: firstPost.url,
-              richContent_keys: rc ? Object.keys(rc) : null,
-              richContent_nodes_count: rc?.nodes?.length ?? 0,
-              // Show first 3 nodes raw structure
-              richContent_first_nodes: rc?.nodes?.slice(0, 3),
-            };
+            // Show ALL top-level keys and their types/previews
+            const keys: Record<string, unknown> = {};
+            for (const [k, v] of Object.entries(firstPost)) {
+              if (typeof v === "string") {
+                keys[k] = v.slice(0, 200);
+              } else if (typeof v === "object" && v !== null) {
+                keys[k] = { _type: Array.isArray(v) ? "array" : "object", _keys: Object.keys(v), _preview: JSON.stringify(v).slice(0, 300) };
+              } else {
+                keys[k] = v;
+              }
+            }
+            wixRawSample = keys;
           }
         }
-      } catch { /* non-fatal */ }
+      } catch (e) { wixRawSample = { error: e instanceof Error ? e.message : "unknown" }; }
     }
 
     // Extract <a> tags from first 3 posts
