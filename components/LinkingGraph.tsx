@@ -1183,29 +1183,32 @@ export default function LinkingGraph() {
               setSelectedNode(prev => prev?.id === (node as GraphNode).id ? null : node as GraphNode);
               setNodeApplyResult(null);
             }}
-            d3AlphaDecay={0.05}
-            d3VelocityDecay={0.4}
-            cooldownTicks={80}
-            d3AlphaMin={0.01}
-            warmupTicks={80}
+            d3AlphaDecay={0.025}
+            d3VelocityDecay={0.3}
+            cooldownTicks={150}
+            d3AlphaMin={0.005}
+            warmupTicks={30}
             onEngineStop={() => {
-              // Freeze all nodes in place after layout converges
               const fg = graphRef.current;
-              if (fg) {
-                fg.zoomToFit(500, 60);
-                // Fix all node positions and save them
+              if (!fg) return;
+              // Wait a tick to ensure positions are finalized
+              setTimeout(() => {
                 const gd = fg.graphData();
-                if (gd?.nodes) {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  gd.nodes.forEach((n: any) => {
-                    n.fx = n.x;
-                    n.fy = n.y;
-                    if (n.id && n.x != null && n.y != null) {
-                      nodePositionsRef.current.set(n.id, { x: n.x, y: n.y });
-                    }
-                  });
-                }
-              }
+                if (!gd?.nodes?.length) return;
+                // Only freeze if nodes have spread (not all at origin)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const hasSpread = gd.nodes.some((n: any) => Math.abs(n.x ?? 0) > 5 || Math.abs(n.y ?? 0) > 5);
+                if (!hasSpread) return;
+                fg.zoomToFit(400, 40);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                gd.nodes.forEach((n: any) => {
+                  n.fx = n.x;
+                  n.fy = n.y;
+                  if (n.id && n.x != null && n.y != null) {
+                    nodePositionsRef.current.set(n.id, { x: n.x, y: n.y });
+                  }
+                });
+              }, 100);
             }}
             minZoom={0.5}
             maxZoom={3}
