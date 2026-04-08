@@ -121,6 +121,9 @@ export default function LinkingGraph() {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIds, setSelectedSuggestionIds] = useState<Set<number>>(new Set());
+  const [applying, setApplying] = useState(false);
+  const [applyResult, setApplyResult] = useState<{ applied: { from_title: string; to_title: string; anchor: string }[]; skipped: { from_title: string; reason: string }[]; errors: string[] } | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -193,6 +196,61 @@ export default function LinkingGraph() {
       setError("Erreur lors de l'analyse");
     } finally {
       setLoading(false);
+    }
+  }
+
+  // ── Apply suggestions to CMS ───────────────────────────────────────────────
+  async function applySuggestions() {
+    if (!data || selectedSuggestionIds.size === 0) return;
+    setApplying(true);
+    setApplyResult(null);
+    try {
+      const toApply = data.suggestions
+        .filter((_, i) => selectedSuggestionIds.has(i))
+        .map(s => ({
+          from_url: s.from_url,
+          from_title: s.from_title,
+          to_url: s.to_url,
+          to_title: s.to_title,
+          anchor: s.anchor,
+        }));
+      const res = await fetch("/api/internal-linking/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suggestions: toApply }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        setApplyResult({ applied: [], skipped: [], errors: [json.error] });
+      } else if (json.result) {
+        setApplyResult(json.result);
+        setSelectedSuggestionIds(new Set());
+        // Re-run analysis to refresh the graph
+        runAnalysis();
+      }
+    } catch {
+      setApplyResult({ applied: [], skipped: [], errors: ["Erreur lors de l'application"] });
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  function toggleSuggestion(idx: number) {
+    setSelectedSuggestionIds(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
+
+  function toggleAllSuggestions() {
+    if (!data) return;
+    const max = Math.min(data.suggestions.length, 20);
+    if (selectedSuggestionIds.size === max) {
+      setSelectedSuggestionIds(new Set());
+    } else {
+      setSelectedSuggestionIds(new Set(Array.from({ length: max }, (_, i) => i)));
     }
   }
 
@@ -1139,13 +1197,66 @@ export default function LinkingGraph() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-white font-bold text-sm">Suggestions de maillage</p>
-              <p className="text-gray-500 text-xs">{data.suggestions.length} lien(s) recommandé(s)</p>
+              <p className="text-gray-500 text-xs">{data.suggestions.length} lien(s) recommandé(s) — sélectionnez puis appliquez</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {selectedSuggestionIds.size > 0 && (
+                <span className="text-xs text-blue-400">{selectedSuggestionIds.size} sélectionné(s)</span>
+              )}
+              <button
+                onClick={applySuggestions}
+                disabled={applying || selectedSuggestionIds.size === 0}
+                className="px-4 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-400 hover:to-amber-400 shadow-lg shadow-orange-500/20"
+              >
+                {applying ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Application en cours...
+                  </span>
+                ) : (
+                  `Appliquer ${selectedSuggestionIds.size > 0 ? `(${selectedSuggestionIds.size})` : "les liens"}`
+                )}
+              </button>
             </div>
           </div>
+
+          {/* Apply result feedback */}
+          {applyResult && (
+            <div className="mb-4 rounded-xl border p-3 text-xs space-y-1" style={{
+              borderColor: applyResult.errors.length > 0 ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)",
+              background: applyResult.errors.length > 0 ? "rgba(239,68,68,0.05)" : "rgba(34,197,94,0.05)",
+            }}>
+              {applyResult.applied.length > 0 && (
+                <p className="text-green-400 font-bold">
+                  {applyResult.applied.length} lien(s) appliqué(s) avec succès
+                </p>
+              )}
+              {applyResult.applied.map((a, i) => (
+                <p key={i} className="text-green-400/70 pl-3">
+                  {a.from_title} → {a.to_title} <span className="text-green-400/50">({a.anchor})</span>
+                </p>
+              ))}
+              {applyResult.skipped.length > 0 && (
+                <p className="text-yellow-400/70">{applyResult.skipped.length} ignoré(s) : {applyResult.skipped.map(s => s.reason).join(", ")}</p>
+              )}
+              {applyResult.errors.map((e, i) => (
+                <p key={i} className="text-red-400">{e}</p>
+              ))}
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-white/[0.06]">
+                  <th className="text-left py-2 pr-2 w-8">
+                    <input
+                      type="checkbox"
+                      checked={selectedSuggestionIds.size === Math.min(data.suggestions.length, 20) && data.suggestions.length > 0}
+                      onChange={toggleAllSuggestions}
+                      className="rounded border-white/20 bg-white/5 text-orange-500 focus:ring-orange-500/30 cursor-pointer"
+                    />
+                  </th>
                   <th className="text-left text-gray-500 font-bold uppercase tracking-wider py-2 pr-3">Source</th>
                   <th className="text-left text-gray-500 font-bold uppercase tracking-wider py-2 pr-3">Cible</th>
                   <th className="text-left text-gray-500 font-bold uppercase tracking-wider py-2 pr-3">Ancre</th>
@@ -1155,7 +1266,20 @@ export default function LinkingGraph() {
               </thead>
               <tbody>
                 {data.suggestions.slice(0, 20).map((s, i) => (
-                  <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                  <tr
+                    key={i}
+                    className={`border-b border-white/[0.03] cursor-pointer transition-colors ${selectedSuggestionIds.has(i) ? "bg-orange-500/[0.06]" : "hover:bg-white/[0.02]"}`}
+                    onClick={() => toggleSuggestion(i)}
+                  >
+                    <td className="py-2 pr-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedSuggestionIds.has(i)}
+                        onChange={() => toggleSuggestion(i)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded border-white/20 bg-white/5 text-orange-500 focus:ring-orange-500/30 cursor-pointer"
+                      />
+                    </td>
                     <td className="py-2 pr-3 text-gray-300">{truncate(s.from_title, 25)}</td>
                     <td className="py-2 pr-3 text-gray-300">{truncate(s.to_title, 25)}</td>
                     <td className="py-2 pr-3">
