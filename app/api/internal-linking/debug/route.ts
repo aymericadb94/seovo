@@ -44,6 +44,33 @@ export async function GET() {
 
     const cmsPosts = await listCmsPosts(creds, 10); // Only 10 for debug
 
+    // Fetch raw Wix API response to see richContent structure
+    let wixRawSample: unknown = null;
+    if (site.cms === "wix" && site.wix_api_key && site.wix_site_id) {
+      try {
+        const rawRes = await fetch(
+          `https://www.wixapis.com/blog/v3/posts?paging.limit=1&fieldsets=CONTENT&fieldsets=URL`,
+          { headers: { "Content-Type": "application/json", Authorization: site.wix_api_key, "wix-site-id": site.wix_site_id } }
+        );
+        if (rawRes.ok) {
+          const rawData = await rawRes.json() as { posts?: { richContent?: unknown; url?: unknown; slug?: string; title?: string }[] };
+          const firstPost = rawData.posts?.[0];
+          if (firstPost) {
+            const rc = firstPost.richContent as { nodes?: unknown[] } | undefined;
+            wixRawSample = {
+              title: firstPost.title,
+              slug: firstPost.slug,
+              url: firstPost.url,
+              richContent_keys: rc ? Object.keys(rc) : null,
+              richContent_nodes_count: rc?.nodes?.length ?? 0,
+              // Show first 3 nodes raw structure
+              richContent_first_nodes: rc?.nodes?.slice(0, 3),
+            };
+          }
+        }
+      } catch { /* non-fatal */ }
+    }
+
     // Extract <a> tags from first 3 posts
     const linksInContent: { post_title: string; post_url: string; hrefs: string[]; content_preview: string; content_length: number }[] = [];
     for (const post of cmsPosts.slice(0, 3)) {
@@ -148,6 +175,7 @@ export async function GET() {
       })),
       links_in_content: linksInContent,
       match_results: matchResults,
+      wix_raw_sample: wixRawSample,
     });
   } catch (err: unknown) {
     return Response.json({ error: err instanceof Error ? err.message : "Erreur" }, { status: 500 });
