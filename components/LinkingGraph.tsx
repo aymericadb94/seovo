@@ -123,7 +123,10 @@ export default function LinkingGraph() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestionIds, setSelectedSuggestionIds] = useState<Set<number>>(new Set());
   const [applying, setApplying] = useState(false);
+  const [applyingNode, setApplyingNode] = useState(false);
+  const [appliedLinks, setAppliedLinks] = useState<Set<string>>(new Set()); // track "from|to|anchor"
   const [applyResult, setApplyResult] = useState<{ applied: { from_title: string; to_title: string; anchor: string }[]; skipped: { from_title: string; reason: string }[]; errors: string[] } | null>(null);
+  const [nodeApplyResult, setNodeApplyResult] = useState<{ ok: number; fail: number } | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -243,6 +246,47 @@ export default function LinkingGraph() {
       setApplyResult({ applied: [], skipped: [], errors: ["Erreur lors de l'application"] });
     } finally {
       setApplying(false);
+    }
+  }
+
+  // Apply specific suggestions (from node detail panel)
+  async function applyNodeSuggestions(suggestions: Suggestion[]) {
+    if (suggestions.length === 0) return;
+    setApplyingNode(true);
+    setNodeApplyResult(null);
+    try {
+      const toApply = suggestions.map(s => ({
+        from_url: s.from_url,
+        from_title: s.from_title,
+        to_url: s.to_url,
+        to_title: s.to_title,
+        anchor: s.anchor,
+      }));
+      const res = await fetch("/api/internal-linking/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suggestions: toApply }),
+      });
+      const json = await res.json();
+      if (json.result) {
+        const ok = json.result.applied?.length ?? 0;
+        const fail = (json.result.skipped?.length ?? 0) + (json.result.errors?.length ?? 0);
+        setNodeApplyResult({ ok, fail });
+        // Mark applied
+        const newApplied = new Set(appliedLinks);
+        for (const a of json.result.applied ?? []) {
+          newApplied.add(`${a.from_title}|${a.to_title}|${a.anchor}`);
+        }
+        setAppliedLinks(newApplied);
+        // Refresh graph after a delay
+        setTimeout(() => runAnalysis(), 1500);
+      } else {
+        setNodeApplyResult({ ok: 0, fail: suggestions.length });
+      }
+    } catch {
+      setNodeApplyResult({ ok: 0, fail: suggestions.length });
+    } finally {
+      setApplyingNode(false);
     }
   }
 
@@ -1124,7 +1168,10 @@ export default function LinkingGraph() {
                 hoverTimeoutRef.current = setTimeout(() => setHoveredNode(null), 120);
               }
             }}
-            onNodeClick={(node) => setSelectedNode(prev => prev?.id === (node as GraphNode).id ? null : node as GraphNode)}
+            onNodeClick={(node) => {
+              setSelectedNode(prev => prev?.id === (node as GraphNode).id ? null : node as GraphNode);
+              setNodeApplyResult(null);
+            }}
             d3AlphaDecay={0.025}
             d3VelocityDecay={0.3}
             cooldownTicks={120}
@@ -1166,13 +1213,60 @@ export default function LinkingGraph() {
               <StatBox label="Sortants" value={String(selectedNode.outgoing)} color="#06b6d4" />
             </div>
 
+            {/* Apply result feedback */}
+            {nodeApplyResult && (
+              <div className={`rounded-lg p-2 mb-3 text-[10px] font-bold ${nodeApplyResult.ok > 0 ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
+                {nodeApplyResult.ok > 0 && <span>{nodeApplyResult.ok} lien(s) appliqué(s)</span>}
+                {nodeApplyResult.fail > 0 && <span>{nodeApplyResult.ok > 0 ? " · " : ""}{nodeApplyResult.fail} ignoré(s)</span>}
+              </div>
+            )}
+
+            {/* All suggestions for this node */}
+            {(selectedSuggestions.incoming.length > 0 || selectedSuggestions.outgoing.length > 0) && (
+              <button
+                onClick={() => applyNodeSuggestions([...selectedSuggestions.incoming, ...selectedSuggestions.outgoing])}
+                disabled={applyingNode}
+                className="w-full mb-3 px-3 py-2 rounded-xl text-[10px] font-bold transition-all disabled:opacity-40 bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-400 hover:to-amber-400"
+              >
+                {applyingNode ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <span className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Application...
+                  </span>
+                ) : (
+                  `Appliquer tous les liens (${selectedSuggestions.incoming.length + selectedSuggestions.outgoing.length})`
+                )}
+              </button>
+            )}
+
             {/* Incoming suggestions */}
             {selectedSuggestions.incoming.length > 0 && (
               <div className="mb-3">
                 <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 mb-2">Liens entrants suggérés</p>
-                {selectedSuggestions.incoming.map((s, i) => (
-                  <LinkRow key={i} label={s.from_title} anchor={s.anchor} priority={s.priority} direction="in" />
-                ))}
+                {selectedSuggestions.incoming.map((s, i) => {
+                  const key = `${s.from_title}|${s.to_title}|${s.anchor}`;
+                  const done = appliedLinks.has(key);
+                  return (
+                    <div key={i} className={`flex items-center gap-2 py-1.5 border-b border-white/[0.03] last:border-0 ${done ? "opacity-40" : ""}`}>
+                      <span className="text-[10px] text-green-400">←</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-gray-300 text-[10px] truncate">{s.from_title}</p>
+                        <p className="text-orange-400/70 text-[10px] truncate">ancre : {s.anchor}</p>
+                      </div>
+                      {done ? (
+                        <span className="text-green-400 text-[10px]">✓</span>
+                      ) : (
+                        <button
+                          onClick={() => applyNodeSuggestions([s])}
+                          disabled={applyingNode}
+                          className="px-2 py-0.5 rounded text-[9px] font-bold bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-colors disabled:opacity-30 flex-shrink-0"
+                        >
+                          Appliquer
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1180,9 +1274,30 @@ export default function LinkingGraph() {
             {selectedSuggestions.outgoing.length > 0 && (
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 mb-2">Liens sortants suggérés</p>
-                {selectedSuggestions.outgoing.map((s, i) => (
-                  <LinkRow key={i} label={s.to_title} anchor={s.anchor} priority={s.priority} direction="out" />
-                ))}
+                {selectedSuggestions.outgoing.map((s, i) => {
+                  const key = `${s.from_title}|${s.to_title}|${s.anchor}`;
+                  const done = appliedLinks.has(key);
+                  return (
+                    <div key={i} className={`flex items-center gap-2 py-1.5 border-b border-white/[0.03] last:border-0 ${done ? "opacity-40" : ""}`}>
+                      <span className="text-[10px] text-blue-400">→</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-gray-300 text-[10px] truncate">{s.to_title}</p>
+                        <p className="text-orange-400/70 text-[10px] truncate">ancre : {s.anchor}</p>
+                      </div>
+                      {done ? (
+                        <span className="text-green-400 text-[10px]">✓</span>
+                      ) : (
+                        <button
+                          onClick={() => applyNodeSuggestions([s])}
+                          disabled={applyingNode}
+                          className="px-2 py-0.5 rounded text-[9px] font-bold bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-colors disabled:opacity-30 flex-shrink-0"
+                        >
+                          Appliquer
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
