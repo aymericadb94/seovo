@@ -169,9 +169,9 @@ export default function LinkingGraph() {
   useEffect(() => {
     const fg = graphRef.current;
     if (!fg || !data) return;
-    fg.d3Force("charge")?.strength(-350).distanceMax(500);
-    fg.d3Force("link")?.distance(100);
-    fg.d3Force("center")?.strength(0.04);
+    fg.d3Force("charge")?.strength(-600).distanceMax(600);
+    fg.d3Force("link")?.distance(140);
+    fg.d3Force("center")?.strength(0.03);
   }, [data]);
 
   async function loadData() {
@@ -321,21 +321,19 @@ export default function LinkingGraph() {
       });
     });
 
-    // Suggestion links (dashed, dimmer) — only show when panel is open
-    if (showSuggestions) {
-      const existingPairs = new Set(existingLinks.map(l => `${l.from_url}|${l.to_url}`));
-      data.suggestions.forEach((s, i) => {
-        if (existingPairs.has(`${s.from_url}|${s.to_url}`)) return;
-        allLinks.push({
-          source: s.from_url,
-          target: s.to_url,
-          weight: s.priority === "haute" ? 1.5 : 1,
-          type: "suggestion",
-          color: "rgba(255,255,255,0.08)",
-          curvature: 0.15 + (i % 3) * 0.05,
-        });
+    // Suggestion links — always in graph data (for layout stability) but rendered differently
+    const existingPairs = new Set(existingLinks.map(l => `${l.from_url}|${l.to_url}`));
+    data.suggestions.forEach((s, i) => {
+      if (existingPairs.has(`${s.from_url}|${s.to_url}`)) return;
+      allLinks.push({
+        source: s.from_url,
+        target: s.to_url,
+        weight: s.priority === "haute" ? 1.5 : 1,
+        type: "suggestion",
+        color: "rgba(255,255,255,0.08)",
+        curvature: 0.15 + (i % 3) * 0.05,
       });
-    }
+    });
 
     // Filter
     let filteredNodes = allNodes;
@@ -359,49 +357,15 @@ export default function LinkingGraph() {
     filteredLinks = filteredLinks.filter(l => nodeIds.has(l.source as string) && nodeIds.has(l.target as string));
 
     return { nodes: filteredNodes, links: filteredLinks };
-  }, [data, filter, selectedCluster, clusterNames, showSuggestions]);
+  }, [data, filter, selectedCluster, clusterNames]);
 
-  // ── Pill drawing helper ───────────────────────────────────────────────────
-  const drawPill = useCallback((
-    ctx: CanvasRenderingContext2D,
-    x: number, y: number,
-    w: number, h: number,
-    fillStyle: string | CanvasGradient,
-    strokeStyle?: string,
-    lineWidth?: number
-  ) => {
-    const r = h / 2;
-    ctx.beginPath();
-    ctx.moveTo(x - w / 2 + r, y - h / 2);
-    ctx.lineTo(x + w / 2 - r, y - h / 2);
-    ctx.arc(x + w / 2 - r, y, r, -Math.PI / 2, Math.PI / 2);
-    ctx.lineTo(x - w / 2 + r, y + h / 2);
-    ctx.arc(x - w / 2 + r, y, r, Math.PI / 2, -Math.PI / 2);
-    ctx.closePath();
-    ctx.fillStyle = fillStyle;
-    ctx.fill();
-    if (strokeStyle) {
-      ctx.strokeStyle = strokeStyle;
-      ctx.lineWidth = lineWidth ?? 1;
-      ctx.stroke();
-    }
-  }, []);
+  // (drawPill removed — using roundRect cards now)
 
-  // Animation frame counter for pulse
-  const frameRef = useRef(0);
-  useEffect(() => {
-    let running = true;
-    function tick() {
-      frameRef.current++;
-      if (running) requestAnimationFrame(tick);
-    }
-    tick();
-    return () => { running = false; };
-  }, []);
+  // (Animation frame counter removed — cards don't pulse)
 
-  // ── Node rendering — Rankpill pills ──────────────────────────────────────
+  // ── Node rendering — large readable cards ───────────────────────────────
   const paintNode = useCallback((node: GraphNode, ctx: CanvasRenderingContext2D) => {
-    const { x = 0, y = 0, size, role } = node;
+    const { x = 0, y = 0, role } = node;
     const hovered = hoveredNodeRef.current;
     const isHovered = hovered?.id === node.id;
     const isSelected = selectedNode?.id === node.id;
@@ -412,37 +376,32 @@ export default function LinkingGraph() {
       ? neighborMap.get(activeNode.id)?.has(node.id) ?? false
       : false;
     const isDimmed = activeNode && !isHighlighted && !isNeighbor;
-    const opacity = isDimmed ? 0.12 : 1;
+    const opacity = isDimmed ? 0.15 : 1;
 
     ctx.globalAlpha = opacity;
 
-    // Is this page linked (has any connections)?
     const isLinked = node.incoming > 0 || node.outgoing > 0;
     const isPillar = role === "pillar";
 
-    // Pill dimensions — based on importance (larger for readability)
-    const pillH = isPillar ? 18 : isLinked ? 13 : 10;
-    const pillW = isPillar ? size * 4.5 : isLinked ? size * 3.5 : size * 2.8;
+    // ── Card dimensions — always show title inside ──
+    const fontSize = isPillar ? 10 : 9;
+    ctx.font = `${isPillar ? "bold " : ""}${fontSize}px Inter, system-ui, sans-serif`;
+    const label = truncate(node.label, isPillar ? 28 : 22);
+    const textW = ctx.measureText(label).width;
+    const padX = 12, padY = 6;
+    const cardW = textW + padX * 2;
+    const cardH = fontSize + padY * 2;
+    const r = cardH / 2;
 
-    // Animation pulse for linked pages
-    const t = frameRef.current * 0.03;
-    const pulse = isLinked ? 0.85 + 0.15 * Math.sin(t + node.id.length * 0.7) : 1;
-
-    // Colors
-    const orangeMain = "#f97316";
-    const orangeGlow = "rgba(249,115,22,0.6)";
-    const greyMain = "#4b5563";
-    const greyBorder = "rgba(107,114,128,0.4)";
-
-    // ── Glow for linked / highlighted pills ──
-    if (isLinked && !isDimmed) {
-      const glowR = pillW * 0.5 + 8;
-      const gradient = ctx.createRadialGradient(x, y, pillH * 0.3, x, y, glowR);
+    // ── Glow ──
+    if ((isLinked || isPillar) && !isDimmed) {
+      const glowR = cardW * 0.4 + 12;
+      const gradient = ctx.createRadialGradient(x, y, cardH * 0.3, x, y, glowR);
       if (isHighlighted) {
-        gradient.addColorStop(0, "rgba(249,115,22,0.35)");
+        gradient.addColorStop(0, isPillar ? "rgba(249,115,22,0.4)" : "rgba(249,115,22,0.25)");
         gradient.addColorStop(1, "rgba(249,115,22,0)");
       } else {
-        gradient.addColorStop(0, `rgba(249,115,22,${0.12 * pulse})`);
+        gradient.addColorStop(0, "rgba(249,115,22,0.08)");
         gradient.addColorStop(1, "rgba(249,115,22,0)");
       }
       ctx.beginPath();
@@ -451,78 +410,101 @@ export default function LinkingGraph() {
       ctx.fill();
     }
 
-    // ── Pill body ──
-    if (isLinked) {
-      // Orange gradient pill
-      const grad = ctx.createLinearGradient(x - pillW / 2, y, x + pillW / 2, y);
-      grad.addColorStop(0, `rgba(249,115,22,${0.7 * pulse})`);
-      grad.addColorStop(0.5, `rgba(249,115,22,${0.95 * pulse})`);
-      grad.addColorStop(1, `rgba(239,68,68,${0.7 * pulse})`);
-      drawPill(ctx, x, y, pillW, pillH, grad,
-        isHighlighted ? "#fff" : orangeGlow,
-        isHighlighted ? 2 : 1);
+    // ── Card body ──
+    const cx = x - cardW / 2, cy = y - cardH / 2;
+    ctx.beginPath();
+    ctx.roundRect(cx, cy, cardW, cardH, r);
+
+    if (isLinked || isPillar) {
+      if (isHighlighted) {
+        ctx.fillStyle = "rgba(249,115,22,0.95)";
+      } else if (isPillar) {
+        ctx.fillStyle = "rgba(249,115,22,0.7)";
+      } else {
+        ctx.fillStyle = "rgba(249,115,22,0.45)";
+      }
     } else {
-      // Grey pill — static, no pulse
-      drawPill(ctx, x, y, pillW, pillH,
-        isHighlighted ? greyMain : `${greyMain}99`,
-        isHighlighted ? "rgba(255,255,255,0.5)" : greyBorder,
-        isHighlighted ? 1.5 : 0.8);
+      // Orphan — grey
+      ctx.fillStyle = isHighlighted ? "rgba(100,116,139,0.85)" : "rgba(51,65,85,0.6)";
+    }
+    ctx.fill();
+
+    // Border
+    if (isHighlighted) {
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else if (isPillar) {
+      ctx.strokeStyle = "rgba(249,115,22,0.6)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
 
-    // ── Inner shine (top highlight for 3D effect) ──
-    if (isLinked) {
-      const shineGrad = ctx.createLinearGradient(x, y - pillH / 2, x, y);
-      shineGrad.addColorStop(0, "rgba(255,255,255,0.25)");
-      shineGrad.addColorStop(1, "rgba(255,255,255,0)");
-      drawPill(ctx, x, y - pillH * 0.08, pillW * 0.85, pillH * 0.5, shineGrad);
-    }
+    // ── Text inside card ──
+    ctx.fillStyle = isHighlighted ? "#fff" : isLinked ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.7)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, x, y + 0.5);
 
-    // ── Pillar marker (white dot in center) ──
-    if (isPillar) {
+    // ── Pillar badge ──
+    if (isPillar && !isDimmed) {
+      const badgeR = 4;
       ctx.beginPath();
-      ctx.arc(x, y, 2.5, 0, 2 * Math.PI);
+      ctx.arc(x + cardW / 2 - 2, cy - 2, badgeR, 0, 2 * Math.PI);
+      ctx.fillStyle = "#f97316";
+      ctx.fill();
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 1;
+      ctx.stroke();
       ctx.fillStyle = "#fff";
-      ctx.fill();
+      ctx.font = "bold 5px Inter, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("P", x + cardW / 2 - 2, cy - 1.5);
     }
 
-    // ── Label — only show on hover/selected/neighbor to avoid clutter ──
-    const showLabel = isHighlighted || (isNeighbor && !!activeNode);
-    if (showLabel) {
-      const fontSize = isHighlighted ? 12 : 10;
-      ctx.font = `${isHighlighted ? "bold " : ""}${fontSize}px Inter, system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-
-      const labelY = y + pillH / 2 + 5;
-
-      // Background pill behind text for readability
-      const textWidth = ctx.measureText(node.label).width;
-      const padX = 6, padY = 2;
-      const bgR = (fontSize + padY * 2) / 2;
-      ctx.fillStyle = "rgba(0,0,0,0.75)";
+    // ── Stats badge (entrants/sortants) on hover ──
+    if (isHighlighted) {
+      const statsText = `↙${node.incoming} ↗${node.outgoing}`;
+      ctx.font = "bold 8px Inter, system-ui, sans-serif";
+      const statsW = ctx.measureText(statsText).width + 8;
+      const statsH = 14;
+      const statsY = y + cardH / 2 + 4;
       ctx.beginPath();
-      ctx.roundRect(x - textWidth / 2 - padX, labelY - padY, textWidth + padX * 2, fontSize + padY * 2, bgR);
+      ctx.roundRect(x - statsW / 2, statsY, statsW, statsH, 4);
+      ctx.fillStyle = "rgba(0,0,0,0.8)";
       ctx.fill();
-
-      ctx.fillStyle = isHighlighted ? "#fff" : "rgba(255,255,255,0.85)";
-      ctx.fillText(node.label, x, labelY);
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(statsText, x, statsY + statsH / 2);
     }
 
     ctx.globalAlpha = 1;
-  }, [selectedNode, neighborMap, drawPill]);
+  }, [selectedNode, neighborMap]);
 
   // ── Link rendering — existing (solid orange) vs suggestions (dashed grey) ─
+  const showSuggestionsRef = useRef(showSuggestions);
+  showSuggestionsRef.current = showSuggestions;
+
   const paintLink = useCallback((link: GraphLink, ctx: CanvasRenderingContext2D) => {
     const src = link.source as unknown as GraphNode;
     const tgt = link.target as unknown as GraphNode;
     const sx = src?.x ?? 0, sy = src?.y ?? 0, tx = tgt?.x ?? 0, ty = tgt?.y ?? 0;
     if (sx === 0 && sy === 0 && tx === 0 && ty === 0) return;
 
+    const isExisting = link.type === "existing";
+
+    // Hide suggestion links when panel is closed
+    if (!isExisting && !showSuggestionsRef.current) {
+      ctx.globalAlpha = 1;
+      return;
+    }
+
     const hovered = hoveredNodeRef.current;
     const activeNode = hovered || selectedNode;
     const isRelated = activeNode && (src.id === activeNode.id || tgt.id === activeNode.id);
     const isDimmed = activeNode && !isRelated;
-    const isExisting = link.type === "existing";
 
     ctx.globalAlpha = isDimmed ? 0.04 : 1;
 
@@ -553,10 +535,10 @@ export default function LinkingGraph() {
       ctx.strokeStyle = isRelated ? "rgba(249,115,22,0.9)" : "rgba(249,115,22,0.3)";
       ctx.lineWidth = isRelated ? link.weight * 1.8 : link.weight;
     } else {
-      // Suggestions: dashed, grey
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = isRelated ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.06)";
-      ctx.lineWidth = isRelated ? 1.2 : 0.6;
+      // Suggestions: dashed, blue-ish
+      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = isRelated ? "rgba(59,130,246,0.6)" : "rgba(59,130,246,0.15)";
+      ctx.lineWidth = isRelated ? 1.5 : 0.8;
     }
     ctx.stroke();
     ctx.setLineDash([]);
@@ -1117,18 +1099,16 @@ export default function LinkingGraph() {
             nodePointerAreaPaint={(node, color, ctx) => {
               const n = node as unknown as GraphNode;
               const isPillar = n.role === "pillar";
-              const isLinked = n.incoming > 0 || n.outgoing > 0;
-              const pillH = (isPillar ? 14 : isLinked ? 10 : 8) + 6;
-              const pillW = (isPillar ? n.size * 3.8 : isLinked ? n.size * 3 : n.size * 2.5) + 6;
-              const r = pillH / 2;
+              // Generous hitbox matching the card size
+              const fontSize = isPillar ? 10 : 9;
+              ctx.font = `${isPillar ? "bold " : ""}${fontSize}px Inter, system-ui, sans-serif`;
+              const label = n.label.length > (isPillar ? 28 : 22) ? n.label.slice(0, isPillar ? 28 : 22) + "..." : n.label;
+              const textW = ctx.measureText(label).width;
+              const cardW = textW + 24 + 10; // padX*2 + extra padding
+              const cardH = fontSize + 12 + 10;
               const x = n.x ?? 0, y = n.y ?? 0;
               ctx.beginPath();
-              ctx.moveTo(x - pillW / 2 + r, y - pillH / 2);
-              ctx.lineTo(x + pillW / 2 - r, y - pillH / 2);
-              ctx.arc(x + pillW / 2 - r, y, r, -Math.PI / 2, Math.PI / 2);
-              ctx.lineTo(x - pillW / 2 + r, y + pillH / 2);
-              ctx.arc(x - pillW / 2 + r, y, r, Math.PI / 2, -Math.PI / 2);
-              ctx.closePath();
+              ctx.roundRect(x - cardW / 2, y - cardH / 2, cardW, cardH, cardH / 2);
               ctx.fillStyle = color;
               ctx.fill();
             }}
@@ -1151,10 +1131,11 @@ export default function LinkingGraph() {
             d3AlphaMin={0.005}
             warmupTicks={30}
             onEngineStop={() => graphRef.current?.zoomToFit(500, 60)}
-            minZoom={0.3}
-            maxZoom={5}
+            minZoom={0.5}
+            maxZoom={3}
             enableZoomInteraction={true}
             enablePanInteraction={true}
+            enableNodeDrag={true}
           />
         </div>
 
