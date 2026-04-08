@@ -443,12 +443,13 @@ async function wixUpdatePost(
   apiKey: string,
   siteId: string,
   postId: string,
-  updates: { title?: string; richContent?: unknown }
+  updates: { title?: string; content?: string; richContent?: unknown }
 ): Promise<UpdateResult> {
   try {
     // Wix uses PATCH for post updates
     const body: Record<string, unknown> = {};
     if (updates.title) body.title = updates.title;
+    if (updates.content) body.content = updates.content;
     if (updates.richContent) body.richContent = updates.richContent;
 
     const res = await fetch(
@@ -690,8 +691,14 @@ export async function updateCmsPost(
       if (!creds.wix_api_key || !creds.wix_site_id) {
         return { success: false, post_id: postId, url: "", error: "Wix credentials missing" };
       }
-      // For Wix, if content is HTML, we'd need to convert to RichContent
-      // For now, we only support title updates and richContent patches
+      // Convert HTML content to Draft.js format for Wix
+      if (updates.content) {
+        const draftContent = htmlToDraftContent(updates.content);
+        return wixUpdatePost(creds.wix_api_key, creds.wix_site_id, postId as string, {
+          title: updates.title,
+          content: JSON.stringify(draftContent),
+        });
+      }
       return wixUpdatePost(creds.wix_api_key, creds.wix_site_id, postId as string, {
         title: updates.title,
       });
@@ -714,6 +721,150 @@ export async function getCmsPost(
       const posts = await listCmsPosts(creds, 100);
       return posts.find(p => String(p.id) === String(postId)) ?? null;
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HTML → DRAFT.JS CONVERSION (for Wix content updates)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Convert HTML to Wix Draft.js format.
+ * Handles: p, h1-h3, ul/ol/li, blockquote, and <a> links.
+ */
+function htmlToDraftContent(html: string): WixContentBlock {
+  const blocks: WixDraftBlock[] = [];
+  const entityMap: Record<string, WixDraftEntity> = {};
+  let entityKey = 0;
+
+  // Split HTML into block-level elements
+  // Match tags like <p>, <h2>, <li>, <blockquote> and their content
+  const blockRegex = /<(p|h[1-3]|li|blockquote|div)[^>]*>([\s\S]*?)<\/\1>/gi;
+  let match;
+  let listType: "unordered" | "ordered" | null = null;
+
+  // Process the HTML sequentially to track list context
+  let pos = 0;
+  while ((match = blockRegex.exec(html)) !== null) {
+    const tag = match[1].toLowerCase();
+    const innerHtml = match[2];
+
+    // Determine list type from context
+    if (tag === "li") {
+      // Check what list tag is open before this <li>
+      const beforeLi = html.slice(pos, match.index);
+      const lastOl = beforeLi.lastIndexOf("<ol");
+      const lastUl = beforeLi.lastIndexOf("<ul");
+      const lastOlEnd = beforeLi.lastIndexOf("</ol");
+      const lastUlEnd = beforeLi.lastIndexOf("</ul");
+      if (lastOl > lastUl && lastOl > lastOlEnd) listType = "ordered";
+      else if (lastUl > lastOl && lastUl > lastUlEnd) listType = "unordered";
+    }
+
+    // Extract text and links from inner HTML
+    const { text, entityRanges, entities } = extractTextAndLinks(innerHtml, entityKey);
+    entityKey += entities.length;
+
+    // Add entities to map
+    for (const e of entities) {
+      entityMap[String(e.key)] = e.entity;
+    }
+
+    // Map tag to Draft.js block type
+    let blockType = "unstyled";
+    switch (tag) {
+      case "h1": blockType = "header-one"; break;
+      case "h2": blockType = "header-two"; break;
+      case "h3": blockType = "header-three"; break;
+      case "li": blockType = listType === "ordered" ? "ordered-list-item" : "unordered-list-item"; break;
+      case "blockquote": blockType = "blockquote"; break;
+    }
+
+    if (text.trim()) {
+      blocks.push({
+        key: generateBlockKey(),
+        type: blockType,
+        text,
+        entityRanges,
+        data: {},
+      });
+    }
+  }
+
+  // Fallback: if no blocks extracted, create one unstyled block with stripped text
+  if (blocks.length === 0) {
+    const stripped = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (stripped) {
+      blocks.push({
+        key: generateBlockKey(),
+        type: "unstyled",
+        text: stripped,
+        entityRanges: [],
+        data: {},
+      });
+    }
+  }
+
+  return { blocks, entityMap };
+}
+
+/** Extract plain text and link entities from inner HTML */
+function extractTextAndLinks(
+  innerHtml: string,
+  startKey: number
+): {
+  text: string;
+  entityRanges: { offset: number; length: number; key: number }[];
+  entities: { key: number; entity: WixDraftEntity }[];
+} {
+  const entityRanges: { offset: number; length: number; key: number }[] = [];
+  const entities: { key: number; entity: WixDraftEntity }[] = [];
+  let currentKey = startKey;
+
+  // Replace <a> tags with markers, tracking positions
+  let text = "";
+  const linkRegex = /<a\s+[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let lastIndex = 0;
+  let linkMatch;
+
+  // Reset the regex
+  linkRegex.lastIndex = 0;
+
+  while ((linkMatch = linkRegex.exec(innerHtml)) !== null) {
+    // Add text before the link
+    const before = innerHtml.slice(lastIndex, linkMatch.index);
+    const cleanBefore = before.replace(/<[^>]+>/g, "");
+    text += cleanBefore;
+
+    // Add the link text
+    const linkText = linkMatch[2].replace(/<[^>]+>/g, "");
+    const offset = text.length;
+    text += linkText;
+
+    entityRanges.push({ offset, length: linkText.length, key: currentKey });
+    entities.push({
+      key: currentKey,
+      entity: { type: "LINK", data: { url: linkMatch[1], target: "_blank" } },
+    });
+    currentKey++;
+    lastIndex = linkMatch.index + linkMatch[0].length;
+  }
+
+  // Add remaining text after last link
+  if (lastIndex < innerHtml.length) {
+    const after = innerHtml.slice(lastIndex);
+    text += after.replace(/<[^>]+>/g, "");
+  }
+
+  // Clean up whitespace
+  text = text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+
+  return { text, entityRanges, entities };
+}
+
+let _blockKeyCounter = 0;
+function generateBlockKey(): string {
+  _blockKeyCounter++;
+  return `bk${Date.now().toString(36)}${_blockKeyCounter.toString(36)}`;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
