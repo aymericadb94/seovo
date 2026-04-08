@@ -219,13 +219,12 @@ async function wixListPosts(
       { headers: wixHeaders(apiKey, siteId) }
     );
     if (!res.ok) return [];
-    type WixNode = { type: string; nodes?: WixNode[]; textData?: { text: string }; linkData?: { link?: { url?: string } }; paragraphData?: unknown };
     const data = await res.json() as {
       posts: {
         id: string;
         title: string;
         slug?: string;
-        richContent?: { nodes: WixNode[] };
+        richContent?: { nodes: WixRichNode[] };
         url?: { base: string; path: string };
         excerpt?: string;
       }[];
@@ -259,41 +258,73 @@ async function wixListPosts(
   }
 }
 
-/** Convert Wix richContent nodes to basic HTML (paragraphs, headings, links) */
-function wixRichContentToHtml(nodes: { type: string; nodes?: unknown[]; textData?: { text: string }; linkData?: { link?: { url?: string } }; headingData?: { level: number }; paragraphData?: unknown }[]): string {
+/**
+ * Convert Wix richContent nodes to basic HTML.
+ *
+ * Wix richContent structure:
+ * - Block nodes: PARAGRAPH, HEADING, BULLETED_LIST, ORDERED_LIST, LIST_ITEM
+ * - Inline nodes: TEXT (with optional decorations for LINK, BOLD, ITALIC)
+ * - Links are decorations on TEXT nodes, NOT separate nodes
+ */
+type WixRichNode = {
+  type: string;
+  nodes?: WixRichNode[];
+  textData?: {
+    text: string;
+    decorations?: { type: string; linkData?: { link?: { url?: string } } }[];
+  };
+  headingData?: { level: number };
+  paragraphData?: unknown;
+  linkData?: { link?: { url?: string } };
+};
+
+function wixRichContentToHtml(nodes: WixRichNode[]): string {
   let html = "";
   for (const node of nodes) {
     if (node.type === "HEADING") {
-      const level = (node as { headingData?: { level: number } }).headingData?.level ?? 2;
-      const inner = wixInlineToHtml((node.nodes ?? []) as { type: string; textData?: { text: string }; linkData?: { link?: { url?: string } } }[]);
+      const level = node.headingData?.level ?? 2;
+      const inner = wixInlineNodesToHtml(node.nodes ?? []);
       html += `<h${level}>${inner}</h${level}>`;
     } else if (node.type === "PARAGRAPH") {
-      const inner = wixInlineToHtml((node.nodes ?? []) as { type: string; textData?: { text: string }; linkData?: { link?: { url?: string } } }[]);
+      const inner = wixInlineNodesToHtml(node.nodes ?? []);
       if (inner.trim()) html += `<p>${inner}</p>`;
     } else if (node.type === "BULLETED_LIST" || node.type === "ORDERED_LIST") {
       const tag = node.type === "ORDERED_LIST" ? "ol" : "ul";
-      const items = (node.nodes ?? []) as { type: string; nodes?: unknown[] }[];
       html += `<${tag}>`;
-      for (const item of items) {
-        const inner = wixRichContentToHtml((item.nodes ?? []) as typeof nodes);
+      for (const item of (node.nodes ?? [])) {
+        // LIST_ITEM contains nested PARAGRAPH/etc
+        const inner = wixRichContentToHtml(item.nodes ?? []);
         html += `<li>${inner}</li>`;
       }
       html += `</${tag}>`;
+    } else if (node.nodes) {
+      // Generic container (TABLE_CELL, BLOCKQUOTE, etc.) — recurse
+      html += wixRichContentToHtml(node.nodes);
     }
   }
   return html;
 }
 
-function wixInlineToHtml(nodes: { type: string; textData?: { text: string }; linkData?: { link?: { url?: string } } }[]): string {
+function wixInlineNodesToHtml(nodes: WixRichNode[]): string {
   let result = "";
   for (const n of nodes) {
     if (n.type === "TEXT") {
-      result += n.textData?.text ?? "";
+      const text = n.textData?.text ?? "";
+      // Check decorations for links
+      const linkDecor = n.textData?.decorations?.find(d => d.type === "LINK");
+      if (linkDecor?.linkData?.link?.url) {
+        result += `<a href="${linkDecor.linkData.link.url}">${text}</a>`;
+      } else {
+        result += text;
+      }
     } else if (n.type === "LINK" || n.linkData?.link?.url) {
-      // For link nodes, recurse into children for text, wrap in <a>
+      // Explicit LINK node (rare but possible)
       const href = n.linkData?.link?.url ?? "";
-      const inner = wixInlineToHtml((n as { nodes?: typeof nodes }).nodes ?? []);
+      const inner = wixInlineNodesToHtml(n.nodes ?? []);
       result += href ? `<a href="${href}">${inner || href}</a>` : inner;
+    } else if (n.nodes) {
+      // Nested inline container
+      result += wixInlineNodesToHtml(n.nodes);
     }
   }
   return result;

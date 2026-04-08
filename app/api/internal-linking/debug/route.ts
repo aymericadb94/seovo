@@ -53,7 +53,13 @@ export async function GET() {
       while ((match = regex.exec(post.content)) !== null) {
         hrefs.push(match[1]);
       }
-      linksInContent.push({ post_title: post.title, post_url: post.url, hrefs });
+      linksInContent.push({
+        post_title: post.title,
+        post_url: post.url,
+        hrefs,
+        content_preview: post.content.slice(0, 300),
+        content_length: post.content.length,
+      });
     }
 
     // Normalize helper
