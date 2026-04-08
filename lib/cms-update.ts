@@ -899,8 +899,10 @@ export function injectLinks(
   for (const link of links) {
     if (injected >= maxLinks) break;
 
-    // Don't self-link
-    if (link.target_url === pageUrl) continue;
+    // Don't self-link (normalize for comparison)
+    const normTarget = link.target_url.replace(/\/$/, "").replace(/^https?:\/\//, "").toLowerCase();
+    const normPage = pageUrl.replace(/\/$/, "").replace(/^https?:\/\//, "").toLowerCase();
+    if (normTarget === normPage) continue;
 
     const anchor = link.anchor?.trim();
     if (!anchor || anchor.length < 2) continue;
@@ -956,28 +958,25 @@ export function injectLinks(
     }
     if (partialInjected) continue;
 
-    // Strategy 3: Append a contextual link paragraph before the last </p>
-    // Find the last </p> that is NOT inside the last section (avoid conclusion clutter)
-    const pClosePositions: number[] = [];
-    const pCloseRegex = /<\/p>/gi;
-    let pMatch;
-    while ((pMatch = pCloseRegex.exec(result)) !== null) {
-      pClosePositions.push(pMatch.index);
-    }
-    // Insert before the 2nd-to-last </p> if possible, otherwise last
-    const insertIdx = pClosePositions.length >= 3
-      ? pClosePositions[pClosePositions.length - 2]
-      : pClosePositions.length >= 1
-        ? pClosePositions[pClosePositions.length - 1]
-        : -1;
+    // Strategy 3: Insert a "À lire aussi" paragraph into the content
+    const linkParagraph = `<p>À lire aussi : <a href="${link.target_url}" title="${link.target_title}">${anchor}</a></p>`;
 
-    if (insertIdx >= 0) {
-      const linkHtml = `</p>\n<p>À lire aussi : <a href="${link.target_url}" title="${link.target_title}">${anchor}</a></p>\n<p`;
-      // Replace </p> at insertIdx with the injected block
-      result = result.slice(0, insertIdx) + linkHtml + result.slice(insertIdx + 4);
+    // Try to insert before the last </p> (before conclusion)
+    const lastPClose = result.lastIndexOf("</p>");
+    if (lastPClose > 0) {
+      // Find 2nd-to-last </p> to avoid inserting at the very end
+      const beforeLast = result.lastIndexOf("</p>", lastPClose - 1);
+      const insertPos = beforeLast > 0 ? beforeLast + 4 : lastPClose + 4;
+      result = result.slice(0, insertPos) + "\n" + linkParagraph + "\n" + result.slice(insertPos);
       injected++;
       injectedLinks.push(link);
+      continue;
     }
+
+    // Strategy 4: No </p> found — append at the end (works with any content format)
+    result = result + "\n" + linkParagraph;
+    injected++;
+    injectedLinks.push(link);
   }
 
   return { html: result, injected, injectedLinks };

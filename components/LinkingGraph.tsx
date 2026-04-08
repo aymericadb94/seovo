@@ -126,7 +126,7 @@ export default function LinkingGraph() {
   const [applyingNode, setApplyingNode] = useState(false);
   const [appliedLinks, setAppliedLinks] = useState<Set<string>>(new Set()); // track "from|to|anchor"
   const [applyResult, setApplyResult] = useState<{ applied: { from_title: string; to_title: string; anchor: string }[]; skipped: { from_title: string; reason: string }[]; errors: string[] } | null>(null);
-  const [nodeApplyResult, setNodeApplyResult] = useState<{ ok: number; fail: number } | null>(null);
+  const [nodeApplyResult, setNodeApplyResult] = useState<{ ok: number; skipped: { from_title: string; reason: string }[]; errors: string[] } | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -272,23 +272,24 @@ export default function LinkingGraph() {
       const json = await res.json();
       if (json.result) {
         const ok = json.result.applied?.length ?? 0;
-        const fail = (json.result.skipped?.length ?? 0) + (json.result.errors?.length ?? 0);
-        setNodeApplyResult({ ok, fail });
-        // Mark applied
+        setNodeApplyResult({
+          ok,
+          skipped: json.result.skipped ?? [],
+          errors: json.result.errors ?? [],
+        });
         const newApplied = new Set(appliedLinks);
         for (const a of json.result.applied ?? []) {
           newApplied.add(`${a.from_title}|${a.to_title}|${a.anchor}`);
         }
         setAppliedLinks(newApplied);
-        // Refresh graph only if links were actually applied
         if (ok > 0) {
           setTimeout(() => runAnalysis(), 2000);
         }
       } else {
-        setNodeApplyResult({ ok: 0, fail: suggestions.length });
+        setNodeApplyResult({ ok: 0, skipped: [], errors: [json.error ?? "Erreur inconnue"] });
       }
     } catch {
-      setNodeApplyResult({ ok: 0, fail: suggestions.length });
+      setNodeApplyResult({ ok: 0, skipped: [], errors: ["Erreur réseau"] });
     } finally {
       setApplyingNode(false);
     }
@@ -1219,9 +1220,16 @@ export default function LinkingGraph() {
 
             {/* Apply result feedback */}
             {nodeApplyResult && (
-              <div className={`rounded-lg p-2 mb-3 text-[10px] font-bold ${nodeApplyResult.ok > 0 ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
-                {nodeApplyResult.ok > 0 && <span>{nodeApplyResult.ok} lien(s) appliqué(s)</span>}
-                {nodeApplyResult.fail > 0 && <span>{nodeApplyResult.ok > 0 ? " · " : ""}{nodeApplyResult.fail} ignoré(s)</span>}
+              <div className={`rounded-lg p-2 mb-3 text-[10px] space-y-1 ${nodeApplyResult.ok > 0 ? "bg-green-500/10 border border-green-500/20" : "bg-red-500/10 border border-red-500/20"}`}>
+                {nodeApplyResult.ok > 0 && (
+                  <p className="text-green-400 font-bold">{nodeApplyResult.ok} lien(s) appliqué(s)</p>
+                )}
+                {nodeApplyResult.skipped.map((s, i) => (
+                  <p key={i} className="text-yellow-400/80">{s.from_title} : {s.reason}</p>
+                ))}
+                {nodeApplyResult.errors.map((e, i) => (
+                  <p key={i} className="text-red-400">{e}</p>
+                ))}
               </div>
             )}
 

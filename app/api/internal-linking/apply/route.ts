@@ -12,6 +12,14 @@ import { listCmsPosts, updateCmsPost, injectLinks, type CmsCredentials, type Lin
 import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
+function normalizeUrl(url: string): string {
+  return url.replace(/\/$/, "").replace(/^https?:\/\//, "").toLowerCase();
+}
+
+function extractSlug(url: string): string {
+  return url.replace(/\/$/, "").split("/").filter(Boolean).pop() ?? "";
+}
+
 export const maxDuration = 120;
 
 type Suggestion = {
@@ -75,16 +83,29 @@ export async function POST(request: Request) {
     const bySource = new Map<string, { post_id: string | number; title: string; url: string; blogId?: number; links: LinkInjection[] }>();
 
     for (const s of suggestions) {
-      const normalizedFrom = s.from_url.replace(/\/$/, "").toLowerCase();
-      const fromSlug = normalizedFrom.split("/").filter(Boolean).pop() ?? "";
-      const post = cmsPosts.find(p => {
-        const pNorm = p.url.replace(/\/$/, "").toLowerCase();
-        if (pNorm === normalizedFrom) return true;
-        // Fuzzy: compare last path segment (slug)
-        const pSlug = pNorm.split("/").filter(Boolean).pop() ?? "";
-        return pSlug.length > 3 && pSlug === fromSlug;
-      });
-      if (!post) continue;
+      const normalizedFrom = normalizeUrl(s.from_url);
+      const fromSlug = extractSlug(s.from_url);
+
+      // Multi-strategy matching: URL → slug → title
+      let post = cmsPosts.find(p => normalizeUrl(p.url) === normalizedFrom);
+      if (!post && fromSlug.length > 3) {
+        post = cmsPosts.find(p => extractSlug(p.url) === fromSlug);
+      }
+      if (!post) {
+        // Title-based fallback: match by from_title
+        post = cmsPosts.find(p => p.title.toLowerCase() === s.from_title.toLowerCase());
+      }
+      if (!post && s.from_title) {
+        // Partial title match
+        const searchTitle = s.from_title.replace(/\.{3}$/, "").toLowerCase().trim();
+        if (searchTitle.length > 10) {
+          post = cmsPosts.find(p => p.title.toLowerCase().startsWith(searchTitle));
+        }
+      }
+      if (!post) {
+        console.warn("[apply] Source post not found:", s.from_url, s.from_title, "available:", cmsPosts.slice(0, 3).map(p => p.url));
+        continue;
+      }
 
       if (!bySource.has(normalizedFrom)) {
         const blogId = "blog_id" in post ? (post as { blog_id: number }).blog_id : undefined;
@@ -97,8 +118,10 @@ export async function POST(request: Request) {
         });
       }
 
+      // Use target title as fallback if anchor is empty
+      const anchor = s.anchor?.trim() || s.to_title?.split(":")[0]?.trim() || s.to_title;
       bySource.get(normalizedFrom)!.links.push({
-        anchor: s.anchor,
+        anchor,
         target_url: s.to_url,
         target_title: s.to_title,
       });
@@ -123,7 +146,10 @@ export async function POST(request: Request) {
       );
 
       if (injected === 0) {
-        result.skipped.push({ from_title: entry.title, reason: "Aucune ancre trouvée dans le contenu" });
+        const contentLen = post.content?.length ?? 0;
+        const anchors = entry.links.map(l => l.anchor).join(", ");
+        result.skipped.push({ from_title: entry.title, reason: `Ancre(s) non injectée(s) — contenu: ${contentLen} chars, ancres: "${anchors}"` });
+        console.warn("[apply] No anchors injected:", entry.title, "contentLen:", contentLen, "anchors:", anchors);
         continue;
       }
 
