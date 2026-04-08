@@ -76,6 +76,8 @@ export default function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [pubFilter, setPubFilter] = useState<"all" | "articles" | "pages" | "indexed" | "not_indexed">("all");
+  const [cmsPages, setCmsPages] = useState<{ id: string; title: string; url: string; keyword: string; published_at: string; page_type: "article" | "page" }[]>([]);
+  const [cmsPagesLoading, setCmsPagesLoading] = useState(false);
 
   // ── Tutorial (0=score, 1=cocon, 2=potentiel, 3=roadmap, 4=libre) ─────────────
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
@@ -296,6 +298,7 @@ export default function Dashboard() {
     loadProjections();
     loadCocoon();
     loadGscPerf();
+    loadCmsPages();
     window.addEventListener("focus", loadData);
     return () => window.removeEventListener("focus", loadData);
   }, []);
@@ -333,6 +336,19 @@ export default function Dashboard() {
     window.location.href = "/login";
   }
 
+  async function loadCmsPages() {
+    setCmsPagesLoading(true);
+    try {
+      const res = await fetch("/api/publications/list");
+      const json = await res.json();
+      if (json.pages) {
+        setCmsPages(json.pages);
+        if (json.synced > 0) setSyncResult(`${json.synced} page(s) auto-synchronisée(s)`);
+      }
+    } catch { /* ignore */ }
+    finally { setCmsPagesLoading(false); }
+  }
+
   async function syncPublications() {
     setSyncing(true);
     setSyncResult(null);
@@ -356,9 +372,10 @@ export default function Dashboard() {
   }
 
   async function checkIndexation() {
-    if (!data?.recentPublications.length) return;
+    const allPages = cmsPages.length > 0 ? cmsPages : (data?.recentPublications ?? []);
+    if (!allPages.length) return;
     setIndexationLoading(true);
-    const urls = data.recentPublications.filter(p => p.url).map(p => p.url);
+    const urls = allPages.filter(p => p.url).map(p => p.url);
     try {
       const res = await fetch("/api/gsc/inspect", {
         method: "POST",
@@ -1996,10 +2013,13 @@ export default function Dashboard() {
 
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden animate-fade-in-up delay-300">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
-                    <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Toutes les pages du site</p>
                     <div className="flex items-center gap-3">
-                      <button onClick={syncPublications} disabled={syncing} className="group flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-blue-500/40 text-gray-400 hover:text-blue-400 transition-all disabled:opacity-40">
-                        {syncing ? (<><span className="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" /> Sync...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/></svg>Synchroniser</>)}
+                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Toutes les pages du site</p>
+                      {cmsPages.length > 0 && <span className="text-xs text-gray-600 font-medium">{cmsPages.length} page(s)</span>}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => { loadCmsPages(); }} disabled={cmsPagesLoading} className="group flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-blue-500/40 text-gray-400 hover:text-blue-400 transition-all disabled:opacity-40">
+                        {cmsPagesLoading ? (<><span className="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" /> Scan CMS...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/></svg>Synchroniser</>)}
                       </button>
                       {syncResult && <span className="text-xs text-blue-400">{syncResult}</span>}
                       {data.site?.gsc_connected && data.site?.gsc_site_url && (
@@ -2018,11 +2038,11 @@ export default function Dashboard() {
                   {/* Filtres */}
                   <div className="flex items-center gap-2 px-6 py-3 border-b border-white/[0.06]">
                     {([
-                      { key: "all", label: "Toutes", count: data.recentPublications.length },
-                      { key: "articles", label: "Articles", count: data.recentPublications.filter(p => p.page_type === "article").length },
-                      { key: "pages", label: "Pages", count: data.recentPublications.filter(p => p.page_type === "page").length },
-                      { key: "indexed", label: "Indexees", count: data.recentPublications.filter(p => p.url && indexationResults[p.url]?.indexed === true).length },
-                      { key: "not_indexed", label: "Non indexees", count: data.recentPublications.filter(p => p.url && indexationResults[p.url]?.indexed === false).length },
+                      { key: "all", label: "Toutes", count: cmsPages.length },
+                      { key: "articles", label: "Articles", count: cmsPages.filter(p => p.page_type === "article").length },
+                      { key: "pages", label: "Pages", count: cmsPages.filter(p => p.page_type === "page").length },
+                      { key: "indexed", label: "Indexées", count: cmsPages.filter(p => p.url && indexationResults[p.url]?.indexed === true).length },
+                      { key: "not_indexed", label: "Non indexées", count: cmsPages.filter(p => p.url && indexationResults[p.url]?.indexed === false).length },
                     ] as { key: typeof pubFilter; label: string; count: number }[]).map(f => (
                       <button
                         key={f.key}
@@ -2038,8 +2058,13 @@ export default function Dashboard() {
                     ))}
                   </div>
 
-                  {(() => {
-                    const filtered = data.recentPublications.filter(pub => {
+                  {cmsPagesLoading && cmsPages.length === 0 ? (
+                    <div className="text-center py-16">
+                      <span className="w-6 h-6 rounded-full border-2 border-orange-400 border-t-transparent animate-spin inline-block mb-3" />
+                      <p className="text-gray-400 text-sm">Scan du CMS en cours...</p>
+                    </div>
+                  ) : (() => {
+                    const filtered = cmsPages.filter(pub => {
                       if (pubFilter === "articles") return pub.page_type === "article";
                       if (pubFilter === "pages") return pub.page_type === "page";
                       if (pubFilter === "indexed") return pub.url && indexationResults[pub.url]?.indexed === true;
@@ -2049,11 +2074,11 @@ export default function Dashboard() {
 
                     return filtered.length === 0 ? (
                       <div className="text-center py-16">
-                        <p className="text-white font-bold mb-2">{pubFilter === "all" ? "Aucune page pour l\u2019instant" : "Aucun r\u00e9sultat pour ce filtre"}</p>
-                        <p className="text-gray-500 text-sm mb-5">{pubFilter === "all" ? "Synchronisez votre CMS ou g\u00e9n\u00e9rez un article" : "Essayez un autre filtre ou synchronisez votre CMS"}</p>
+                        <p className="text-white font-bold mb-2">{pubFilter === "all" ? "Aucune page détectée" : "Aucun résultat pour ce filtre"}</p>
+                        <p className="text-gray-500 text-sm mb-5">{pubFilter === "all" ? "Cliquez sur Synchroniser pour scanner votre CMS" : "Essayez un autre filtre ou vérifiez l\u2019indexation"}</p>
                         {pubFilter === "all" && (
-                          <button onClick={() => handleManualPublish()} className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-6 py-2.5 rounded-lg text-sm uppercase tracking-wide">
-                            Lancer la publication maintenant
+                          <button onClick={() => loadCmsPages()} className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-black px-6 py-2.5 rounded-lg text-sm uppercase tracking-wide">
+                            Scanner le CMS
                           </button>
                         )}
                       </div>
@@ -2064,8 +2089,7 @@ export default function Dashboard() {
                             <tr className="border-b border-white/[0.05]">
                               <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Titre</th>
                               <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Type</th>
-                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Mot-cl\u00e9</th>
-                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Date</th>
+                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Mot-clé</th>
                               <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Indexation</th>
                               <th className="px-6 py-3" />
                             </tr>
@@ -2082,24 +2106,23 @@ export default function Dashboard() {
                                     </span>
                                   </td>
                                   <td className="px-6 py-4">
-                                    {pub.keyword && pub.keyword !== "__page__" ? (
+                                    {pub.keyword ? (
                                       <span className="bg-orange-500/10 text-orange-400 text-xs font-bold px-2.5 py-1 rounded-full">{pub.keyword}</span>
                                     ) : (
-                                      <span className="text-gray-700 text-xs">\u2014</span>
+                                      <span className="text-gray-700 text-xs">—</span>
                                     )}
                                   </td>
-                                  <td className="px-6 py-4 text-gray-500 text-sm whitespace-nowrap">{new Date(pub.published_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}</td>
                                   <td className="px-6 py-4">
-                                    {!idx ? (<span className="text-gray-700 text-xs">\u2014</span>) : idx.indexed === true ? (
-                                      <span className="flex items-center gap-1.5 text-xs font-bold text-green-400"><span className="w-1.5 h-1.5 bg-green-400 rounded-full" /> Index\u00e9</span>
+                                    {!idx ? (<span className="text-gray-700 text-xs">—</span>) : idx.indexed === true ? (
+                                      <span className="flex items-center gap-1.5 text-xs font-bold text-green-400"><span className="w-1.5 h-1.5 bg-green-400 rounded-full" /> Indexé</span>
                                     ) : idx.indexed === false ? (
-                                      <span className="flex items-center gap-1.5 text-xs font-bold text-red-400"><span className="w-1.5 h-1.5 bg-red-400 rounded-full" /> Non index\u00e9</span>
+                                      <span className="flex items-center gap-1.5 text-xs font-bold text-red-400"><span className="w-1.5 h-1.5 bg-red-400 rounded-full" /> Non indexé</span>
                                     ) : (
                                       <span className="text-gray-500 text-xs">Inconnu</span>
                                     )}
                                   </td>
                                   <td className="px-6 py-4 text-right">
-                                    {pub.url && <a href={pub.url} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors">Voir \u2192</a>}
+                                    {pub.url && <a href={pub.url} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors">Voir →</a>}
                                   </td>
                                 </tr>
                               );
