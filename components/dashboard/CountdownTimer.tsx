@@ -7,13 +7,8 @@ export default function CountdownTimer({ targetIso }: { targetIso: string | null
   const [time, setTime] = useState({ h: 0, m: 0, s: 0, ms: 0 });
   const [glow, setGlow] = useState(false);
   const prevSec = useRef(-1);
-  const totalDurationRef = useRef(0);
 
   useEffect(() => {
-    if (targetIso) {
-      const initial = new Date(targetIso).getTime() - Date.now();
-      if (initial > 0) totalDurationRef.current = initial;
-    }
     function calc() {
       if (!targetIso) { setTime({ h: 0, m: 0, s: 0, ms: 0 }); return; }
       const diff = new Date(targetIso).getTime() - Date.now();
@@ -33,11 +28,9 @@ export default function CountdownTimer({ targetIso }: { targetIso: string | null
   }, [targetIso]);
 
   const hasTime = time.ms > 0 && targetIso;
-  // Use the actual initial duration for progress, fallback to 24h
-  const total = totalDurationRef.current > 0 ? totalDurationRef.current : 24 * 60 * 60 * 1000;
-  const remaining = time.ms;
-  const elapsed = total - remaining;
-  const progress = hasTime ? Math.max(2, Math.min(98, (elapsed / total) * 100)) : 0;
+  // Progress = how far through a 24h cycle we are (daily publication)
+  const CYCLE_MS = 24 * 60 * 60 * 1000;
+  const progress = hasTime ? Math.max(2, Math.min(98, ((CYCLE_MS - time.ms) / CYCLE_MS) * 100)) : 0;
 
   return (
     <div className="flex flex-col gap-4 w-full">
