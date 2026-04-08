@@ -159,18 +159,33 @@ FORMAT JSON uniquement:
 
   // ── Step 12: Contrôle final qualité ────────────────────────────────
   results.push(await testAiStep(12, "Contrôle final qualité", "final_check",
-    `Contrôle final qualité SEO de ce contenu. Vérifie complétude, cohérence, structure, naturalité. Mot-clé: "${KW}".
+    `Tu es un expert SEO. Effectue un contrôle final qualité de ce contenu avant publication.
 
-CONTENU:
+Mot-clé principal : "${KW}"
+
+CONTENU HTML :
 ${TEST_HTML}
 
-FORMAT JSON uniquement:
-{"quality_score": 85, "seo_score": 80, "final_verdict": "ready", "final_content": "le HTML validé/corrigé", "issues": [], "improvements": []}`,
+IMPORTANT : Tu DOIS retourner le champ "final_content" avec le HTML complet (corrigé ou identique si déjà bon).
+
+FORMAT JSON uniquement, sans texte avant ou après :
+{
+  "quality_score": 85,
+  "seo_score": 80,
+  "readability_score": 85,
+  "issues": ["problème éventuel"],
+  "improvements": ["amélioration appliquée"],
+  "final_verdict": "ready",
+  "final_content": "<h1>Le contenu HTML complet ici</h1>..."
+}`,
     (d) => {
-      const data = d as { final_content?: string; final_verdict?: string; quality_score?: number };
-      if (!data.final_content) return "Pas de final_content";
-      if (!data.final_verdict) return "Pas de final_verdict";
-      return `ok (verdict: ${data.final_verdict}, quality: ${data.quality_score ?? "?"}/100)`;
+      const data = d as Record<string, unknown>;
+      // Try multiple field names in case AI uses different naming
+      const content = (data.final_content ?? data.finalContent ?? data.content ?? data.corrected_content) as string | undefined;
+      const verdict = (data.final_verdict ?? data.finalVerdict ?? data.verdict) as string | undefined;
+      if (!content) return `Pas de final_content. Clés retournées: ${Object.keys(data).join(", ")}`;
+      if (!verdict) return `ok mais pas de verdict (${content.length} chars)`;
+      return `ok (verdict: ${verdict}, quality: ${(data.quality_score as number) ?? "?"}/100)`;
     }
   ));
 
