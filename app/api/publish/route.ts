@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { publishToWix } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
-import { fetchPexelsImage } from "@/lib/pexels";
+import { fetchPexelsImage, fetchPexelsImages, injectImagesIntoHtml } from "@/lib/pexels";
 import { shopifyFetch } from "@/lib/shopify";
 
 async function uploadImageToWordPress(
@@ -119,7 +119,23 @@ export async function POST(request: Request) {
       return Response.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const { title, content, meta_description = "", keyword = "", cover_image_query = null, cover_alt_text = null } = await request.json();
+    const { title, content: rawContent, meta_description = "", keyword = "", cover_image_query = null, cover_alt_text = null, section_image_queries = [] } = await request.json();
+
+    // Inject inline images into content
+    let content = rawContent as string;
+    const imgQueries = (section_image_queries as string[]) ?? [];
+    if (imgQueries.length > 0) {
+      try {
+        const images = await fetchPexelsImages(imgQueries, 3);
+        const imgArray = [...images.values()].map(img => ({ url: img.url, alt: img.alt }));
+        if (imgArray.length > 0) {
+          content = injectImagesIntoHtml(content, imgArray, 3);
+          console.log(`[publish] ${imgArray.length} inline images injected`);
+        }
+      } catch (err) {
+        console.error("[publish] inline image injection failed (non-fatal):", err);
+      }
+    }
 
     // Lire la config du site de l'utilisateur
     const { data: site, error: siteError } = await supabase

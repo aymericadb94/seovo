@@ -114,6 +114,12 @@ QUALITÉ — RÈGLES ABSOLUES :
 - Voix active. Direct. Concret.
 - Contenu total : 1500-2200 mots.
 
+IMAGES — OBLIGATOIRE :
+- Génère "section_image_queries" : un tableau de 2-4 requêtes Pexels en anglais (3-5 mots chacune).
+- Chaque requête doit correspondre à une section différente de l'article.
+- Requêtes spécifiques et visuelles (ex: "vintage clothing wholesale warehouse" pas "clothes").
+- Aucune requête ne doit être identique à "pexels_query" (cover image).
+
 ---
 
 FORMAT DE SORTIE : JSON valide uniquement.
@@ -223,7 +229,8 @@ function buildJsonSchema(
   }
 
   schema.internal_links = '[{ "anchor": "...", "target": "..." }]';
-  schema.pexels_query = '"3-5 english keywords"';
+  schema.pexels_query = '"3-5 english keywords for cover image"';
+  schema.section_image_queries = '["3-5 english keywords for section 1 image", "for section 2", "for section 3"]';
   schema.cover_alt_text = '"Texte alt SEO"';
 
   const entries = Object.entries(schema)
@@ -413,6 +420,7 @@ export async function generatePageSync(ctx: PageContext): Promise<AssembledPage 
     blocks,
     internal_links: (parsed.internal_links as { anchor: string; target: string }[]) ?? [],
     pexels_query: (parsed.pexels_query as string) ?? "",
+    section_image_queries: (parsed.section_image_queries as string[]) ?? [],
     cover_alt_text: (parsed.cover_alt_text as string) ?? "",
     engine: {
       version: ENGINE_VERSION,

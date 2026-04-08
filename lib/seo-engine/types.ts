@@ -192,6 +192,7 @@ export type AssembledPage = {
   blocks: PageBlock[];
   internal_links: { anchor: string; target: string }[];
   pexels_query: string;
+  section_image_queries: string[];
   cover_alt_text: string;
   // Metadata moteur
   engine: {

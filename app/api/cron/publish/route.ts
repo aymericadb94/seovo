@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { sendArticlePublishedEmail } from "@/lib/email";
 import { publishToWix, analyzeWixSite } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
-import { fetchPexelsImage } from "@/lib/pexels";
+import { fetchPexelsImage, fetchPexelsImages, injectImagesIntoHtml } from "@/lib/pexels";
 import { emitEvent, createPublicationEvent, createMilestoneEvent } from "@/lib/seo-events";
 import { recordAction } from "@/lib/seo-feedback";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
@@ -185,6 +185,8 @@ QUALITY REQUIREMENTS (premium SEO agency level):
 
 8. INTERNAL LINKING: Naturally integrate mentions of other site topics to create internal linking opportunities.
 
+9. IMAGES: Generate 3 different Pexels search queries (in English, 3-5 keywords each) for inline images — one per main section. Each must be specific to the section content and different from the cover image query.
+
 RESPONSE FORMAT: Valid JSON only, no text before or after.
 
 {
@@ -192,6 +194,7 @@ RESPONSE FORMAT: Valid JSON only, no text before or after.
   "meta_description": "The 150-160 character meta description",
   "cover_image_query": "3-5 english keywords for a relevant stock photo (e.g. 'vintage clothing warehouse wholesale')",
   "cover_alt_text": "SEO-optimized alt text, 8-12 words, includes main keyword, written in the article language",
+  "section_image_queries": ["english query for section 1 image", "english query for section 2 image", "english query for section 3 image"],
   "content": "The complete HTML content with all tags"
 }
 
@@ -213,6 +216,7 @@ HTML content must use: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table
     content: string;
     cover_image_query?: string;
     cover_alt_text?: string;
+    section_image_queries?: string[];
   }>(aiResult.text);
 
   if (!parsed) throw new Error("Format de réponse Claude invalide");
@@ -509,9 +513,24 @@ export async function GET(request: Request) {
             language,
             cocoonData,
           );
-          const content = linkedContent;
+          let content = linkedContent;
           if (outgoingLinks > 0) {
             logger.info(`[cron] ${outgoingLinks} outgoing links added to "${title}"`);
+          }
+
+          // ── Injection d'images inline via Pexels ──
+          const sectionImgQueries = generated.section_image_queries ?? [];
+          if (sectionImgQueries.length > 0) {
+            try {
+              const images = await fetchPexelsImages(sectionImgQueries, 3);
+              const imgArray = [...images.values()].map(img => ({ url: img.url, alt: img.alt }));
+              if (imgArray.length > 0) {
+                content = injectImagesIntoHtml(content, imgArray, 3);
+                logger.info(`[cron] ${imgArray.length} inline images injected into "${title}"`);
+              }
+            } catch (imgErr) {
+              logger.warn("Inline image injection failed (non-fatal)", { context: "cron/publish", error: imgErr });
+            }
           }
 
           let publishedUrl = "";

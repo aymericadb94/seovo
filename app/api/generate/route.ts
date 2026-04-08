@@ -402,6 +402,7 @@ export async function POST(request: Request) {
         meta_description: page.meta_description,
         cover_image_query: page.pexels_query,
         cover_alt_text: page.cover_alt_text,
+        section_image_queries: page.section_image_queries ?? [],
         structured: {
           hero: page.blocks.find(b => b.type === "hero")?.data,
           quick_answer: (page.blocks.find(b => b.type === "quick_answer")?.data as { answer: string } | undefined)?.answer,
@@ -630,7 +631,8 @@ MAILLAGE INTERNE
 ${cocoonPos ? "Les liens sortants obligatoires sont définis ci-dessus. Intègre-les dans les sections du contenu principal." : "Propose 2 à 4 liens internes avec ancrage naturel."}
 
 IMAGE
-- Génère une requête Pexels précise (3-5 mots-clés en anglais).
+- Génère une requête Pexels précise pour la couverture (3-5 mots-clés en anglais).
+- Génère 3 requêtes Pexels différentes pour les images inline (1 par section principale). Chaque requête doit être spécifique au contenu de la section et différente de la couverture.
 
 MÉTA DONNÉES
 - title SEO : optimisé CTR, 50-60 caractères, contient le mot-clé.
@@ -699,7 +701,8 @@ FORMAT DE SORTIE : JSON valide uniquement, aucun texte avant ou après.
     { "anchor": "texte d'ancrage", "target": "slug-ou-url" }
   ],
   "pexels_query": "3-5 english keywords",
-  "cover_alt_text": "Texte alt SEO 8-12 mots"
+  "cover_alt_text": "Texte alt SEO 8-12 mots",
+  "section_image_queries": ["english query for section 1 image", "english query for section 2 image", "english query for section 3 image"]
 }
 
 HTML autorisé dans les champs content/scenario : <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <table>, <thead>, <tbody>, <tr>, <th>, <td>. Pas de <h2> dans content (le H2 est le champ title). Pas de <html>, <body>, <head>.`;
@@ -739,6 +742,7 @@ HTML autorisé dans les champs content/scenario : <h3>, <p>, <ul>, <ol>, <li>, <
       internal_links?: { anchor: string; target: string }[];
       pexels_query?: string;
       cover_alt_text?: string;
+      section_image_queries?: string[];
     };
 
     const parsed = parseAiJson<StructuredPage>(aiResult.text);
@@ -756,6 +760,7 @@ HTML autorisé dans les champs content/scenario : <h3>, <p>, <ul>, <ol>, <li>, <
       meta_description: parsed.meta_description,
       cover_image_query: parsed.pexels_query ?? null,
       cover_alt_text: parsed.cover_alt_text ?? null,
+      section_image_queries: parsed.section_image_queries ?? [],
       // Données structurées pour le preview moderne
       structured: {
         hero: parsed.hero,

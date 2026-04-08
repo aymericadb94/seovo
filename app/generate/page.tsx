@@ -41,6 +41,7 @@ type GeneratedArticle = {
   meta_description: string;
   cover_image_query?: string | null;
   cover_alt_text?: string | null;
+  section_image_queries?: string[] | null;
   structured?: StructuredData | null;
 };
 
@@ -462,7 +463,7 @@ export default function GeneratePage() {
       };
 
       const parsed = parseJson(fullText) as {
-        title?: string; meta_description?: string; pexels_query?: string; cover_alt_text?: string;
+        title?: string; meta_description?: string; pexels_query?: string; cover_alt_text?: string; section_image_queries?: string[];
         // Nouveau format structuré
         hero?: { title: string; subtitle: string; promise: string; cta: string | null };
         quick_answer?: string;
@@ -740,6 +741,7 @@ export default function GeneratePage() {
         meta_description: optimizedMeta,
         cover_image_query: parsed.pexels_query ?? null,
         cover_alt_text: parsed.cover_alt_text ?? null,
+        section_image_queries: parsed.section_image_queries ?? null,
         structured: structuredData,
       };
 
@@ -1007,6 +1009,7 @@ export default function GeneratePage() {
           keyword: activeKeyword,
           cover_image_query: article.cover_image_query ?? null,
           cover_alt_text: article.cover_alt_text ?? null,
+          section_image_queries: article.section_image_queries ?? [],
         }),
       });
 
