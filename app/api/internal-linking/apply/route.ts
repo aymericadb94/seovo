@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       }
       if (!post && s.from_title) {
         // Partial title match
-        const searchTitle = s.from_title.replace(/\.{3}$/, "").toLowerCase().trim();
+        const searchTitle = s.from_title.replace(/[.…]+$/, "").toLowerCase().trim();
         if (searchTitle.length > 10) {
           post = cmsPosts.find(p => p.title.toLowerCase().startsWith(searchTitle));
         }
@@ -175,12 +175,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // Log skipped suggestions where source wasn't found
+    // Log skipped suggestions where source wasn't found (use same normalizeUrl)
     const processedUrls = new Set([...bySource.keys()]);
     for (const s of suggestions) {
-      if (!processedUrls.has(s.from_url.replace(/\/$/, "").toLowerCase())) {
+      const normUrl = normalizeUrl(s.from_url);
+      if (!processedUrls.has(normUrl)) {
         result.skipped.push({ from_title: s.from_title, reason: "URL source introuvable dans le CMS" });
-        processedUrls.add(s.from_url.replace(/\/$/, "").toLowerCase());
+        processedUrls.add(normUrl);
       }
     }
 
