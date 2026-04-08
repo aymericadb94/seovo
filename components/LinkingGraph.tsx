@@ -127,6 +127,7 @@ export default function LinkingGraph() {
   const [appliedLinks, setAppliedLinks] = useState<Set<string>>(new Set()); // track "from|to|anchor"
   const [applyResult, setApplyResult] = useState<{ applied: { from_title: string; to_title: string; anchor: string }[]; skipped: { from_title: string; reason: string }[]; errors: string[] } | null>(null);
   const [nodeApplyResult, setNodeApplyResult] = useState<{ ok: number; skipped: { from_title: string; reason: string }[]; errors: string[] } | null>(null);
+  const [linkPopup, setLinkPopup] = useState<{ applied: { from_title: string; to_title: string; anchor: string }[]; skipped: { from_title: string; reason: string }[]; errors: string[] } | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -237,17 +238,17 @@ export default function LinkingGraph() {
       });
       const json = await res.json();
       if (json.error) {
-        setApplyResult({ applied: [], skipped: [], errors: [json.error] });
+        setLinkPopup({ applied: [], skipped: [], errors: [json.error] });
       } else if (json.result) {
         setApplyResult(json.result);
+        setLinkPopup({ applied: json.result.applied ?? [], skipped: json.result.skipped ?? [], errors: json.result.errors ?? [] });
         setSelectedSuggestionIds(new Set());
-        // Re-run analysis only if links were applied
         if ((json.result.applied?.length ?? 0) > 0) {
           setTimeout(() => runAnalysis(), 2000);
         }
       }
     } catch {
-      setApplyResult({ applied: [], skipped: [], errors: ["Erreur lors de l'application"] });
+      setLinkPopup({ applied: [], skipped: [], errors: ["Erreur lors de l'application"] });
     } finally {
       setApplying(false);
     }
@@ -274,11 +275,8 @@ export default function LinkingGraph() {
       const json = await res.json();
       if (json.result) {
         const ok = json.result.applied?.length ?? 0;
-        setNodeApplyResult({
-          ok,
-          skipped: json.result.skipped ?? [],
-          errors: json.result.errors ?? [],
-        });
+        setNodeApplyResult({ ok, skipped: json.result.skipped ?? [], errors: json.result.errors ?? [] });
+        setLinkPopup({ applied: json.result.applied ?? [], skipped: json.result.skipped ?? [], errors: json.result.errors ?? [] });
         const newApplied = new Set(appliedLinks);
         for (const a of json.result.applied ?? []) {
           newApplied.add(`${a.from_title}|${a.to_title}|${a.anchor}`);
@@ -288,10 +286,10 @@ export default function LinkingGraph() {
           setTimeout(() => runAnalysis(), 2000);
         }
       } else {
-        setNodeApplyResult({ ok: 0, skipped: [], errors: [json.error ?? "Erreur inconnue"] });
+        setLinkPopup({ applied: [], skipped: [], errors: [json.error ?? "Erreur inconnue"] });
       }
     } catch {
-      setNodeApplyResult({ ok: 0, skipped: [], errors: ["Erreur réseau"] });
+      setLinkPopup({ applied: [], skipped: [], errors: ["Erreur réseau"] });
     } finally {
       setApplyingNode(false);
     }
@@ -1519,6 +1517,282 @@ export default function LinkingGraph() {
 
       {/* ── Score comment ────────────────────────────────────────────────── */}
       <p className="text-gray-600 text-xs text-center">{data.score_comment}</p>
+
+      {/* ── Link applied popup ─────────────────────────────────────────── */}
+      {linkPopup && (
+        <LinkAppliedPopup
+          applied={linkPopup.applied}
+          skipped={linkPopup.skipped}
+          errors={linkPopup.errors}
+          onClose={() => setLinkPopup(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Link Applied Popup with animation ────────────────────────────────────────
+
+function LinkAppliedPopup({
+  applied,
+  skipped,
+  errors,
+  onClose,
+}: {
+  applied: { from_title: string; to_title: string; anchor: string }[];
+  skipped: { from_title: string; reason: string }[];
+  errors: string[];
+  onClose: () => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hasSuccess = applied.length > 0;
+
+  // Connection animation
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || applied.length === 0) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const W = 320;
+    const H = Math.min(160, 60 + applied.length * 40);
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.scale(dpr, dpr);
+
+    // Build node pairs
+    type Dot = { x: number; y: number; label: string; color: string };
+    type Connection = { from: Dot; to: Dot; progress: number; delay: number; particles: { t: number; speed: number }[] };
+
+    const connections: Connection[] = applied.slice(0, 5).map((a, i) => {
+      const yPos = 30 + i * 32;
+      return {
+        from: { x: 45, y: yPos, label: truncate(a.from_title, 14), color: "#f97316" },
+        to: { x: W - 45, y: yPos, label: truncate(a.to_title, 14), color: "#22c55e" },
+        progress: 0,
+        delay: i * 0.3,
+        particles: [
+          { t: 0, speed: 0.008 + Math.random() * 0.004 },
+          { t: 0.3, speed: 0.006 + Math.random() * 0.004 },
+        ],
+      };
+    });
+
+    let t = 0;
+    let rafId: number;
+
+    function draw() {
+      if (!ctx) return;
+      t += 0.016;
+      ctx.clearRect(0, 0, W, H);
+
+      for (const c of connections) {
+        const elapsed = Math.max(0, t - c.delay);
+        c.progress = Math.min(1, elapsed * 1.2);
+
+        const { from, to } = c;
+        const midX = (from.x + to.x) / 2;
+        const midY = from.y - 12 + Math.sin(t * 2 + c.delay) * 3;
+
+        // Connection line (animated draw)
+        if (c.progress > 0) {
+          ctx.beginPath();
+          ctx.moveTo(from.x, from.y);
+
+          // Draw partial bezier
+          const steps = Math.floor(c.progress * 30);
+          for (let s = 1; s <= steps; s++) {
+            const p = s / 30;
+            const x = (1 - p) * (1 - p) * from.x + 2 * (1 - p) * p * midX + p * p * to.x;
+            const y = (1 - p) * (1 - p) * from.y + 2 * (1 - p) * p * midY + p * p * to.y;
+            ctx.lineTo(x, y);
+          }
+
+          const grad = ctx.createLinearGradient(from.x, 0, to.x, 0);
+          grad.addColorStop(0, "rgba(249,115,22,0.6)");
+          grad.addColorStop(1, "rgba(34,197,94,0.6)");
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+
+        // Traveling particles (after line is drawn)
+        if (c.progress >= 1) {
+          for (const particle of c.particles) {
+            particle.t = (particle.t + particle.speed) % 1;
+            const p = particle.t;
+            const px = (1 - p) * (1 - p) * from.x + 2 * (1 - p) * p * midX + p * p * to.x;
+            const py = (1 - p) * (1 - p) * from.y + 2 * (1 - p) * p * midY + p * p * to.y;
+
+            const glow = ctx.createRadialGradient(px, py, 0, px, py, 6);
+            glow.addColorStop(0, `rgba(249,115,22,${0.8 + Math.sin(t * 8) * 0.2})`);
+            glow.addColorStop(1, "rgba(249,115,22,0)");
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(px, py, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.arc(px, py, 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // Source node
+        const fromScale = c.progress > 0 ? 1 : 0.5;
+        ctx.beginPath();
+        ctx.arc(from.x, from.y, 8 * fromScale, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(249,115,22,0.15)";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(from.x, from.y, 5 * fromScale, 0, Math.PI * 2);
+        ctx.fillStyle = from.color;
+        ctx.fill();
+
+        // Target node
+        const toScale = c.progress >= 1 ? 1 : 0.3 + c.progress * 0.7;
+        ctx.beginPath();
+        ctx.arc(to.x, to.y, 8 * toScale, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(34,197,94,0.15)";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(to.x, to.y, 5 * toScale, 0, Math.PI * 2);
+        ctx.fillStyle = to.color;
+        ctx.fill();
+
+        // Checkmark on complete
+        if (c.progress >= 1) {
+          const checkAlpha = Math.min(1, (elapsed - 0.85) * 3);
+          if (checkAlpha > 0) {
+            ctx.save();
+            ctx.globalAlpha = checkAlpha;
+            ctx.strokeStyle = "#22c55e";
+            ctx.lineWidth = 2;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(to.x - 3, to.y);
+            ctx.lineTo(to.x - 1, to.y + 2.5);
+            ctx.lineTo(to.x + 3, to.y - 2.5);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        // Labels
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.font = "bold 7px system-ui";
+        ctx.textAlign = "right";
+        ctx.fillText(from.label, from.x - 12, from.y + 3);
+        ctx.textAlign = "left";
+        ctx.fillText(to.label, to.x + 12, to.y + 3);
+      }
+
+      rafId = requestAnimationFrame(draw);
+    }
+
+    rafId = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(rafId);
+  }, [applied]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+      style={{ animation: "fadeIn 0.2s ease-out" }}
+    >
+      <div
+        className="relative bg-[#141418] border border-white/[0.1] rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4"
+        onClick={e => e.stopPropagation()}
+        style={{ animation: "popIn 0.3s cubic-bezier(0.16,1,0.3,1)" }}
+      >
+        {/* Close button */}
+        <button onClick={onClose} className="absolute top-3 right-3 text-gray-600 hover:text-gray-300 text-sm">
+          ✕
+        </button>
+
+        {/* Header */}
+        <div className="flex items-center gap-2 mb-4">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${hasSuccess ? "bg-green-500/15 text-green-400" : "bg-red-500/15 text-red-400"}`}>
+            {hasSuccess ? "✓" : "!"}
+          </div>
+          <div>
+            <p className="text-white font-bold text-sm">
+              {hasSuccess ? `${applied.length} lien${applied.length > 1 ? "s" : ""} appliqué${applied.length > 1 ? "s" : ""}` : "Aucun lien appliqué"}
+            </p>
+            <p className="text-gray-500 text-[10px]">
+              {hasSuccess ? "Maillage interne mis à jour" : "Vérifiez les détails ci-dessous"}
+            </p>
+          </div>
+        </div>
+
+        {/* Canvas animation */}
+        {applied.length > 0 && (
+          <div className="mb-4 flex justify-center">
+            <canvas ref={canvasRef} />
+          </div>
+        )}
+
+        {/* Applied links detail */}
+        {applied.length > 0 && (
+          <div className="space-y-2 mb-3">
+            {applied.map((a, i) => (
+              <div key={i} className="flex items-center gap-2 text-[11px]" style={{ animation: `slideIn 0.3s ease-out ${0.1 + i * 0.08}s both` }}>
+                <span className="text-green-400 text-xs">✓</span>
+                <span className="text-gray-300 truncate flex-1">{truncate(a.from_title, 22)}</span>
+                <span className="text-orange-400">→</span>
+                <span className="text-gray-300 truncate flex-1">{truncate(a.to_title, 22)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Skipped */}
+        {skipped.length > 0 && (
+          <div className="border-t border-white/[0.06] pt-2 mt-2 space-y-1">
+            <p className="text-yellow-400/70 text-[10px] font-bold">{skipped.length} ignoré(s)</p>
+            {skipped.map((s, i) => (
+              <p key={i} className="text-yellow-400/50 text-[10px] truncate">{s.from_title} — {s.reason}</p>
+            ))}
+          </div>
+        )}
+
+        {/* Errors */}
+        {errors.length > 0 && (
+          <div className="border-t border-white/[0.06] pt-2 mt-2 space-y-1">
+            {errors.map((e, i) => (
+              <p key={i} className="text-red-400 text-[10px]">{e}</p>
+            ))}
+          </div>
+        )}
+
+        {/* Close CTA */}
+        <button
+          onClick={onClose}
+          className="w-full mt-4 py-2 rounded-xl text-xs font-bold bg-white/[0.05] hover:bg-white/[0.1] text-gray-300 transition-all"
+        >
+          Fermer
+        </button>
+      </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.9) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateX(-8px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
     </div>
   );
 }
