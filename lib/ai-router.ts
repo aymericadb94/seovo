@@ -60,6 +60,8 @@ export type TaskType =
   | "content_enrichment"      // Existing content improvement
   | "meta_optimization"       // Title/meta description optimization
   | "linking_enrichment"      // Linking analysis enrichment (opportunities)
+  | "retroactive_linking"     // Retroactive link injection in existing articles
+  | "cron_outgoing_linking"   // Outgoing link insertion during cron publish
   | "recalc_intermediate"     // Intermediate recalculation
   | "seo_engine_execution"    // SEO engine content production
 
@@ -98,6 +100,8 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
   content_enrichment: "sonnet",
   meta_optimization: "sonnet",
   linking_enrichment: "sonnet",
+  retroactive_linking: "sonnet",
+  cron_outgoing_linking: "sonnet",
   recalc_intermediate: "sonnet",
   seo_engine_execution: "sonnet",
 
@@ -135,6 +139,8 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   content_enrichment: 4000,
   meta_optimization: 3000,
   linking_enrichment: 500,
+  retroactive_linking: 2000,
+  cron_outgoing_linking: 10000,
   recalc_intermediate: 4000,
   seo_engine_execution: 8000,
 

@@ -279,6 +279,17 @@ const STEPS = [
       </svg>
     ),
   },
+  {
+    id: "retroactive-linking",
+    label: "Maillage rétroactif",
+    sub: "Mise à jour des anciens articles avec liens vers le nouveau",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+      </svg>
+    ),
+  },
 ];
 
 const SOURCE_BADGES: Record<string, { label: string; color: string; bg: string }> = {
@@ -1032,8 +1043,27 @@ export default function GeneratePage() {
           }),
         });
       } catch {
-        // Non-blocking — failure doesn't affect published page
         console.warn("[roadmap-integrate] Non-blocking error, skipping");
+      }
+
+      // ── Step 15: Retroactive internal linking ──────────────────
+      setCurrentStep(15);
+      try {
+        const retroRes = await fetch("/api/internal-linking/retroactive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            keyword: activeKeyword,
+            title: article.title,
+            url: data.url,
+          }),
+        });
+        const retroData = await retroRes.json();
+        if (retroData.result?.updated_pages?.length > 0) {
+          console.log(`[retroactive] ${retroData.result.updated_pages.length} pages mises à jour`);
+        }
+      } catch {
+        console.warn("[retroactive-linking] Non-blocking error, skipping");
       }
 
       setStatus("done");

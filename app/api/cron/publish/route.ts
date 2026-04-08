@@ -8,6 +8,8 @@ import { recordAction } from "@/lib/seo-feedback";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
 import { shopifyFetch } from "@/lib/shopify";
 import { logger } from "@/lib/logger";
+import { addOutgoingLinks, addRetroactiveLinks } from "@/lib/internal-linking-engine";
+import type { CmsCredentials } from "@/lib/cms-update";
 
 function createAdminClient() {
   return createClient(
@@ -478,7 +480,7 @@ export async function GET(request: Request) {
         const keyword = keywordsToPublish[f] ?? keywords[totalPublished % keywords.length];
 
         for (const language of targetLanguages) {
-          const { title, content, meta_description, cover_image_query, cover_alt_text } = await generateArticle({
+          const generated = await generateArticle({
             keyword,
             allKeywords: keywords,
             businessName: site.business_name,
@@ -488,6 +490,26 @@ export async function GET(request: Request) {
             language,
             styleGuide,
           });
+
+          const { title, meta_description, cover_image_query, cover_alt_text } = generated;
+
+          // ── Maillage sortant : liens FROM nouvel article TO pages existantes ──
+          const { data: existingPubs } = await supabase
+            .from("publications")
+            .select("title, keyword, wordpress_url")
+            .eq("site_id", site.id);
+
+          const { content: linkedContent, links_added: outgoingLinks } = await addOutgoingLinks(
+            generated.content,
+            keyword,
+            title,
+            existingPubs ?? [],
+            language
+          );
+          const content = linkedContent;
+          if (outgoingLinks > 0) {
+            logger.info(`[cron] ${outgoingLinks} outgoing links added to "${title}"`);
+          }
 
           let publishedUrl = "";
 
@@ -547,6 +569,30 @@ export async function GET(request: Request) {
           });
           if (insertError) {
             logger.error("Failed to record publication in DB", { context: "cron/publish", userId: site.user_id, error: new Error(insertError.message) });
+          }
+
+          // ── Maillage rétroactif : liens FROM anciens articles TO nouveau ──
+          if (publishedUrl) {
+            try {
+              const creds: CmsCredentials = {
+                cms: site.cms,
+                site_url: site.site_url,
+                wp_username: site.wp_username,
+                wp_app_password: site.wp_app_password,
+                shopify_api_key: site.shopify_api_key,
+                shopify_store_url: site.shopify_store_url,
+                wix_api_key: site.wix_api_key,
+                wix_site_id: site.wix_site_id,
+                custom_api_url: site.custom_api_url,
+                custom_api_key: site.custom_api_key,
+              };
+              const retro = await addRetroactiveLinks(supabase, site.user_id, creds, { keyword, title, url: publishedUrl });
+              if (retro.updated_pages.length > 0) {
+                logger.info(`[cron] Retroactive linking: ${retro.updated_pages.length} pages updated for "${title}"`);
+              }
+            } catch (err) {
+              logger.warn("Retroactive linking failed (non-blocking)", { context: "cron/publish", userId: site.user_id, error: err });
+            }
           }
 
           // ── SEO Event hook — enregistrer la publication pour le recalcul ──
