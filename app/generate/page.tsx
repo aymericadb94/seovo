@@ -579,9 +579,10 @@ export default function GeneratePage() {
             const data = await res.json() as T;
             const result = extract(data);
             if (result) {
+              const prevLen = articleContent.length;
               articleContent = result;
               stepResults[step] = "success";
-              console.log(`[step ${step}] ${url} → OK`);
+              console.log(`[step ${step}] ${url} → OK (${prevLen} → ${result.length} chars, delta: ${result.length - prevLen > 0 ? "+" : ""}${result.length - prevLen})`);
             } else {
               stepResults[step] = "skipped";
               console.log(`[step ${step}] ${url} → skipped (no extractable result)`);
