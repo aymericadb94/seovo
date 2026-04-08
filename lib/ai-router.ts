@@ -351,8 +351,12 @@ export function aiCallStream(
           encoder.encode(`data: ${JSON.stringify({ type: "done", text: fullText, stop_reason: stopReason })}\n\n`)
         );
       } catch (err) {
+        const rawMsg = err instanceof Error ? err.message : "Erreur inconnue";
+        const userMsg = rawMsg.toLowerCase().includes("network") || rawMsg.toLowerCase().includes("timeout") || rawMsg.toLowerCase().includes("econnreset")
+          ? "Erreur de connexion avec l'IA — veuillez réessayer dans quelques secondes"
+          : rawMsg;
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ type: "error", error: err instanceof Error ? err.message : "Erreur inconnue" })}\n\n`)
+          encoder.encode(`data: ${JSON.stringify({ type: "error", error: userMsg })}\n\n`)
         );
       } finally {
         controller.close();
