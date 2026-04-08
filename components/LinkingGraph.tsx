@@ -169,9 +169,9 @@ export default function LinkingGraph() {
   useEffect(() => {
     const fg = graphRef.current;
     if (!fg || !data) return;
-    fg.d3Force("charge")?.strength(-600).distanceMax(600);
-    fg.d3Force("link")?.distance(140);
-    fg.d3Force("center")?.strength(0.03);
+    fg.d3Force("charge")?.strength(-250).distanceMax(400);
+    fg.d3Force("link")?.distance(80);
+    fg.d3Force("center")?.strength(0.05);
   }, [data]);
 
   async function loadData() {
@@ -363,7 +363,7 @@ export default function LinkingGraph() {
 
   // (Animation frame counter removed — cards don't pulse)
 
-  // ── Node rendering — large readable cards ───────────────────────────────
+  // ── Node rendering — compact dots with label on hover ────────────────────
   const paintNode = useCallback((node: GraphNode, ctx: CanvasRenderingContext2D) => {
     const { x = 0, y = 0, role } = node;
     const hovered = hoveredNodeRef.current;
@@ -376,108 +376,113 @@ export default function LinkingGraph() {
       ? neighborMap.get(activeNode.id)?.has(node.id) ?? false
       : false;
     const isDimmed = activeNode && !isHighlighted && !isNeighbor;
-    const opacity = isDimmed ? 0.15 : 1;
 
-    ctx.globalAlpha = opacity;
+    ctx.globalAlpha = isDimmed ? 0.15 : 1;
 
     const isLinked = node.incoming > 0 || node.outgoing > 0;
     const isPillar = role === "pillar";
 
-    // ── Card dimensions — always show title inside ──
-    const fontSize = isPillar ? 10 : 9;
-    ctx.font = `${isPillar ? "bold " : ""}${fontSize}px Inter, system-ui, sans-serif`;
-    const label = truncate(node.label, isPillar ? 28 : 22);
-    const textW = ctx.measureText(label).width;
-    const padX = 12, padY = 6;
-    const cardW = textW + padX * 2;
-    const cardH = fontSize + padY * 2;
-    const r = cardH / 2;
+    // ── Circle radius based on importance ──
+    const baseR = isPillar ? 14 : isLinked ? 10 : 7;
+    const r = isHighlighted ? baseR + 3 : baseR;
 
     // ── Glow ──
-    if ((isLinked || isPillar) && !isDimmed) {
-      const glowR = cardW * 0.4 + 12;
-      const gradient = ctx.createRadialGradient(x, y, cardH * 0.3, x, y, glowR);
-      if (isHighlighted) {
-        gradient.addColorStop(0, isPillar ? "rgba(249,115,22,0.4)" : "rgba(249,115,22,0.25)");
-        gradient.addColorStop(1, "rgba(249,115,22,0)");
-      } else {
-        gradient.addColorStop(0, "rgba(249,115,22,0.08)");
-        gradient.addColorStop(1, "rgba(249,115,22,0)");
-      }
+    if (!isDimmed && (isLinked || isHighlighted)) {
+      const glowR = r + (isHighlighted ? 16 : 8);
+      const gradient = ctx.createRadialGradient(x, y, r * 0.5, x, y, glowR);
+      const alpha = isHighlighted ? 0.35 : 0.12;
+      gradient.addColorStop(0, `rgba(249,115,22,${alpha})`);
+      gradient.addColorStop(1, "rgba(249,115,22,0)");
       ctx.beginPath();
       ctx.arc(x, y, glowR, 0, 2 * Math.PI);
       ctx.fillStyle = gradient;
       ctx.fill();
     }
 
-    // ── Card body ──
-    const cx = x - cardW / 2, cy = y - cardH / 2;
+    // ── Circle body ──
     ctx.beginPath();
-    ctx.roundRect(cx, cy, cardW, cardH, r);
+    ctx.arc(x, y, r, 0, 2 * Math.PI);
 
     if (isLinked || isPillar) {
-      if (isHighlighted) {
-        ctx.fillStyle = "rgba(249,115,22,0.95)";
-      } else if (isPillar) {
-        ctx.fillStyle = "rgba(249,115,22,0.7)";
-      } else {
-        ctx.fillStyle = "rgba(249,115,22,0.45)";
-      }
+      ctx.fillStyle = isHighlighted ? "#f97316"
+        : isPillar ? "rgba(249,115,22,0.85)"
+        : "rgba(249,115,22,0.5)";
     } else {
-      // Orphan — grey
-      ctx.fillStyle = isHighlighted ? "rgba(100,116,139,0.85)" : "rgba(51,65,85,0.6)";
+      ctx.fillStyle = isHighlighted ? "rgba(100,116,139,0.9)" : "rgba(71,85,105,0.5)";
     }
     ctx.fill();
 
     // Border
-    if (isHighlighted) {
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    } else if (isPillar) {
-      ctx.strokeStyle = "rgba(249,115,22,0.6)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
+    ctx.strokeStyle = isHighlighted ? "#fff"
+      : isPillar ? "rgba(249,115,22,0.5)"
+      : isLinked ? "rgba(249,115,22,0.2)"
+      : "rgba(100,116,139,0.3)";
+    ctx.lineWidth = isHighlighted ? 2.5 : isPillar ? 2 : 1;
+    ctx.stroke();
 
-    // ── Text inside card ──
-    ctx.fillStyle = isHighlighted ? "#fff" : isLinked ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.7)";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, x, y + 0.5);
-
-    // ── Pillar badge ──
-    if (isPillar && !isDimmed) {
-      const badgeR = 4;
-      ctx.beginPath();
-      ctx.arc(x + cardW / 2 - 2, cy - 2, badgeR, 0, 2 * Math.PI);
-      ctx.fillStyle = "#f97316";
-      ctx.fill();
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 1;
-      ctx.stroke();
+    // ── Pillar "P" inside ──
+    if (isPillar) {
       ctx.fillStyle = "#fff";
-      ctx.font = "bold 5px Inter, system-ui, sans-serif";
+      ctx.font = `bold ${isHighlighted ? 11 : 9}px Inter, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("P", x + cardW / 2 - 2, cy - 1.5);
+      ctx.fillText("P", x, y + 0.5);
     }
 
-    // ── Stats badge (entrants/sortants) on hover ──
-    if (isHighlighted) {
-      const statsText = `↙${node.incoming} ↗${node.outgoing}`;
-      ctx.font = "bold 8px Inter, system-ui, sans-serif";
-      const statsW = ctx.measureText(statsText).width + 8;
-      const statsH = 14;
-      const statsY = y + cardH / 2 + 4;
-      ctx.beginPath();
-      ctx.roundRect(x - statsW / 2, statsY, statsW, statsH, 4);
-      ctx.fillStyle = "rgba(0,0,0,0.8)";
-      ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.7)";
+    // ── Link count inside circle (non-pillar linked pages) ──
+    if (isLinked && !isPillar && !isHighlighted) {
+      const total = node.incoming + node.outgoing;
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = "bold 7px Inter, system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(statsText, x, statsY + statsH / 2);
+      ctx.fillText(String(total), x, y + 0.5);
+    }
+
+    // ── Label + stats tooltip on hover/selected/neighbor ──
+    if (isHighlighted || (isNeighbor && !!activeNode)) {
+      const label = node.label;
+      const fontSize = isHighlighted ? 11 : 9;
+      ctx.font = `${isHighlighted ? "bold " : ""}${fontSize}px Inter, system-ui, sans-serif`;
+      const textW = ctx.measureText(label).width;
+      const padX = 8, padY = 4;
+      const bgW = textW + padX * 2;
+      const bgH = fontSize + padY * 2;
+      const labelY = y - r - 8;
+
+      // Background
+      ctx.beginPath();
+      ctx.roundRect(x - bgW / 2, labelY - bgH, bgW, bgH, 6);
+      ctx.fillStyle = isHighlighted ? "rgba(0,0,0,0.9)" : "rgba(0,0,0,0.75)";
+      ctx.fill();
+      if (isHighlighted) {
+        ctx.strokeStyle = "rgba(249,115,22,0.4)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // Text
+      ctx.fillStyle = isHighlighted ? "#fff" : "rgba(255,255,255,0.85)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x, labelY - bgH / 2);
+
+      // Stats badge below node on highlight
+      if (isHighlighted) {
+        const stats = `${node.incoming} entrant${node.incoming !== 1 ? "s" : ""} · ${node.outgoing} sortant${node.outgoing !== 1 ? "s" : ""}`;
+        ctx.font = "9px Inter, system-ui, sans-serif";
+        const sW = ctx.measureText(stats).width + 12;
+        const sH = 16;
+        const sY = y + r + 6;
+        ctx.beginPath();
+        ctx.roundRect(x - sW / 2, sY, sW, sH, 4);
+        ctx.fillStyle = "rgba(0,0,0,0.85)";
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(stats, x, sY + sH / 2);
+      }
     }
 
     ctx.globalAlpha = 1;
@@ -1099,16 +1104,11 @@ export default function LinkingGraph() {
             nodePointerAreaPaint={(node, color, ctx) => {
               const n = node as unknown as GraphNode;
               const isPillar = n.role === "pillar";
-              // Generous hitbox matching the card size
-              const fontSize = isPillar ? 10 : 9;
-              ctx.font = `${isPillar ? "bold " : ""}${fontSize}px Inter, system-ui, sans-serif`;
-              const label = n.label.length > (isPillar ? 28 : 22) ? n.label.slice(0, isPillar ? 28 : 22) + "..." : n.label;
-              const textW = ctx.measureText(label).width;
-              const cardW = textW + 24 + 10; // padX*2 + extra padding
-              const cardH = fontSize + 12 + 10;
+              const isLinked = n.incoming > 0 || n.outgoing > 0;
+              const r = (isPillar ? 14 : isLinked ? 10 : 7) + 8; // generous padding
               const x = n.x ?? 0, y = n.y ?? 0;
               ctx.beginPath();
-              ctx.roundRect(x - cardW / 2, y - cardH / 2, cardW, cardH, cardH / 2);
+              ctx.arc(x, y, r, 0, 2 * Math.PI);
               ctx.fillStyle = color;
               ctx.fill();
             }}
