@@ -135,6 +135,12 @@ export async function POST() {
         link_score: p.link_score,
         position: p.position,
       })),
+      existing_links: analysis.existing_links.map(l => ({
+        from_url: l.from_url,
+        from_title: l.from_title,
+        to_url: l.to_url,
+        to_title: l.to_title,
+      })),
       opportunities: opportunities ?? [],
     };
 

@@ -44,12 +44,20 @@ type ClusterAnalysis = {
 type OrphanPage = { url: string; title: string; reason: string };
 type UnderlinkedPage = { url: string; title: string; incoming: number; needed: number };
 
+type ExistingLink = {
+  from_url: string;
+  from_title: string;
+  to_url: string;
+  to_title: string;
+};
+
 type LinkingData = {
   score: number;
   score_label: string;
   score_comment: string;
   cluster_analysis: ClusterAnalysis[];
   suggestions: Suggestion[];
+  existing_links?: ExistingLink[];
   orphan_pages: OrphanPage[];
   underlinked_pages: UnderlinkedPage[];
   page_profiles: PageProfile[];
@@ -118,16 +126,18 @@ export default function LinkingGraph() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 
-  // Pré-calculer les voisins pour l'effet de focus
+  // Pré-calculer les voisins pour l'effet de focus (existing + suggestions)
   const neighborMap = useMemo(() => {
     const map = new Map<string, Set<string>>();
     if (!data) return map;
-    data.suggestions.forEach(s => {
-      if (!map.has(s.from_url)) map.set(s.from_url, new Set());
-      if (!map.has(s.to_url)) map.set(s.to_url, new Set());
-      map.get(s.from_url)!.add(s.to_url);
-      map.get(s.to_url)!.add(s.from_url);
-    });
+    const addPair = (a: string, b: string) => {
+      if (!map.has(a)) map.set(a, new Set());
+      if (!map.has(b)) map.set(b, new Set());
+      map.get(a)!.add(b);
+      map.get(b)!.add(a);
+    };
+    data.suggestions.forEach(s => addPair(s.from_url, s.to_url));
+    (data.existing_links ?? []).forEach(l => addPair(l.from_url, l.to_url));
     return map;
   }, [data]);
 
@@ -226,21 +236,35 @@ export default function LinkingGraph() {
       };
     });
 
-    // Build links from suggestions
-    const allLinks: GraphLink[] = data.suggestions.map((s, i) => {
-      const typeColors: Record<string, string> = {
-        seo: "rgba(249,115,22,0.35)",
-        ux: "rgba(59,130,246,0.30)",
-        conversion: "rgba(34,197,94,0.30)",
-      };
-      return {
+    // Build links — existing (real) + suggestions (recommended)
+    const allLinks: GraphLink[] = [];
+
+    // Existing links from CMS content (real <a> tags)
+    const existingLinks = data.existing_links ?? [];
+    existingLinks.forEach((l, i) => {
+      allLinks.push({
+        source: l.from_url,
+        target: l.to_url,
+        weight: 1.5,
+        type: "existing",
+        color: "rgba(249,115,22,0.4)",
+        curvature: 0.1 + (i % 4) * 0.04,
+      });
+    });
+
+    // Suggestion links (dashed, dimmer)
+    const existingPairs = new Set(existingLinks.map(l => `${l.from_url}|${l.to_url}`));
+    data.suggestions.forEach((s, i) => {
+      // Skip suggestions that duplicate existing links
+      if (existingPairs.has(`${s.from_url}|${s.to_url}`)) return;
+      allLinks.push({
         source: s.from_url,
         target: s.to_url,
-        weight: s.priority === "haute" ? 2.5 : s.priority === "moyenne" ? 1.5 : 1,
-        type: s.objective,
-        color: typeColors[s.objective] ?? "rgba(255,255,255,0.1)",
+        weight: s.priority === "haute" ? 1.5 : 1,
+        type: "suggestion",
+        color: "rgba(255,255,255,0.08)",
         curvature: 0.15 + (i % 3) * 0.05,
-      };
+      });
     });
 
     // Filter
@@ -412,7 +436,7 @@ export default function LinkingGraph() {
     ctx.globalAlpha = 1;
   }, [selectedNode, neighborMap, drawPill]);
 
-  // ── Link rendering — curved orange lines ──────────────────────────────────
+  // ── Link rendering — existing (solid orange) vs suggestions (dashed grey) ─
   const paintLink = useCallback((link: GraphLink, ctx: CanvasRenderingContext2D) => {
     const src = link.source as unknown as GraphNode;
     const tgt = link.target as unknown as GraphNode;
@@ -423,22 +447,24 @@ export default function LinkingGraph() {
     const activeNode = hovered || selectedNode;
     const isRelated = activeNode && (src.id === activeNode.id || tgt.id === activeNode.id);
     const isDimmed = activeNode && !isRelated;
+    const isExisting = link.type === "existing";
 
     ctx.globalAlpha = isDimmed ? 0.04 : 1;
 
     // Curved line with control point
     const dx = tx - sx, dy = ty - sy;
     const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1) { ctx.globalAlpha = 1; return; }
     const curveOffset = dist * 0.15 * link.curvature;
     const mx = (sx + tx) / 2 - dy / dist * curveOffset;
     const my = (sy + ty) / 2 + dx / dist * curveOffset;
 
-    // Glow for active links
-    if (isRelated) {
+    // Glow for existing active links
+    if (isRelated && isExisting) {
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.quadraticCurveTo(mx, my, tx, ty);
-      ctx.strokeStyle = "rgba(249,115,22,0.25)";
+      ctx.strokeStyle = "rgba(249,115,22,0.3)";
       ctx.lineWidth = link.weight * 4;
       ctx.stroke();
     }
@@ -447,27 +473,40 @@ export default function LinkingGraph() {
     ctx.beginPath();
     ctx.moveTo(sx, sy);
     ctx.quadraticCurveTo(mx, my, tx, ty);
-    ctx.strokeStyle = isRelated ? "rgba(249,115,22,0.8)" : "rgba(249,115,22,0.15)";
-    ctx.lineWidth = isRelated ? link.weight * 1.5 : link.weight * 0.8;
-    ctx.stroke();
 
-    // Arrow at midpoint
-    const t = 0.55;
-    const arrowX = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * mx + t * t * tx;
-    const arrowY = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * my + t * t * ty;
-    const tangentX = 2 * (1 - t) * (mx - sx) + 2 * t * (tx - mx);
-    const tangentY = 2 * (1 - t) * (my - sy) + 2 * t * (ty - my);
-    const angle = Math.atan2(tangentY, tangentX);
-    const arrowLen = isRelated ? 6 : 4;
-
-    ctx.beginPath();
-    ctx.moveTo(arrowX, arrowY);
-    ctx.lineTo(arrowX - arrowLen * Math.cos(angle - Math.PI / 6), arrowY - arrowLen * Math.sin(angle - Math.PI / 6));
-    ctx.moveTo(arrowX, arrowY);
-    ctx.lineTo(arrowX - arrowLen * Math.cos(angle + Math.PI / 6), arrowY - arrowLen * Math.sin(angle + Math.PI / 6));
-    ctx.strokeStyle = isRelated ? "rgba(255,255,255,0.5)" : "rgba(249,115,22,0.1)";
-    ctx.lineWidth = 1;
+    if (isExisting) {
+      ctx.strokeStyle = isRelated ? "rgba(249,115,22,0.9)" : "rgba(249,115,22,0.3)";
+      ctx.lineWidth = isRelated ? link.weight * 1.8 : link.weight;
+    } else {
+      // Suggestions: dashed, grey
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = isRelated ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.06)";
+      ctx.lineWidth = isRelated ? 1.2 : 0.6;
+    }
     ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Arrow at midpoint (only for existing links or related suggestions)
+    if (isExisting || isRelated) {
+      const t = 0.55;
+      const arrowX = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * mx + t * t * tx;
+      const arrowY = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * my + t * t * ty;
+      const tangentX = 2 * (1 - t) * (mx - sx) + 2 * t * (tx - mx);
+      const tangentY = 2 * (1 - t) * (my - sy) + 2 * t * (ty - my);
+      const angle = Math.atan2(tangentY, tangentX);
+      const arrowLen = isRelated ? 6 : 4;
+
+      ctx.beginPath();
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(arrowX - arrowLen * Math.cos(angle - Math.PI / 6), arrowY - arrowLen * Math.sin(angle - Math.PI / 6));
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(arrowX - arrowLen * Math.cos(angle + Math.PI / 6), arrowY - arrowLen * Math.sin(angle + Math.PI / 6));
+      ctx.strokeStyle = isExisting
+        ? (isRelated ? "rgba(249,115,22,0.7)" : "rgba(249,115,22,0.2)")
+        : "rgba(255,255,255,0.25)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
 
     ctx.globalAlpha = 1;
   }, [selectedNode]);
@@ -673,7 +712,7 @@ export default function LinkingGraph() {
           style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.06)" }}
         >
           {/* Legend */}
-          <div className="absolute top-3 left-3 z-10 flex flex-col gap-2 bg-black/40 backdrop-blur-sm rounded-xl px-3 py-2.5 border border-white/[0.06]">
+          <div className="absolute top-3 left-3 z-10 flex flex-col gap-2 bg-black/50 backdrop-blur-sm rounded-xl px-3 py-2.5 border border-white/[0.06]">
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-2.5 rounded-full" style={{ background: "linear-gradient(90deg, #f97316, #ef4444)", boxShadow: "0 0 8px rgba(249,115,22,0.5)" }} />
               <span className="text-[10px] text-gray-400 font-medium">Page maillée</span>
@@ -689,6 +728,16 @@ export default function LinkingGraph() {
             <div className="flex items-center gap-2.5">
               <div className="w-6 h-2 rounded-full" style={{ background: "#4b5563" }} />
               <span className="text-[10px] text-gray-400 font-medium">Orpheline</span>
+            </div>
+            <div className="mt-1 pt-1 border-t border-white/[0.06] flex flex-col gap-1.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-0.5" style={{ background: "rgba(249,115,22,0.5)" }} />
+                <span className="text-[10px] text-gray-500">Lien existant</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-0" style={{ borderTop: "1px dashed rgba(255,255,255,0.2)" }} />
+                <span className="text-[10px] text-gray-500">Suggestion</span>
+              </div>
             </div>
           </div>
 

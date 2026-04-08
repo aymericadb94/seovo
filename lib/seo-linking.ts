@@ -64,12 +64,20 @@ export type ClusterStrength = {
   avg_position: number | null;
 };
 
+export type ExistingLink = {
+  from_url: string;
+  from_title: string;
+  to_url: string;
+  to_title: string;
+};
+
 export type LinkingAnalysis = {
   page_profiles: PageLinkProfile[];
   cluster_strengths: ClusterStrength[];
   orphan_pages: { url: string; title: string; reason: string }[];
   underlinked_pages: { url: string; title: string; incoming: number; needed: number }[];
   suggestions: LinkSuggestion[];
+  existing_links: ExistingLink[];
   global_score: number;
   global_label: string;
 };
@@ -130,7 +138,10 @@ export async function analyzeLinking(
     supabase, userId, profiles, cocoon, gscByQuery, roadmapArticles, siteUrl
   );
 
-  // 7. Global score
+  // 7. Extract existing links from CMS content
+  const existingLinks = extractExistingLinks(cmsPosts, publications, siteUrl);
+
+  // 8. Global score
   const globalScore = computeGlobalScore(profiles, clusterStrengths, orphans);
   const globalLabel = globalScore >= 75 ? "Excellent" : globalScore >= 50 ? "Bon" : globalScore >= 25 ? "Moyen" : "Faible";
 
@@ -140,6 +151,7 @@ export async function analyzeLinking(
     orphan_pages: orphans,
     underlinked_pages: underlinked,
     suggestions,
+    existing_links: existingLinks,
     global_score: globalScore,
     global_label: globalLabel,
   };
@@ -652,6 +664,73 @@ function computeGlobalScore(
 // ══════════════════════════════════════════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXISTING LINKS EXTRACTION — Scan CMS content for real <a> tags
+// ══════════════════════════════════════════════════════════════════════════════
+
+function extractExistingLinks(
+  cmsPosts: CmsPost[],
+  publications: { title: string; keyword: string; wordpress_url: string | null }[],
+  siteUrl: string
+): ExistingLink[] {
+  const links: ExistingLink[] = [];
+  const domain = (() => { try { return new URL(siteUrl).hostname; } catch { return ""; } })();
+  const seen = new Set<string>();
+
+  // Build URL → title lookup from CMS posts + publications
+  const urlToTitle = new Map<string, string>();
+  for (const p of cmsPosts) {
+    urlToTitle.set(normalizeUrl(p.url), p.title);
+  }
+  for (const p of publications) {
+    if (p.wordpress_url) {
+      urlToTitle.set(normalizeUrl(p.wordpress_url), p.title);
+    }
+  }
+
+  // All known internal URLs (normalized)
+  const knownUrls = new Set([...urlToTitle.keys()]);
+
+  for (const post of cmsPosts) {
+    const fromUrl = post.url;
+    const fromNorm = normalizeUrl(fromUrl);
+    const fromTitle = post.title;
+
+    const regex = /<a[^>]+href=["']([^"']+)["']/gi;
+    let match;
+    while ((match = regex.exec(post.content)) !== null) {
+      const href = match[1];
+      let targetNorm: string | null = null;
+
+      try {
+        const u = new URL(href, siteUrl);
+        if (u.hostname === domain) {
+          targetNorm = normalizeUrl(u.href);
+        }
+      } catch {
+        if (href.startsWith("/")) {
+          targetNorm = href.replace(/\/$/, "").toLowerCase();
+        }
+      }
+
+      if (!targetNorm || targetNorm === fromNorm) continue;
+      if (!knownUrls.has(targetNorm)) continue;
+
+      const pairKey = `${fromNorm}|${targetNorm}`;
+      if (seen.has(pairKey)) continue;
+      seen.add(pairKey);
+
+      // Find the full URL for the target
+      const toTitle = urlToTitle.get(targetNorm) ?? targetNorm;
+      const toUrl = cmsPosts.find(p => normalizeUrl(p.url) === targetNorm)?.url ?? href;
+
+      links.push({ from_url: fromUrl, from_title: fromTitle, to_url: toUrl, to_title: toTitle });
+    }
+  }
+
+  return links;
+}
 
 function normalizeUrl(url: string): string {
   try {
