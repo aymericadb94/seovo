@@ -299,6 +299,7 @@ export default function Dashboard() {
     loadCocoon();
     loadGscPerf();
     loadCmsPages();
+    loadIndexationCache();
     window.addEventListener("focus", loadData);
     return () => window.removeEventListener("focus", loadData);
   }, []);
@@ -334,6 +335,14 @@ export default function Dashboard() {
     const supabase = createClient();
     await supabase.auth.signOut();
     window.location.href = "/login";
+  }
+
+  async function loadIndexationCache() {
+    try {
+      const res = await fetch("/api/gsc/inspect");
+      const json = await res.json();
+      if (json.results) setIndexationResults(json.results);
+    } catch { /* ignore */ }
   }
 
   async function loadCmsPages() {
