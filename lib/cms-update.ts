@@ -243,66 +243,68 @@ async function wixListPosts(
       { headers: wixHeaders(apiKey, siteId) }
     );
     if (!res.ok) return [];
-    const data = await res.json() as {
-      posts: {
-        id: string;
-        title: string;
-        slug?: string;
-        content?: WixDraftBlock[] | WixContentBlock;
-        richContent?: { nodes: WixRichNode[] };
-        url?: { base: string; path: string };
-        excerpt?: string;
-      }[];
-    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await res.json() as { posts?: any[] };
 
     const base = siteUrl?.replace(/\/$/, "") ?? "";
 
-    return (data.posts ?? []).map(p => {
-      // Build URL: prefer url.base+path, fallback to site_url/post/slug
+    return (data.posts ?? []).map((p: Record<string, unknown>) => {
+      const title = (p.title as string) ?? "";
+      const slug = (p.slug as string) ?? "";
+      const excerpt = (p.excerpt as string) ?? "";
+      const urlObj = p.url as { base?: string; path?: string } | undefined;
+
+      // Build URL
       let postUrl = "";
-      if (p.url?.base && p.url?.path) {
-        postUrl = `${p.url.base}${p.url.path}`;
-      } else if (p.slug) {
-        postUrl = `${base}/post/${p.slug}`;
+      if (urlObj?.base && urlObj?.path) {
+        postUrl = `${urlObj.base}${urlObj.path}`;
+      } else if (slug) {
+        postUrl = `${base}/post/${slug}`;
       }
 
-      // Convert content to HTML — handle all possible formats
+      // Convert content to HTML — Wix sends content as a JSON string
       let html = "";
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let contentObj: any = p.content;
-        // If content is a JSON string, parse it
-        if (typeof contentObj === "string") {
-          try { contentObj = JSON.parse(contentObj); } catch { /* not JSON */ }
+        let raw = p.content;
+        // Step 1: if string, parse JSON
+        if (typeof raw === "string") {
+          try { raw = JSON.parse(raw); } catch { /* if it contains HTML, use as-is */ }
         }
-        if (contentObj) {
-          if (Array.isArray(contentObj)) {
-            // Direct array of blocks
-            html = wixDraftBlocksToHtml(contentObj, {});
-          } else if (Array.isArray(contentObj.blocks)) {
-            // { blocks: [...], entityMap: {...} }
-            html = wixDraftBlocksToHtml(contentObj.blocks, contentObj.entityMap ?? {});
-          } else if (typeof contentObj === "string" && contentObj.includes("<")) {
-            // Already HTML
-            html = contentObj;
+        // Step 2: if still a string (raw HTML or unparseable), use directly
+        if (typeof raw === "string") {
+          html = raw;
+        } else if (raw && typeof raw === "object") {
+          const obj = raw as Record<string, unknown>;
+          if (Array.isArray(obj)) {
+            // Direct array of Draft.js blocks
+            html = wixDraftBlocksToHtml(obj as WixDraftBlock[], {});
+          } else if (Array.isArray(obj.blocks)) {
+            // { blocks: [...], entityMap: {...} } — standard Draft.js format
+            html = wixDraftBlocksToHtml(
+              obj.blocks as WixDraftBlock[],
+              (obj.entityMap ?? {}) as Record<string, WixDraftEntity>
+            );
           }
         }
       } catch { /* non-fatal */ }
-      if (!html && p.richContent?.nodes?.length) {
-        html = wixRichContentToHtml(p.richContent.nodes);
+
+      // Fallback: try richContent
+      const rc = p.richContent as { nodes?: WixRichNode[] } | undefined;
+      if (!html && rc?.nodes?.length) {
+        html = wixRichContentToHtml(rc.nodes);
       }
-      // Last resort: use excerpt as content
-      if (!html && p.excerpt) {
-        html = `<p>${p.excerpt}</p>`;
+      // Last resort: excerpt
+      if (!html && excerpt) {
+        html = `<p>${excerpt}</p>`;
       }
 
       return {
-        id: p.id,
-        wix_id: p.id,
-        title: p.title,
+        id: (p.id as string) ?? "",
+        wix_id: (p.id as string) ?? "",
+        title,
         content: html,
         url: postUrl,
-        excerpt: p.excerpt ?? "",
+        excerpt,
       };
     });
   } catch {
