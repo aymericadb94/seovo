@@ -172,7 +172,7 @@ function buildPageProfiles(
   const allUrls = cmsPosts.map(p => p.url);
 
   for (const post of cmsPosts) {
-    const pub = publications.find(p => p.wordpress_url && normalizeUrl(p.wordpress_url) === normalizeUrl(post.url));
+    const pub = publications.find(p => p.wordpress_url && urlsMatch(p.wordpress_url, post.url));
     const keyword = pub?.keyword ?? "";
 
     // Find cluster membership
@@ -678,19 +678,21 @@ function extractExistingLinks(
   const domain = (() => { try { return new URL(siteUrl).hostname; } catch { return ""; } })();
   const seen = new Set<string>();
 
-  // Build URL → title lookup from CMS posts + publications
+  // Build normalized-pathname → title lookup from CMS posts + publications
   const urlToTitle = new Map<string, string>();
   for (const p of cmsPosts) {
-    urlToTitle.set(normalizeUrl(p.url), p.title);
+    const norm = normalizeUrl(p.url);
+    urlToTitle.set(norm, p.title);
   }
   for (const p of publications) {
     if (p.wordpress_url) {
-      urlToTitle.set(normalizeUrl(p.wordpress_url), p.title);
+      const norm = normalizeUrl(p.wordpress_url);
+      if (!urlToTitle.has(norm)) urlToTitle.set(norm, p.title);
     }
   }
 
-  // All known internal URLs (normalized)
-  const knownUrls = new Set([...urlToTitle.keys()]);
+  // All known internal URLs (raw list for fuzzy matching)
+  const knownUrlsList = [...urlToTitle.keys()];
 
   for (const post of cmsPosts) {
     const fromUrl = post.url;
@@ -701,29 +703,34 @@ function extractExistingLinks(
     let match;
     while ((match = regex.exec(post.content)) !== null) {
       const href = match[1];
-      let targetNorm: string | null = null;
+      let resolvedHref: string | null = null;
 
       try {
         const u = new URL(href, siteUrl);
         if (u.hostname === domain) {
-          targetNorm = normalizeUrl(u.href);
+          resolvedHref = u.href;
         }
       } catch {
         if (href.startsWith("/")) {
-          targetNorm = href.replace(/\/$/, "").toLowerCase();
+          resolvedHref = href;
         }
       }
 
-      if (!targetNorm || targetNorm === fromNorm) continue;
-      if (!knownUrls.has(targetNorm)) continue;
+      if (!resolvedHref) continue;
+      const targetNorm = normalizeUrl(resolvedHref);
+      if (targetNorm === fromNorm) continue;
 
-      const pairKey = `${fromNorm}|${targetNorm}`;
+      // Fuzzy match against known URLs
+      const matchedKey = knownUrlsList.find(k => k === targetNorm || urlsMatch(resolvedHref!, k));
+      if (!matchedKey) continue;
+
+      const pairKey = `${fromNorm}|${matchedKey}`;
       if (seen.has(pairKey)) continue;
       seen.add(pairKey);
 
       // Find the full URL for the target
-      const toTitle = urlToTitle.get(targetNorm) ?? targetNorm;
-      const toUrl = cmsPosts.find(p => normalizeUrl(p.url) === targetNorm)?.url ?? href;
+      const toTitle = urlToTitle.get(matchedKey) ?? targetNorm;
+      const toUrl = cmsPosts.find(p => urlsMatch(p.url, resolvedHref!))?.url ?? href;
 
       links.push({ from_url: fromUrl, from_title: fromTitle, to_url: toUrl, to_title: toTitle });
     }
@@ -741,13 +748,30 @@ function normalizeUrl(url: string): string {
   }
 }
 
+/** Extract the last path segment (slug) for fuzzy matching */
+function extractSlug(url: string): string {
+  const norm = normalizeUrl(url);
+  const parts = norm.split("/").filter(Boolean);
+  return parts[parts.length - 1] ?? "";
+}
+
+/** Fuzzy URL comparison: exact pathname OR same slug */
+function urlsMatch(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (normalizeUrl(a) === normalizeUrl(b)) return true;
+  // Fallback: compare slugs (last segment)
+  const slugA = extractSlug(a);
+  const slugB = extractSlug(b);
+  return slugA.length > 3 && slugA === slugB;
+}
+
 function matchesPage(
   cocoonPage: { keyword: string; url?: string },
   postUrl: string,
   postKeyword: string
 ): boolean {
-  if (cocoonPage.url && normalizeUrl(cocoonPage.url) === normalizeUrl(postUrl)) return true;
-  if (cocoonPage.keyword.toLowerCase() === postKeyword.toLowerCase()) return true;
+  if (cocoonPage.url && urlsMatch(cocoonPage.url, postUrl)) return true;
+  if (postKeyword && cocoonPage.keyword.toLowerCase() === postKeyword.toLowerCase()) return true;
   return false;
 }
 
@@ -770,22 +794,20 @@ function countLinksInHtml(html: string, siteUrls: string[], siteUrl: string): nu
 }
 
 function countIncomingLinks(targetUrl: string, allPosts: CmsPost[], siteUrl: string): number {
-  const normalized = normalizeUrl(targetUrl);
   let count = 0;
   for (const post of allPosts) {
-    if (normalizeUrl(post.url) === normalized) continue;
-    // Check if this post's content links to target
+    if (urlsMatch(post.url, targetUrl)) continue; // skip self
     const regex = /<a[^>]+href=["']([^"']+)["']/gi;
     let match;
     while ((match = regex.exec(post.content)) !== null) {
       try {
         const u = new URL(match[1], siteUrl);
-        if (normalizeUrl(u.href) === normalized || normalizeUrl(u.pathname) === normalized) {
+        if (urlsMatch(u.href, targetUrl)) {
           count++;
-          break; // Count each source page once
+          break;
         }
       } catch {
-        if (normalizeUrl(match[1]) === normalized) {
+        if (urlsMatch(match[1], targetUrl)) {
           count++;
           break;
         }
