@@ -267,67 +267,152 @@ export default function LinkingGraph() {
     return { nodes: filteredNodes, links: filteredLinks };
   }, [data, filter, selectedCluster, clusterNames]);
 
-  // ── Node rendering ────────────────────────────────────────────────────────
+  // ── Pill drawing helper ───────────────────────────────────────────────────
+  const drawPill = useCallback((
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number,
+    w: number, h: number,
+    fillStyle: string | CanvasGradient,
+    strokeStyle?: string,
+    lineWidth?: number
+  ) => {
+    const r = h / 2;
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2 + r, y - h / 2);
+    ctx.lineTo(x + w / 2 - r, y - h / 2);
+    ctx.arc(x + w / 2 - r, y, r, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(x - w / 2 + r, y + h / 2);
+    ctx.arc(x - w / 2 + r, y, r, Math.PI / 2, -Math.PI / 2);
+    ctx.closePath();
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+    if (strokeStyle) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth ?? 1;
+      ctx.stroke();
+    }
+  }, []);
+
+  // Animation frame counter for pulse
+  const frameRef = useRef(0);
+  useEffect(() => {
+    let running = true;
+    function tick() {
+      frameRef.current++;
+      if (running) requestAnimationFrame(tick);
+    }
+    tick();
+    return () => { running = false; };
+  }, []);
+
+  // ── Node rendering — Rankpill pills ──────────────────────────────────────
   const paintNode = useCallback((node: GraphNode, ctx: CanvasRenderingContext2D) => {
-    const { x = 0, y = 0, size, color, role, borderColor } = node;
+    const { x = 0, y = 0, size, role } = node;
     const hovered = hoveredNodeRef.current;
     const isHovered = hovered?.id === node.id;
     const isSelected = selectedNode?.id === node.id;
     const isHighlighted = isHovered || isSelected;
 
-    // Déterminer si ce nœud est "en focus" (voisin du nœud survolé/sélectionné)
     const activeNode = hovered || selectedNode;
     const isNeighbor = activeNode
       ? neighborMap.get(activeNode.id)?.has(node.id) ?? false
       : false;
     const isDimmed = activeNode && !isHighlighted && !isNeighbor;
-    const opacity = isDimmed ? 0.15 : 1;
+    const opacity = isDimmed ? 0.12 : 1;
 
     ctx.globalAlpha = opacity;
 
-    // Glow effect — subtil et propre
-    if (isHighlighted) {
-      const gradient = ctx.createRadialGradient(x, y, size * 0.5, x, y, size + 10);
-      gradient.addColorStop(0, `${color}55`);
-      gradient.addColorStop(1, `${color}00`);
+    // Is this page linked (has any connections)?
+    const isLinked = node.incoming > 0 || node.outgoing > 0;
+    const isPillar = role === "pillar";
+
+    // Pill dimensions — based on importance
+    const pillH = isPillar ? 14 : isLinked ? 10 : 8;
+    const pillW = isPillar ? size * 3.8 : isLinked ? size * 3 : size * 2.5;
+
+    // Animation pulse for linked pages
+    const t = frameRef.current * 0.03;
+    const pulse = isLinked ? 0.85 + 0.15 * Math.sin(t + node.id.length * 0.7) : 1;
+
+    // Colors
+    const orangeMain = "#f97316";
+    const orangeGlow = "rgba(249,115,22,0.6)";
+    const greyMain = "#4b5563";
+    const greyBorder = "rgba(107,114,128,0.4)";
+
+    // ── Glow for linked / highlighted pills ──
+    if (isLinked && !isDimmed) {
+      const glowR = pillW * 0.5 + 8;
+      const gradient = ctx.createRadialGradient(x, y, pillH * 0.3, x, y, glowR);
+      if (isHighlighted) {
+        gradient.addColorStop(0, "rgba(249,115,22,0.35)");
+        gradient.addColorStop(1, "rgba(249,115,22,0)");
+      } else {
+        gradient.addColorStop(0, `rgba(249,115,22,${0.12 * pulse})`);
+        gradient.addColorStop(1, "rgba(249,115,22,0)");
+      }
       ctx.beginPath();
-      ctx.arc(x, y, size + 10, 0, 2 * Math.PI);
+      ctx.arc(x, y, glowR, 0, 2 * Math.PI);
       ctx.fillStyle = gradient;
       ctx.fill();
     }
 
-    // Node circle
-    ctx.beginPath();
-    ctx.arc(x, y, size, 0, 2 * Math.PI);
-    ctx.fillStyle = isHighlighted ? color : `${color}cc`;
-    ctx.fill();
+    // ── Pill body ──
+    if (isLinked) {
+      // Orange gradient pill
+      const grad = ctx.createLinearGradient(x - pillW / 2, y, x + pillW / 2, y);
+      grad.addColorStop(0, `rgba(249,115,22,${0.7 * pulse})`);
+      grad.addColorStop(0.5, `rgba(249,115,22,${0.95 * pulse})`);
+      grad.addColorStop(1, `rgba(239,68,68,${0.7 * pulse})`);
+      drawPill(ctx, x, y, pillW, pillH, grad,
+        isHighlighted ? "#fff" : orangeGlow,
+        isHighlighted ? 2 : 1);
+    } else {
+      // Grey pill — static, no pulse
+      drawPill(ctx, x, y, pillW, pillH,
+        isHighlighted ? greyMain : `${greyMain}99`,
+        isHighlighted ? "rgba(255,255,255,0.5)" : greyBorder,
+        isHighlighted ? 1.5 : 0.8);
+    }
 
-    // Border
-    ctx.strokeStyle = isHighlighted ? "#fff" : borderColor;
-    ctx.lineWidth = role === "pillar" ? 2 : 1;
-    ctx.stroke();
+    // ── Inner shine (top highlight for 3D effect) ──
+    if (isLinked) {
+      const shineGrad = ctx.createLinearGradient(x, y - pillH / 2, x, y);
+      shineGrad.addColorStop(0, "rgba(255,255,255,0.25)");
+      shineGrad.addColorStop(1, "rgba(255,255,255,0)");
+      drawPill(ctx, x, y - pillH * 0.08, pillW * 0.85, pillH * 0.5, shineGrad);
+    }
 
-    // Pillar icon (star shape)
-    if (role === "pillar") {
+    // ── Pillar marker (white dot in center) ──
+    if (isPillar) {
       ctx.beginPath();
-      ctx.arc(x, y, size * 0.35, 0, 2 * Math.PI);
+      ctx.arc(x, y, 2.5, 0, 2 * Math.PI);
       ctx.fillStyle = "#fff";
       ctx.fill();
     }
 
-    // Label — affiché pour les nœuds en focus ou les piliers
-    if (isHighlighted || (isNeighbor && activeNode) || size >= 10) {
+    // ── Label ──
+    if (isHighlighted || (isNeighbor && activeNode) || isPillar) {
       ctx.font = `${isHighlighted ? "bold " : ""}${isHighlighted ? 11 : 9}px Inter, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      ctx.fillStyle = isHighlighted ? "#fff" : isNeighbor ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.6)";
-      ctx.fillText(node.label, x, y + size + 3);
+
+      // Text shadow for readability
+      if (isHighlighted) {
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillText(node.label, x + 0.5, y + pillH / 2 + 4.5);
+      }
+
+      ctx.fillStyle = isHighlighted ? "#fff"
+        : isNeighbor ? "rgba(255,255,255,0.8)"
+        : isLinked ? "rgba(249,115,22,0.6)" : "rgba(255,255,255,0.45)";
+      ctx.fillText(node.label, x, y + pillH / 2 + 4);
     }
 
     ctx.globalAlpha = 1;
-  }, [selectedNode, neighborMap]);
+  }, [selectedNode, neighborMap, drawPill]);
 
-  // ── Link rendering ────────────────────────────────────────────────────────
+  // ── Link rendering — curved orange lines ──────────────────────────────────
   const paintLink = useCallback((link: GraphLink, ctx: CanvasRenderingContext2D) => {
     const src = link.source as unknown as GraphNode;
     const tgt = link.target as unknown as GraphNode;
@@ -339,26 +424,48 @@ export default function LinkingGraph() {
     const isRelated = activeNode && (src.id === activeNode.id || tgt.id === activeNode.id);
     const isDimmed = activeNode && !isRelated;
 
-    ctx.globalAlpha = isDimmed ? 0.06 : 1;
+    ctx.globalAlpha = isDimmed ? 0.04 : 1;
 
+    // Curved line with control point
+    const dx = tx - sx, dy = ty - sy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const curveOffset = dist * 0.15 * link.curvature;
+    const mx = (sx + tx) / 2 - dy / dist * curveOffset;
+    const my = (sy + ty) / 2 + dx / dist * curveOffset;
+
+    // Glow for active links
+    if (isRelated) {
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.quadraticCurveTo(mx, my, tx, ty);
+      ctx.strokeStyle = "rgba(249,115,22,0.25)";
+      ctx.lineWidth = link.weight * 4;
+      ctx.stroke();
+    }
+
+    // Main line
     ctx.beginPath();
     ctx.moveTo(sx, sy);
-    ctx.lineTo(tx, ty);
-    ctx.strokeStyle = isRelated ? link.color.replace(/[\d.]+\)$/, "0.8)") : link.color;
-    ctx.lineWidth = isRelated ? link.weight * 2 : link.weight;
+    ctx.quadraticCurveTo(mx, my, tx, ty);
+    ctx.strokeStyle = isRelated ? "rgba(249,115,22,0.8)" : "rgba(249,115,22,0.15)";
+    ctx.lineWidth = isRelated ? link.weight * 1.5 : link.weight * 0.8;
     ctx.stroke();
 
-    // Arrow
-    const angle = Math.atan2(ty - sy, tx - sx);
+    // Arrow at midpoint
+    const t = 0.55;
+    const arrowX = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * mx + t * t * tx;
+    const arrowY = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * my + t * t * ty;
+    const tangentX = 2 * (1 - t) * (mx - sx) + 2 * t * (tx - mx);
+    const tangentY = 2 * (1 - t) * (my - sy) + 2 * t * (ty - my);
+    const angle = Math.atan2(tangentY, tangentX);
     const arrowLen = isRelated ? 6 : 4;
-    const midX = (sx + tx) / 2;
-    const midY = (sy + ty) / 2;
+
     ctx.beginPath();
-    ctx.moveTo(midX, midY);
-    ctx.lineTo(midX - arrowLen * Math.cos(angle - Math.PI / 6), midY - arrowLen * Math.sin(angle - Math.PI / 6));
-    ctx.moveTo(midX, midY);
-    ctx.lineTo(midX - arrowLen * Math.cos(angle + Math.PI / 6), midY - arrowLen * Math.sin(angle + Math.PI / 6));
-    ctx.strokeStyle = isRelated ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.15)";
+    ctx.moveTo(arrowX, arrowY);
+    ctx.lineTo(arrowX - arrowLen * Math.cos(angle - Math.PI / 6), arrowY - arrowLen * Math.sin(angle - Math.PI / 6));
+    ctx.moveTo(arrowX, arrowY);
+    ctx.lineTo(arrowX - arrowLen * Math.cos(angle + Math.PI / 6), arrowY - arrowLen * Math.sin(angle + Math.PI / 6));
+    ctx.strokeStyle = isRelated ? "rgba(255,255,255,0.5)" : "rgba(249,115,22,0.1)";
     ctx.lineWidth = 1;
     ctx.stroke();
 
@@ -566,18 +673,22 @@ export default function LinkingGraph() {
           style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.06)" }}
         >
           {/* Legend */}
-          <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-white/80 border border-white/30" style={{ boxShadow: "inset 0 0 0 1.5px rgba(0,0,0,0.3)" }} />
-              <span className="text-[10px] text-gray-500">Pilier</span>
+          <div className="absolute top-3 left-3 z-10 flex flex-col gap-2 bg-black/40 backdrop-blur-sm rounded-xl px-3 py-2.5 border border-white/[0.06]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-2.5 rounded-full" style={{ background: "linear-gradient(90deg, #f97316, #ef4444)", boxShadow: "0 0 8px rgba(249,115,22,0.5)" }} />
+              <span className="text-[10px] text-gray-400 font-medium">Page maillée</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: CLUSTER_COLORS[0].main }} />
-              <span className="text-[10px] text-gray-500">Support</span>
+            <div className="flex items-center gap-2.5">
+              <div className="relative w-7 h-3 rounded-full" style={{ background: "linear-gradient(90deg, #f97316, #ef4444)", boxShadow: "0 0 8px rgba(249,115,22,0.5)" }}>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                </div>
+              </div>
+              <span className="text-[10px] text-gray-400 font-medium">Pilier</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ background: ORPHAN_COLOR.main }} />
-              <span className="text-[10px] text-gray-500">Orpheline</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-6 h-2 rounded-full" style={{ background: "#4b5563" }} />
+              <span className="text-[10px] text-gray-400 font-medium">Orpheline</span>
             </div>
           </div>
 
@@ -610,8 +721,19 @@ export default function LinkingGraph() {
             nodeCanvasObject={(node, ctx) => paintNode(node as unknown as GraphNode, ctx)}
             nodePointerAreaPaint={(node, color, ctx) => {
               const n = node as unknown as GraphNode;
+              const isPillar = n.role === "pillar";
+              const isLinked = n.incoming > 0 || n.outgoing > 0;
+              const pillH = (isPillar ? 14 : isLinked ? 10 : 8) + 6;
+              const pillW = (isPillar ? n.size * 3.8 : isLinked ? n.size * 3 : n.size * 2.5) + 6;
+              const r = pillH / 2;
+              const x = n.x ?? 0, y = n.y ?? 0;
               ctx.beginPath();
-              ctx.arc(n.x ?? 0, n.y ?? 0, n.size + 3, 0, 2 * Math.PI);
+              ctx.moveTo(x - pillW / 2 + r, y - pillH / 2);
+              ctx.lineTo(x + pillW / 2 - r, y - pillH / 2);
+              ctx.arc(x + pillW / 2 - r, y, r, -Math.PI / 2, Math.PI / 2);
+              ctx.lineTo(x - pillW / 2 + r, y + pillH / 2);
+              ctx.arc(x - pillW / 2 + r, y, r, Math.PI / 2, -Math.PI / 2);
+              ctx.closePath();
               ctx.fillStyle = color;
               ctx.fill();
             }}
