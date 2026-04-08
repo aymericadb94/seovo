@@ -526,144 +526,114 @@ export default function GeneratePage() {
         articleContent = parsed.featured_snippet ? parsed.featured_snippet + "\n" + parsed.content! : parsed.content!;
       }
 
-      // ── Step 7: Semantic enrichment ──────────────────────────
-      setCurrentStep(7);
+      // ── Helper : appel agent post-gen avec retry ─────────────
+      const kw = localKeywords?.primary_keyword || activeKeyword;
 
-      try {
-        const enrichRes = await fetch("/api/content/enrich", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: articleContent,
-            title: parsed.title,
-            keyword: localKeywords?.primary_keyword || activeKeyword,
-            language,
-            keyword_strategy: localKeywords ? {
-              primary_keyword: localKeywords.primary_keyword,
-              secondary_keywords: localKeywords.secondary_keywords,
-              semantic_field: localKeywords.semantic_field,
-            } : undefined,
-            intent_analysis: localIntent ? {
-              intent_type: localIntent.intent_type,
-              user_intent: localIntent.user_intent,
-            } : undefined,
-          }),
-        });
-
-        if (enrichRes.ok) {
-          const enrichData = await enrichRes.json() as {
-            enrichment: { improved_content: string; improvements: string[] };
-          };
-          if (enrichData.enrichment?.improved_content) {
-            articleContent = enrichData.enrichment.improved_content;
+      async function callAgent<T>(
+        step: number,
+        url: string,
+        body: Record<string, unknown>,
+        extract: (data: T) => string | null,
+      ): Promise<void> {
+        setCurrentStep(step);
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            console.warn(`[step ${step}] ${url} → ${res.status}`);
+            return;
           }
+          const data = await res.json() as T;
+          const result = extract(data);
+          if (result) {
+            articleContent = result;
+            console.log(`[step ${step}] ${url} → OK`);
+          }
+        } catch (err) {
+          console.warn(`[step ${step}] ${url} →`, err);
         }
-      } catch {
-        // Non-blocking: if enrichment fails, use original content
       }
 
-      // ── Step 8: Value enhancement ───────────────────────────
-      setCurrentStep(8);
+      // ── Step 7: Enrichissement sémantique ───────────────────
+      await callAgent<{ enrichment: { improved_content: string } }>(
+        7, "/api/content/enrich",
+        {
+          content: articleContent,
+          title: parsed.title,
+          keyword: kw,
+          language,
+          keyword_strategy: localKeywords ? {
+            primary_keyword: localKeywords.primary_keyword,
+            secondary_keywords: localKeywords.secondary_keywords,
+            semantic_field: localKeywords.semantic_field,
+          } : undefined,
+          intent_analysis: localIntent ? {
+            intent_type: localIntent.intent_type,
+            user_intent: localIntent.user_intent,
+          } : undefined,
+        },
+        (d) => d.enrichment?.improved_content ?? null,
+      );
 
-      try {
-        const enhanceRes = await fetch("/api/content/enhance", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: articleContent,
-            title: parsed.title,
-            keyword: localKeywords?.primary_keyword || activeKeyword,
-            language,
-            intent_analysis: localIntent ? {
-              intent_type: localIntent.intent_type,
-              user_intent: localIntent.user_intent,
-              recommended_content_type: localIntent.recommended_content_type,
-              angle: localIntent.angle,
-            } : undefined,
-            keyword_strategy: localKeywords ? {
-              primary_keyword: localKeywords.primary_keyword,
-              seo_angle: localKeywords.seo_angle,
-            } : undefined,
-          }),
-        });
+      // ── Step 8: Valeur ajoutée & crédibilité ───────────────
+      await callAgent<{ enhancement: { enhanced_content: string } }>(
+        8, "/api/content/enhance",
+        {
+          content: articleContent,
+          title: parsed.title,
+          keyword: kw,
+          language,
+          intent_analysis: localIntent ? {
+            intent_type: localIntent.intent_type,
+            user_intent: localIntent.user_intent,
+            recommended_content_type: localIntent.recommended_content_type,
+            angle: localIntent.angle,
+          } : undefined,
+          keyword_strategy: localKeywords ? {
+            primary_keyword: localKeywords.primary_keyword,
+            seo_angle: localKeywords.seo_angle,
+          } : undefined,
+        },
+        (d) => d.enhancement?.enhanced_content ?? null,
+      );
 
-        if (enhanceRes.ok) {
-          const enhanceData = await enhanceRes.json() as {
-            enhancement: { enhanced_content: string };
-          };
-          if (enhanceData.enhancement?.enhanced_content) {
-            articleContent = enhanceData.enhancement.enhanced_content;
-          }
-        }
-      } catch {
-        // Non-blocking: if enhancement fails, use current content
-      }
+      // ── Step 9: Maillage interne intelligent ────────────────
+      await callAgent<{ linking: { updated_content: string } }>(
+        9, "/api/content/linking",
+        {
+          content: articleContent,
+          title: parsed.title,
+          keyword: kw,
+          language,
+          cocoon_positioning: localPosition ? {
+            page_type: localPosition.page_type,
+            seo_role: localPosition.seo_role,
+            pillar_relation: localPosition.pillar_relation,
+            linking_strategy: localPosition.linking_strategy,
+            risk_level: localPosition.risk_level,
+          } : undefined,
+        },
+        (d) => d.linking?.updated_content ?? null,
+      );
 
-      // ── Step 9: Internal linking ────────────────────────────
-      setCurrentStep(9);
+      // ── Step 10: Audit qualité SEO ──────────────────────────
+      await callAgent<{ audit: { corrected_content: string } }>(
+        10, "/api/content/audit",
+        {
+          content: articleContent,
+          primary_keyword: kw,
+          secondary_keywords: localKeywords?.secondary_keywords,
+          semantic_field: localKeywords?.semantic_field,
+          language,
+        },
+        (d) => d.audit?.corrected_content ?? null,
+      );
 
-      try {
-        const linkRes = await fetch("/api/content/linking", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: articleContent,
-            title: parsed.title,
-            keyword: localKeywords?.primary_keyword || activeKeyword,
-            language,
-            cocoon_positioning: localPosition ? {
-              page_type: localPosition.page_type,
-              seo_role: localPosition.seo_role,
-              pillar_relation: localPosition.pillar_relation,
-              linking_strategy: localPosition.linking_strategy,
-              risk_level: localPosition.risk_level,
-            } : undefined,
-          }),
-        });
-
-        if (linkRes.ok) {
-          const linkData = await linkRes.json() as {
-            linking: { updated_content: string; links_added: unknown[] };
-          };
-          if (linkData.linking?.updated_content) {
-            articleContent = linkData.linking.updated_content;
-          }
-        }
-      } catch {
-        // Non-blocking: if linking fails, publish without internal links
-      }
-
-      // ── Step 10: Content quality audit ─────────────────────────
-      setCurrentStep(10);
-
-      try {
-        const auditRes = await fetch("/api/content/audit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: articleContent,
-            primary_keyword: localKeywords?.primary_keyword || activeKeyword,
-            secondary_keywords: localKeywords?.secondary_keywords,
-            semantic_field: localKeywords?.semantic_field,
-            language,
-          }),
-        });
-
-        if (auditRes.ok) {
-          const auditData = await auditRes.json() as {
-            audit: { corrected_content: string; naturalness_score: number };
-          };
-          if (auditData.audit?.corrected_content) {
-            articleContent = auditData.audit.corrected_content;
-          }
-        }
-      } catch {
-        // Non-blocking: if audit fails, use current content
-      }
-
-      // ── Step 11: Meta optimization (title & meta description) ──
+      // ── Step 11: Optimisation title & meta ──────────────────
       setCurrentStep(11);
-
       let optimizedTitle = parsed.title;
       let optimizedMeta = parsed.meta_description ?? "";
 
@@ -672,7 +642,7 @@ export default function GeneratePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            primary_keyword: localKeywords?.primary_keyword || activeKeyword,
+            primary_keyword: kw,
             secondary_keywords: localKeywords?.secondary_keywords,
             content_summary: articleContent.slice(0, 500).replace(/<[^>]+>/g, ""),
             intent_analysis: localIntent ? {
@@ -685,61 +655,72 @@ export default function GeneratePage() {
             language,
           }),
         });
-
         if (metaRes.ok) {
-          const metaData = await metaRes.json() as {
-            meta: { titles: string[]; meta_descriptions: string[] };
-          };
-          if (metaData.meta?.titles?.[0]) {
-            optimizedTitle = metaData.meta.titles[0];
-          }
-          if (metaData.meta?.meta_descriptions?.[0]) {
-            optimizedMeta = metaData.meta.meta_descriptions[0];
-          }
+          const metaData = await metaRes.json() as { meta: { titles: string[]; meta_descriptions: string[] } };
+          if (metaData.meta?.titles?.[0]) optimizedTitle = metaData.meta.titles[0];
+          if (metaData.meta?.meta_descriptions?.[0]) optimizedMeta = metaData.meta.meta_descriptions[0];
+          console.log("[step 11] /api/content/meta → OK");
         }
-      } catch {
-        // Non-blocking: if meta optimization fails, use original title/meta
+      } catch (err) {
+        console.warn("[step 11] /api/content/meta →", err);
       }
 
-      // ── Step 12: Final quality check ──────────────────────────
-      setCurrentStep(12);
+      // ── Step 12: Contrôle final qualité ─────────────────────
+      await callAgent<{ check: { final_content: string; final_verdict: string } }>(
+        12, "/api/content/final-check",
+        {
+          content: articleContent,
+          title: optimizedTitle,
+          meta_description: optimizedMeta,
+          primary_keyword: kw,
+          seo_structure: localStructure ? {
+            h1: localStructure.h1,
+            sections: localStructure.h2_structure?.map(s => ({
+              h2: s.title,
+              subsections: s.h3?.map(h3 => ({ h3 })),
+            })),
+          } : undefined,
+          cocoon_positioning: localPosition ? {
+            page_type: localPosition.page_type,
+            seo_role: localPosition.seo_role,
+            pillar_relation: localPosition.pillar_relation,
+            risk_level: localPosition.risk_level,
+          } : undefined,
+          language,
+        },
+        (d) => d.check?.final_content && d.check.final_verdict !== "rewrite" ? d.check.final_content : null,
+      );
 
-      try {
-        const checkRes = await fetch("/api/content/final-check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: articleContent,
-            title: optimizedTitle,
-            meta_description: optimizedMeta,
-            primary_keyword: localKeywords?.primary_keyword || activeKeyword,
-            seo_structure: localStructure ? {
-              h1: localStructure.h1,
-              sections: localStructure.h2_structure?.map(s => ({
-                h2: s.title,
-                subsections: s.h3?.map(h3 => ({ h3 })),
-              })),
-            } : undefined,
-            cocoon_positioning: localPosition ? {
-              page_type: localPosition.page_type,
-              seo_role: localPosition.seo_role,
-              pillar_relation: localPosition.pillar_relation,
-              risk_level: localPosition.risk_level,
-            } : undefined,
-            language,
-          }),
-        });
-
-        if (checkRes.ok) {
-          const checkData = await checkRes.json() as {
-            check: { final_content: string; final_verdict: string };
-          };
-          if (checkData.check?.final_content && checkData.check.final_verdict !== "rewrite") {
-            articleContent = checkData.check.final_content;
-          }
+      // ── Re-parser les données structurées depuis le HTML post-traité ──
+      // Les agents ont modifié articleContent — on reconstruit structuredData
+      if (structuredData) {
+        // Re-extraire les sections depuis le HTML post-traité
+        // Le contenu des sections a été amélioré par les agents
+        const updatedSections: typeof structuredData.sections = [];
+        const h2Regex = /<h2>(.*?)<\/h2>([\s\S]*?)(?=<h2>|$)/gi;
+        let match;
+        const skipH2s = new Set(["en bref", "chiffres clés", "erreurs à éviter", "questions fréquentes"]);
+        while ((match = h2Regex.exec(articleContent)) !== null) {
+          const h2Title = match[1].trim();
+          if (skipH2s.has(h2Title.toLowerCase())) continue;
+          const sectionHtml = match[2].trim();
+          // Chercher les tips et exemples dans le contenu
+          const tipMatch = sectionHtml.match(/<p><strong>💡<\/strong>\s*(.*?)<\/p>/);
+          const exampleMatch = sectionHtml.match(/<p><em>Exemple\s*:\s*(.*?)<\/em><\/p>/);
+          const cleanContent = sectionHtml
+            .replace(/<p><strong>💡<\/strong>.*?<\/p>/g, "")
+            .replace(/<p><em>Exemple\s*:.*?<\/em><\/p>/g, "")
+            .trim();
+          updatedSections.push({
+            title: h2Title,
+            content: cleanContent,
+            tip: tipMatch?.[1],
+            example: exampleMatch?.[1],
+          });
         }
-      } catch {
-        // Non-blocking: if final check fails, use current content
+        if (updatedSections.length > 0) {
+          structuredData = { ...structuredData, sections: updatedSections };
+        }
       }
 
       const article: GeneratedArticle = {
