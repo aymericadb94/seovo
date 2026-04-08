@@ -266,18 +266,34 @@ async function wixListPosts(
         postUrl = `${base}/post/${p.slug}`;
       }
 
-      // Convert content to HTML — try Draft.js blocks first, then richContent
+      // Convert content to HTML — handle all possible formats
       let html = "";
-      if (p.content) {
-        // content can be an array of blocks or { blocks, entityMap }
-        if (Array.isArray(p.content)) {
-          html = wixDraftBlocksToHtml(p.content, {});
-        } else if (p.content.blocks) {
-          html = wixDraftBlocksToHtml(p.content.blocks, p.content.entityMap ?? {});
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let contentObj: any = p.content;
+        // If content is a JSON string, parse it
+        if (typeof contentObj === "string") {
+          try { contentObj = JSON.parse(contentObj); } catch { /* not JSON */ }
         }
-      }
+        if (contentObj) {
+          if (Array.isArray(contentObj)) {
+            // Direct array of blocks
+            html = wixDraftBlocksToHtml(contentObj, {});
+          } else if (Array.isArray(contentObj.blocks)) {
+            // { blocks: [...], entityMap: {...} }
+            html = wixDraftBlocksToHtml(contentObj.blocks, contentObj.entityMap ?? {});
+          } else if (typeof contentObj === "string" && contentObj.includes("<")) {
+            // Already HTML
+            html = contentObj;
+          }
+        }
+      } catch { /* non-fatal */ }
       if (!html && p.richContent?.nodes?.length) {
         html = wixRichContentToHtml(p.richContent.nodes);
+      }
+      // Last resort: use excerpt as content
+      if (!html && p.excerpt) {
+        html = `<p>${p.excerpt}</p>`;
       }
 
       return {

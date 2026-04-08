@@ -44,7 +44,7 @@ export async function GET() {
 
     const cmsPosts = await listCmsPosts(creds, 10); // Only 10 for debug
 
-    // Fetch raw Wix API response — show ALL keys to find content field
+    // Fetch raw Wix API response — show content field details
     let wixRawSample: unknown = null;
     if (site.cms === "wix" && site.wix_api_key && site.wix_site_id) {
       try {
@@ -53,21 +53,26 @@ export async function GET() {
           { headers: { "Content-Type": "application/json", Authorization: site.wix_api_key, "wix-site-id": site.wix_site_id } }
         );
         if (rawRes.ok) {
-          const rawData = await rawRes.json() as { posts?: Record<string, unknown>[] };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rawData = await rawRes.json() as { posts?: any[] };
           const firstPost = rawData.posts?.[0];
           if (firstPost) {
-            // Show ALL top-level keys and their types/previews
-            const keys: Record<string, unknown> = {};
-            for (const [k, v] of Object.entries(firstPost)) {
-              if (typeof v === "string") {
-                keys[k] = v.slice(0, 200);
-              } else if (typeof v === "object" && v !== null) {
-                keys[k] = { _type: Array.isArray(v) ? "array" : "object", _keys: Object.keys(v), _preview: JSON.stringify(v).slice(0, 300) };
-              } else {
-                keys[k] = v;
-              }
-            }
-            wixRawSample = keys;
+            const contentField = firstPost.content;
+            const richContentField = firstPost.richContent;
+            wixRawSample = {
+              title: firstPost.title,
+              slug: firstPost.slug,
+              all_keys: Object.keys(firstPost),
+              content_typeof: typeof contentField,
+              content_is_null: contentField === null || contentField === undefined,
+              content_is_array: Array.isArray(contentField),
+              content_keys: contentField && typeof contentField === "object" ? Object.keys(contentField) : null,
+              content_blocks_length: contentField?.blocks?.length ?? null,
+              content_first_block: contentField?.blocks?.[0] ? JSON.stringify(contentField.blocks[0]).slice(0, 300) : null,
+              content_raw_preview: JSON.stringify(contentField).slice(0, 500),
+              richContent_typeof: typeof richContentField,
+              richContent_is_null: richContentField === null || richContentField === undefined,
+            };
           }
         }
       } catch (e) { wixRawSample = { error: e instanceof Error ? e.message : "unknown" }; }
