@@ -1963,9 +1963,9 @@ export default function Dashboard() {
 
                 <div className="grid grid-cols-3 gap-4">
                   {[
-                    { label: "Total", value: kpis?.totalArticles ?? 0, icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>), color: "#f97316", delay: "0ms" },
-                    { label: "Ce mois", value: kpis?.articlesThisMonth ?? 0, icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>), color: "#fb923c", delay: "100ms" },
-                    { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>), color: "#ef4444", delay: "200ms" },
+                    { label: "Total pages", value: cmsPages.length || (kpis?.totalArticles ?? 0), icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>), color: "#f97316", delay: "0ms" },
+                    { label: "Articles", value: cmsPages.length > 0 ? cmsPages.filter(p => p.page_type === "article").length : (kpis?.articlesThisMonth ?? 0), icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>), color: "#fb923c", delay: "100ms" },
+                    { label: "Pages", value: cmsPages.length > 0 ? cmsPages.filter(p => p.page_type === "page").length : 0, icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>), color: "#ef4444", delay: "200ms" },
                   ].map(s => (
                     <div key={s.label} className="relative group bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden" style={{ animationDelay: s.delay }}>
                       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl" style={{ background: `radial-gradient(ellipse at top right, ${s.color}12, transparent 60%)` }} />
@@ -1987,7 +1987,7 @@ export default function Dashboard() {
                     </div>
                     <span className="relative overflow-hidden text-xs bg-orange-500/10 text-orange-400 font-bold px-3 py-1.5 rounded-full">
                       <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.25), transparent)" }} />
-                      {kpis?.totalArticles ?? 0} au total
+                      {cmsPages.length || (kpis?.totalArticles ?? 0)} au total
                     </span>
                   </div>
                   <ResponsiveContainer width="100%" height={200}>
