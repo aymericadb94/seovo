@@ -131,6 +131,8 @@ export default function LinkingGraph() {
   const graphRef = useRef<any>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
+  // Store node positions to preserve layout across data refreshes
+  const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
   // Pré-calculer les voisins pour l'effet de focus (existing + suggestions si actives)
   const neighborMap = useMemo(() => {
@@ -338,6 +340,9 @@ export default function LinkingGraph() {
       else if (p.link_score > 60) size = 10;
       else if (isOrphan) size = 5;
 
+      // Restore saved position if available (keeps layout stable across refreshes)
+      const savedPos = nodePositionsRef.current.get(p.url);
+
       return {
         id: p.url,
         label: truncate(p.title, 30),
@@ -351,6 +356,7 @@ export default function LinkingGraph() {
         position: p.position,
         incoming: p.incoming,
         outgoing: p.outgoing,
+        ...(savedPos ? { x: savedPos.x, y: savedPos.y, fx: savedPos.x, fy: savedPos.y } : {}),
       };
     });
 
@@ -1177,17 +1183,35 @@ export default function LinkingGraph() {
               setSelectedNode(prev => prev?.id === (node as GraphNode).id ? null : node as GraphNode);
               setNodeApplyResult(null);
             }}
-            d3AlphaDecay={0.025}
-            d3VelocityDecay={0.3}
-            cooldownTicks={120}
-            d3AlphaMin={0.005}
-            warmupTicks={30}
-            onEngineStop={() => graphRef.current?.zoomToFit(500, 60)}
+            d3AlphaDecay={0.05}
+            d3VelocityDecay={0.4}
+            cooldownTicks={80}
+            d3AlphaMin={0.01}
+            warmupTicks={80}
+            onEngineStop={() => {
+              // Freeze all nodes in place after layout converges
+              const fg = graphRef.current;
+              if (fg) {
+                fg.zoomToFit(500, 60);
+                // Fix all node positions and save them
+                const gd = fg.graphData();
+                if (gd?.nodes) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  gd.nodes.forEach((n: any) => {
+                    n.fx = n.x;
+                    n.fy = n.y;
+                    if (n.id && n.x != null && n.y != null) {
+                      nodePositionsRef.current.set(n.id, { x: n.x, y: n.y });
+                    }
+                  });
+                }
+              }
+            }}
             minZoom={0.5}
             maxZoom={3}
             enableZoomInteraction={true}
             enablePanInteraction={true}
-            enableNodeDrag={true}
+            enableNodeDrag={false}
           />
         </div>
 
