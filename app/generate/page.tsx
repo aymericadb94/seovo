@@ -12,14 +12,23 @@ type SiteConfig = {
   target_languages: Locale[];
 };
 
+type GscMetrics = {
+  position: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+};
+
 type SuggestedKeyword = {
   keyword: string;
-  source: "roadmap" | "cocoon" | "settings";
-  role: "pillar" | "support" | "unknown";
+  source: "roadmap" | "cocoon" | "gsc" | "settings";
+  role: "pillar" | "support" | "opportunity" | "unknown";
   cluster: string | null;
   phase: number | null;
   priority: "haute" | "moyenne" | "faible";
   reason: string;
+  score: number;
+  gsc: GscMetrics | null;
 };
 
 type StructuredData = {
@@ -132,8 +141,30 @@ const STEPS = [
 const SOURCE_BADGES: Record<string, { label: string; color: string; bg: string }> = {
   roadmap: { label: "Roadmap", color: "#f97316", bg: "rgba(249,115,22,0.12)" },
   cocoon: { label: "Cocon", color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
+  gsc: { label: "GSC", color: "#22c55e", bg: "rgba(34,197,94,0.12)" },
   settings: { label: "Config", color: "#6b7280", bg: "rgba(107,114,128,0.12)" },
 };
+
+const ROLE_LABELS: Record<string, string> = {
+  pillar: "Pilier",
+  support: "Support",
+  opportunity: "Opportunit\u00e9",
+  unknown: "",
+};
+
+function scoreColor(score: number): string {
+  if (score >= 70) return "#22c55e"; // green
+  if (score >= 45) return "#f97316"; // orange
+  return "#6b7280"; // gray
+}
+
+function scoreBars(score: number): number {
+  if (score >= 80) return 5;
+  if (score >= 65) return 4;
+  if (score >= 50) return 3;
+  if (score >= 35) return 2;
+  return 1;
+}
 
 export default function GeneratePage() {
   const [site, setSite] = useState<SiteConfig | null>(null);
@@ -150,7 +181,7 @@ export default function GeneratePage() {
   const [generated, setGenerated] = useState<GeneratedArticle | null>(null);
   const [result, setResult] = useState<{ title: string; url: string; meta?: string } | null>(null);
   const [error, setError] = useState("");
-  const [kwFilter, setKwFilter] = useState<"all" | "roadmap" | "cocoon">("all");
+  const [kwFilter, setKwFilter] = useState<"all" | "roadmap" | "cocoon" | "gsc">("all");
 
   useEffect(() => {
     // Load site config + smart keywords in parallel
@@ -546,11 +577,12 @@ export default function GeneratePage() {
 
               {/* Source filters */}
               {smartKeywords.length > 0 && (
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-4 flex-wrap">
                   {([
-                    { key: "all" as const, label: "Tous", count: smartKeywords.length },
-                    { key: "roadmap" as const, label: "Roadmap SEO", count: smartKeywords.filter(k => k.source === "roadmap").length },
-                    { key: "cocoon" as const, label: "Cocon", count: smartKeywords.filter(k => k.source === "cocoon").length },
+                    { key: "all" as const, label: "Tous", count: smartKeywords.length, color: "" },
+                    { key: "roadmap" as const, label: "Roadmap", count: smartKeywords.filter(k => k.source === "roadmap").length, color: "orange" },
+                    { key: "cocoon" as const, label: "Cocon", count: smartKeywords.filter(k => k.source === "cocoon").length, color: "blue" },
+                    { key: "gsc" as const, label: "GSC", count: smartKeywords.filter(k => k.source === "gsc").length, color: "green" },
                   ]).filter(f => f.count > 0).map(f => (
                     <button
                       key={f.key}
@@ -568,47 +600,93 @@ export default function GeneratePage() {
                 </div>
               )}
 
-              {/* Keywords grid */}
+              {/* Keywords grouped by priority tier */}
               {filteredKeywords.length > 0 ? (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {filteredKeywords.map((kw) => {
-                    const badge = SOURCE_BADGES[kw.source];
-                    const isSelected = keyword === kw.keyword && !customKeyword.trim();
+                <div className="space-y-4 mb-4">
+                  {(["haute", "moyenne", "faible"] as const).map(tier => {
+                    const tierKws = filteredKeywords.filter(k => k.priority === tier);
+                    if (tierKws.length === 0) return null;
+                    const tierLabel = tier === "haute" ? "Priorit\u00e9 haute" : tier === "moyenne" ? "Priorit\u00e9 moyenne" : "Autres";
+                    const tierIcon = tier === "haute" ? "\u25CF" : tier === "moyenne" ? "\u25CB" : "";
+                    const tierColor = tier === "haute" ? "text-green-400" : tier === "moyenne" ? "text-orange-400" : "text-gray-500";
                     return (
-                      <button
-                        key={kw.keyword}
-                        type="button"
-                        onClick={() => { setKeyword(kw.keyword); setCustomKeyword(""); }}
-                        className={`group relative px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                          isSelected
-                            ? "bg-orange-500/20 border-orange-500/50 text-orange-300"
-                            : "bg-white/[0.04] border-white/[0.1] text-gray-400 hover:border-orange-500/30 hover:text-orange-400"
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          {kw.keyword}
-                          {kw.source !== "settings" && (
-                            <span
-                              className="text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase"
-                              style={{ background: badge.bg, color: badge.color }}
-                            >
-                              {kw.role === "pillar" ? "Pilier" : badge.label}
-                            </span>
-                          )}
-                          {kw.priority === "haute" && (
-                            <span className="text-red-400 text-[9px]">●</span>
-                          )}
-                        </span>
-                        {/* Tooltip on hover */}
-                        <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#111] border border-white/10 text-gray-300 text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                          {kw.reason}{kw.cluster ? ` · ${kw.cluster}` : ""}
-                        </span>
-                      </button>
+                      <div key={tier}>
+                        <div className={`flex items-center gap-1.5 mb-2 ${tierColor}`}>
+                          {tierIcon && <span className="text-[8px]">{tierIcon}</span>}
+                          <span className="text-[10px] font-bold uppercase tracking-wider">{tierLabel}</span>
+                          <span className="text-[9px] text-gray-600">({tierKws.length})</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {tierKws.map((kw) => {
+                            const badge = SOURCE_BADGES[kw.source];
+                            const roleLabel = ROLE_LABELS[kw.role];
+                            const isSelected = keyword === kw.keyword && !customKeyword.trim();
+                            const bars = scoreBars(kw.score);
+                            const sColor = scoreColor(kw.score);
+                            return (
+                              <button
+                                key={kw.keyword}
+                                type="button"
+                                onClick={() => { setKeyword(kw.keyword); setCustomKeyword(""); }}
+                                className={`group relative px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                                  isSelected
+                                    ? "bg-orange-500/20 border-orange-500/50 text-orange-300 shadow-[0_0_12px_rgba(249,115,22,0.15)]"
+                                    : "bg-white/[0.04] border-white/[0.08] text-gray-400 hover:border-orange-500/30 hover:text-orange-400"
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  {/* Score bars */}
+                                  <span className="flex items-end gap-[2px] mr-0.5" title={`Score: ${kw.score}/100`}>
+                                    {[1, 2, 3, 4, 5].map(i => (
+                                      <span
+                                        key={i}
+                                        className="w-[3px] rounded-full"
+                                        style={{
+                                          height: `${6 + i * 2}px`,
+                                          background: i <= bars ? sColor : "rgba(255,255,255,0.08)",
+                                        }}
+                                      />
+                                    ))}
+                                  </span>
+                                  {kw.keyword}
+                                  {/* Source badge */}
+                                  <span
+                                    className="text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase"
+                                    style={{ background: badge.bg, color: badge.color }}
+                                  >
+                                    {badge.label}
+                                  </span>
+                                  {/* Role badge */}
+                                  {roleLabel && (
+                                    <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase bg-white/[0.06] text-gray-500">
+                                      {roleLabel}
+                                    </span>
+                                  )}
+                                </span>
+                                {/* GSC position indicator */}
+                                {kw.gsc && (
+                                  <span className="flex items-center gap-1 mt-1 text-[9px] text-gray-600">
+                                    <span style={{ color: kw.gsc.position <= 10 ? "#22c55e" : kw.gsc.position <= 20 ? "#f97316" : "#6b7280" }}>
+                                      pos {kw.gsc.position}
+                                    </span>
+                                    <span>·</span>
+                                    <span>{kw.gsc.impressions} imp</span>
+                                    {kw.gsc.clicks > 0 && <><span>·</span><span>{kw.gsc.clicks} clics</span></>}
+                                  </span>
+                                )}
+                                {/* Tooltip */}
+                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#111] border border-white/10 text-gray-300 text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                  Score {kw.score}/100 — {kw.reason}{kw.cluster ? ` · ${kw.cluster}` : ""}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
               ) : site && site.keywords.length > 0 ? (
-                /* Fallback: raw site keywords */
                 <div className="flex flex-wrap gap-2 mb-4">
                   {site.keywords.map((kw) => (
                     <button
