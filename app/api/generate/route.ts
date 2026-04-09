@@ -42,6 +42,7 @@ export async function POST(request: Request) {
             controller.enqueue(encoder.encode(`data: ${event}\n\n`));
           } catch (err) {
             const msg = err instanceof Error ? err.message : "Erreur inconnue";
+            console.error("[generate/stream] Pipeline error:", err);
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", error: msg })}\n\n`));
           } finally {
             controller.close();

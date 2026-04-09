@@ -254,43 +254,43 @@ export default function GeneratePage() {
         buffer = lines.pop() ?? "";
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
+          let event: {
+            type: string;
+            step?: number;
+            agent?: string;
+            result?: ApiResult;
+            error?: string;
+          };
           try {
-            const event = JSON.parse(line.slice(6)) as {
-              type: string;
-              step?: number;
-              agent?: string;
-              result?: ApiResult;
-              error?: string;
-            };
-            if (event.type === "progress" && event.agent) {
-              const idx = AGENT_TO_STEP[event.agent];
-              if (idx !== undefined) {
-                // Mark previous steps as success
-                setStepOutcomes(prev => {
-                  const next = { ...prev };
-                  for (let i = 0; i < idx; i++) {
-                    if (!next[i]) next[i] = "success";
-                  }
-                  return next;
-                });
-                setCurrentStep(idx);
-              }
-            } else if (event.type === "done" && event.result) {
-              apiResult = event.result;
-              // Mark all steps as success
+            event = JSON.parse(line.slice(6));
+          } catch {
+            // Incomplete JSON chunk — skip, will be completed in next read
+            continue;
+          }
+          if (event.type === "progress" && event.agent) {
+            const idx = AGENT_TO_STEP[event.agent];
+            if (idx !== undefined) {
               setStepOutcomes(prev => {
                 const next = { ...prev };
-                for (let i = 0; i < STEPS.length; i++) {
+                for (let i = 0; i < idx; i++) {
                   if (!next[i]) next[i] = "success";
                 }
                 return next;
               });
-              setCurrentStep(STEPS.length);
-            } else if (event.type === "error") {
-              throw new Error(event.error || "Erreur de génération");
+              setCurrentStep(idx);
             }
-          } catch (parseErr) {
-            if (parseErr instanceof Error && parseErr.message.includes("génération")) throw parseErr;
+          } else if (event.type === "done" && event.result) {
+            apiResult = event.result;
+            setStepOutcomes(prev => {
+              const next = { ...prev };
+              for (let i = 0; i < STEPS.length; i++) {
+                if (!next[i]) next[i] = "success";
+              }
+              return next;
+            });
+            setCurrentStep(STEPS.length);
+          } else if (event.type === "error") {
+            throw new Error(event.error || "Erreur de génération");
           }
         }
       }
