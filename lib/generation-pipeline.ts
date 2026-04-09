@@ -293,8 +293,13 @@ export async function collectRankpillContext(
 // ── Contexte système commun ──────────────────────────────────────────────────
 
 function systemContext(ctx: RankpillContext, input: PipelineInput): string {
+  const now = new Date();
+  const currentDate = now.toISOString().split("T")[0];
+  const currentYear = now.getFullYear();
+
   const parts = [
     `Tu es intégré dans Rankpill. Tu dois produire un résultat non générique, basé sur les données, connecté au reste du site. Chaque sortie doit être exploitable par un système backend.`,
+    `\nDate du jour : ${currentDate}. Année en cours : ${currentYear}. Utilise TOUJOURS ${currentYear} comme année de référence, JAMAIS une année passée.`,
     `\nBusiness : ${input.business_name}`,
     `Secteur : ${input.industry}`,
     `Langue : ${input.language}`,
