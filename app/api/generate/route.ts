@@ -31,8 +31,8 @@ export async function POST(request: Request) {
               supabase,
               user!.id,
               { keyword, language, business_name: businessName ?? "", industry: industry ?? "e-commerce" },
-              (step, agent) => {
-                const event = JSON.stringify({ type: "progress", step, agent });
+              (step, agent, details) => {
+                const event = JSON.stringify({ type: "progress", step, agent, details });
                 controller.enqueue(encoder.encode(`data: ${event}\n\n`));
               },
             );

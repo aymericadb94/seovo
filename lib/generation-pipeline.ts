@@ -130,7 +130,7 @@ export type PipelineResult = {
 
 // ── Callback for progress tracking ───────────────────────────────────────────
 
-export type PipelineProgressCallback = (step: number, agent: string) => void;
+export type PipelineProgressCallback = (step: number, agent: string, details?: string[]) => void;
 
 // ── Contexte Rankpill — collecte des données ─────────────────────────────────
 
@@ -803,39 +803,93 @@ export async function runGenerationPipeline(
   // Collect Rankpill context
   const ctx = await collectRankpillContext(supabase, userId, input.keyword);
 
+  // ── Build contextual details for each agent ──
+  const gscKw = ctx.gsc_data?.queries.find(q => q.query.toLowerCase().includes(input.keyword.toLowerCase()));
+  const gscCount = ctx.gsc_data?.queries.length ?? 0;
+  const pagesCount = ctx.existing_pages.length;
+  const cocoonCluster = ctx.cocoon?.cluster;
+  const cocoonType = ctx.cocoon?.page_type;
+  const siblings = ctx.cocoon?.sibling_keywords ?? [];
+  const roadmapPhase = ctx.roadmap?.phase;
+  const roadmapPriority = ctx.roadmap?.priority;
+
   // Agent 1: Intent
-  onProgress?.(1, "intent");
+  onProgress?.(1, "intent", [
+    `Analyse du mot-clé "${input.keyword}"`,
+    ...(gscKw ? [`Données GSC trouvées — position ${gscKw.position}, ${gscKw.impressions} impressions, CTR ${gscKw.ctr}%`] : [`Pas de données GSC pour ce mot-clé — première analyse`]),
+    ...(cocoonCluster ? [`Mot-clé localisé dans le cluster "${cocoonCluster}" (${cocoonType})`] : []),
+    `Détection de l'intention de recherche et du niveau de maturité utilisateur`,
+  ]);
   const intent = await runIntentAgent(input, ctx);
 
   // Agent 2: SERP
-  onProgress?.(2, "serp");
+  onProgress?.(2, "serp", [
+    `Scraping des résultats Google pour "${input.keyword}"`,
+    `Analyse des 5 premiers résultats organiques`,
+    `Extraction des patterns de contenu, faiblesses et opportunités`,
+    `Identification des content gaps exploitables`,
+  ]);
   const serp = await runSerpAgent(input, ctx);
 
   // Agent 3: Diff
-  onProgress?.(3, "diff");
+  onProgress?.(3, "diff", [
+    `${serp.patterns.length} patterns SERP identifiés, ${serp.weaknesses.length} faiblesses détectées`,
+    ...(roadmapPhase ? [`Intégration de la roadmap SEO — phase ${roadmapPhase}, priorité ${roadmapPriority}`] : []),
+    ...(cocoonCluster ? [`Positionnement dans le cluster "${cocoonCluster}" — ${siblings.length} pages sœurs`] : []),
+    `Création d'un angle unique vs concurrence`,
+  ]);
   const diff = await runDiffAgent(input, ctx, serp);
 
   // Agent 4: Structure
-  onProgress?.(4, "structure");
+  onProgress?.(4, "structure", [
+    `Intent détecté : ${intent.intent} — utilisateur ${intent.user_stage}`,
+    `Angle retenu : "${diff.angle}"`,
+    `Sélection des blocs de contenu adaptés à l'intention`,
+    `Construction de la structure de page dynamique`,
+  ]);
   const structure = await runStructureAgent(input, ctx, intent, diff);
 
   // Agent 5: Content
-  onProgress?.(5, "content");
+  onProgress?.(5, "content", [
+    `Structure validée : ${structure.blocks.length} blocs (${structure.blocks.join(", ")})`,
+    `Rédaction SEO 1 500+ mots avec données chiffrées`,
+    ...(gscCount > 0 ? [`Intégration des ${gscCount} requêtes GSC dans le champ sémantique`] : []),
+    `Variations mot-clé : ${intent.keyword_variations.slice(0, 4).join(", ")}`,
+    `Promesse : "${diff.promise}"`,
+  ]);
   const content = await runContentAgent(input, ctx, intent, diff, structure);
 
   // Agent 6: Linking
-  onProgress?.(6, "linking");
+  onProgress?.(6, "linking", [
+    ...(pagesCount > 0 ? [
+      `${pagesCount} pages existantes analysées pour le maillage`,
+      ...(cocoonCluster ? [`Priorité aux liens du cluster "${cocoonCluster}"`] : []),
+      `Insertion de 2-4 liens internes avec ancres naturelles`,
+    ] : [
+      `Aucune page existante — maillage interne ignoré`,
+    ]),
+  ]);
   const linking = await runLinkingAgent(input, ctx, content);
 
   // Assemble HTML
   const html = assembleHtml(content, linking);
 
   // Agent 7: Risk
-  onProgress?.(7, "risk");
+  onProgress?.(7, "risk", [
+    `Vérification de la densité mot-clé (seuil < 2%)`,
+    ...(pagesCount > 0 ? [`Analyse de cannibalisation vs ${pagesCount} pages existantes`] : []),
+    `Détection des signaux de contenu IA`,
+    `Contrôle de la structure H2/H3`,
+  ]);
   const risk = await runRiskAgent(input, ctx, html);
 
   // Agent 8: CTR
-  onProgress?.(8, "ctr");
+  onProgress?.(8, "ctr", [
+    ...(gscKw ? [`CTR actuel GSC : ${gscKw.ctr}% — optimisation ciblée`] : [`Pas de CTR GSC — optimisation from scratch`]),
+    `Création du title SEO (50-60 caractères)`,
+    `Rédaction meta description (150-160 caractères)`,
+    `Score de risque : ${risk.risk_score}/100${risk.issues.length > 0 ? ` — ${risk.issues.length} point(s) corrigé(s)` : " — aucun problème détecté"}`,
+  ]);
   const ctr = await runCtrAgent(input, ctx, content);
 
   return {

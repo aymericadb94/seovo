@@ -145,6 +145,8 @@ export default function GeneratePage() {
   const [status, setStatus] = useState<"idle" | "generating" | "preview" | "publishing" | "done" | "error">("idle");
   const [currentStep, setCurrentStep] = useState(0);
   const [stepOutcomes, setStepOutcomes] = useState<Record<number, "success" | "skipped" | "failed">>({});
+  const [stepDetails, setStepDetails] = useState<Record<number, string[]>>({});
+  const [visibleDetails, setVisibleDetails] = useState<Record<number, number>>({});
   const [generated, setGenerated] = useState<GeneratedArticle | null>(null);
   const [result, setResult] = useState<{ title: string; url: string; meta?: string } | null>(null);
   const [error, setError] = useState("");
@@ -188,6 +190,26 @@ export default function GeneratePage() {
       return () => clearInterval(id);
     }
   }, [status]);
+
+  // Animate detail lines appearing one by one
+  useEffect(() => {
+    if (status !== "generating") return;
+    const details = stepDetails[currentStep];
+    if (!details || details.length === 0) return;
+
+    // Reset visible count for this step
+    setVisibleDetails(prev => ({ ...prev, [currentStep]: 0 }));
+
+    let count = 0;
+    const step = currentStep;
+    const id = setInterval(() => {
+      count++;
+      setVisibleDetails(prev => ({ ...prev, [step]: count }));
+      if (count >= details.length) clearInterval(id);
+    }, 600);
+
+    return () => clearInterval(id);
+  }, [currentStep, status, stepDetails]);
 
   const activeKeyword = customKeyword.trim() || keyword;
 
@@ -261,6 +283,7 @@ export default function GeneratePage() {
               type: string;
               step?: number;
               agent?: string;
+              details?: string[];
               result?: ApiResult;
               error?: string;
             };
@@ -279,6 +302,9 @@ export default function GeneratePage() {
                   }
                   return next;
                 });
+                if (event.details) {
+                  setStepDetails(prev => ({ ...prev, [idx]: event.details! }));
+                }
                 setCurrentStep(idx);
               }
             } else if (event.type === "done" && event.result) {
@@ -387,6 +413,8 @@ export default function GeneratePage() {
     setStatus("generating");
     setCurrentStep(0);
     setStepOutcomes({});
+    setStepDetails({});
+    setVisibleDetails({});
     setError("");
     setResult(null);
     setGenerated(null);
@@ -747,92 +775,125 @@ export default function GeneratePage() {
               </div>
 
               {/* Steps */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1">
                 {STEPS.map((step, i) => {
                   const isDone = i < currentStep;
                   const isActive = i === currentStep;
-                  const outcome = stepOutcomes[i]; // "success" | "skipped" | "failed" | undefined
+                  const outcome = stepOutcomes[i];
                   const isFailed = isDone && outcome === "failed";
                   const isSkipped = isDone && outcome === "skipped";
+                  const details = stepDetails[i] ?? [];
+                  const visibleCount = visibleDetails[i] ?? (isDone ? details.length : 0);
 
                   return (
                     <div
                       key={step.id}
-                      className="flex items-start gap-4 p-4 rounded-xl transition-all duration-500"
+                      className="rounded-xl transition-all duration-500 overflow-hidden"
                       style={{
                         background: isFailed
                           ? "rgba(239,68,68,0.06)"
                           : isSkipped
                           ? "rgba(234,179,8,0.06)"
-                          : isDone
-                          ? "rgba(249,115,22,0.06)"
                           : isActive
-                          ? "rgba(255,255,255,0.04)"
+                          ? "rgba(249,115,22,0.04)"
+                          : isDone
+                          ? "rgba(249,115,22,0.03)"
                           : "transparent",
                         borderLeft: isFailed
                           ? "2px solid rgba(239,68,68,0.5)"
                           : isActive ? "2px solid #f97316" : "2px solid transparent",
-                        opacity: !isDone && !isActive ? 0.35 : 1,
+                        opacity: !isDone && !isActive ? 0.3 : 1,
                       }}
                     >
-                      {/* Icon */}
-                      <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 transition-all duration-500"
-                        style={{
-                          background: isFailed
-                            ? "rgba(239,68,68,0.2)"
-                            : isSkipped
-                            ? "rgba(234,179,8,0.2)"
-                            : isDone
-                            ? "rgba(249,115,22,0.2)"
-                            : isActive
-                            ? "rgba(249,115,22,0.1)"
-                            : "rgba(255,255,255,0.04)",
-                          color: isFailed ? "#ef4444" : isSkipped ? "#eab308" : isDone ? "#f97316" : isActive ? "#fb923c" : "#4b5563",
-                        }}
-                      >
-                        {isFailed ? (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                          </svg>
-                        ) : isSkipped ? (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                            <path d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                          </svg>
-                        ) : isDone ? (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
-                        ) : isActive ? (
-                          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="9" stroke="rgba(249,115,22,0.2)" strokeWidth="2"/>
-                            <path d="M12 3a9 9 0 019 9" stroke="#f97316" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
-                        ) : (
-                          step.icon
-                        )}
-                      </div>
-
-                      {/* Text */}
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className="text-sm font-bold leading-snug transition-colors duration-300"
-                          style={{ color: isFailed ? "#fca5a5" : isSkipped ? "#fde047" : isDone ? "#fdba74" : isActive ? "white" : "#6b7280" }}
+                      {/* Step header */}
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        {/* Icon */}
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-500"
+                          style={{
+                            background: isFailed
+                              ? "rgba(239,68,68,0.2)"
+                              : isSkipped
+                              ? "rgba(234,179,8,0.2)"
+                              : isDone
+                              ? "rgba(249,115,22,0.2)"
+                              : isActive
+                              ? "rgba(249,115,22,0.15)"
+                              : "rgba(255,255,255,0.04)",
+                            color: isFailed ? "#ef4444" : isSkipped ? "#eab308" : isDone ? "#f97316" : isActive ? "#fb923c" : "#4b5563",
+                          }}
                         >
-                          {step.label}
-                        </p>
-                        {(isDone || isActive) && (
-                          <p className="text-xs mt-0.5 transition-all duration-300" style={{ color: isFailed ? "rgba(239,68,68,0.6)" : isSkipped ? "rgba(234,179,8,0.5)" : "rgba(156,163,175,0.6)" }}>
-                            {isFailed ? "Échec — contenu précédent conservé" : isSkipped ? "Ignoré — aucun changement applicable" : step.sub}
+                          {isFailed ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                          ) : isDone ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          ) : isActive ? (
+                            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="9" stroke="rgba(249,115,22,0.2)" strokeWidth="2"/>
+                              <path d="M12 3a9 9 0 019 9" stroke="#f97316" strokeWidth="2" strokeLinecap="round"/>
+                            </svg>
+                          ) : (
+                            step.icon
+                          )}
+                        </div>
+
+                        {/* Title + sub */}
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className="text-sm font-bold leading-snug transition-colors duration-300"
+                            style={{ color: isFailed ? "#fca5a5" : isDone ? "#fdba74" : isActive ? "white" : "#6b7280" }}
+                          >
+                            {step.label}
                           </p>
+                        </div>
+
+                        {/* Status */}
+                        {isDone && (
+                          <span className="text-[10px] font-black uppercase tracking-wider flex-shrink-0" style={{ color: isFailed ? "rgba(239,68,68,0.5)" : "rgba(249,115,22,0.4)" }}>
+                            {isFailed ? "Échec" : "OK"}
+                          </span>
                         )}
                       </div>
 
-                      {/* Status badge */}
-                      {isDone && (
-                        <span className="text-xs font-bold flex-shrink-0 mt-0.5" style={{ color: isFailed ? "rgba(239,68,68,0.6)" : isSkipped ? "rgba(234,179,8,0.6)" : "rgba(249,115,22,0.6)" }}>
-                          {isFailed ? "✕" : isSkipped ? "–" : "✓"}
-                        </span>
+                      {/* Detail lines — terminal-style animation */}
+                      {(isActive || isDone) && details.length > 0 && (
+                        <div className="px-4 pb-3 pl-14">
+                          <div className="flex flex-col gap-1">
+                            {details.slice(0, isDone ? details.length : visibleCount).map((detail, j) => {
+                              const isLastVisible = isActive && j === visibleCount - 1;
+                              return (
+                                <div
+                                  key={j}
+                                  className="flex items-start gap-2 transition-all duration-500"
+                                  style={{
+                                    opacity: isDone ? 0.5 : 1,
+                                    animation: !isDone ? "fadeSlideIn 0.4s ease-out" : undefined,
+                                  }}
+                                >
+                                  <span
+                                    className="flex-shrink-0 mt-0.5 text-[10px] font-mono"
+                                    style={{ color: isLastVisible && isActive ? "#fb923c" : isDone ? "rgba(249,115,22,0.3)" : "rgba(249,115,22,0.5)" }}
+                                  >
+                                    {isDone ? "✓" : isLastVisible ? "▸" : "✓"}
+                                  </span>
+                                  <span
+                                    className="text-[11px] leading-relaxed font-mono"
+                                    style={{ color: isLastVisible && isActive ? "rgba(255,255,255,0.7)" : isDone ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.4)" }}
+                                  >
+                                    {detail}
+                                    {isLastVisible && isActive && (
+                                      <span className="inline-block w-1 h-3 bg-orange-400 ml-1 animate-pulse" style={{ verticalAlign: "text-bottom" }} />
+                                    )}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       )}
                     </div>
                   );
