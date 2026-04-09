@@ -1,6 +1,6 @@
 // ─── Types Ricos (format natif Wix) ──────────────────────────────────────────
 
-type Decoration = { type: "BOLD" } | { type: "ITALIC" };
+type Decoration = { type: "BOLD" } | { type: "ITALIC" } | { type: "LINK"; linkData: { link: { url: string; target?: string } } };
 
 type TextNode = {
   type: "TEXT";
@@ -74,31 +74,43 @@ function genId() {
   return `n${++_idCounter}`;
 }
 
+function decodeEntities(s: string): string {
+  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, "\u00a0").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+}
+
 function parseInline(html: string): TextNode[] {
   const clean = html.replace(/<br\s*\/?>/gi, " ");
-  // Support <strong> with attributes (e.g. <strong class="...">)
-  const segments = clean.split(/(<strong[^>]*>[\s\S]*?<\/strong>|<em[^>]*>[\s\S]*?<\/em>)/);
+  // Split on inline tags: <strong>, <em>, <a>, <b>, <i>
+  const segments = clean.split(/(<(?:strong|b|em|i|a)\b[^>]*>[\s\S]*?<\/(?:strong|b|em|i|a)>)/i);
   const result: TextNode[] = [];
 
   for (const seg of segments) {
     if (!seg) continue;
-    const boldMatch = seg.match(/^<strong[^>]*>([\s\S]*?)<\/strong>$/);
-    const italicMatch = seg.match(/^<em[^>]*>([\s\S]*?)<\/em>$/);
+    const boldMatch = seg.match(/^<(?:strong|b)[^>]*>([\s\S]*?)<\/(?:strong|b)>$/i);
+    const italicMatch = seg.match(/^<(?:em|i)[^>]*>([\s\S]*?)<\/(?:em|i)>$/i);
+    const linkMatch = seg.match(/^<a\s+[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>$/i);
+
+    if (linkMatch) {
+      const href = decodeEntities(linkMatch[1]);
+      const linkText = decodeEntities(linkMatch[2].replace(/<[^>]+>/g, ""));
+      if (!linkText.trim()) continue;
+      result.push({
+        type: "TEXT", id: "", nodes: [],
+        textData: {
+          text: linkText,
+          decorations: [{ type: "LINK", linkData: { link: { url: href, target: "_blank" } } }],
+        },
+      });
+      continue;
+    }
+
     const inner = boldMatch?.[1] ?? italicMatch?.[1] ?? seg;
-    // Preserve spaces — don't trim, only skip purely empty nodes
-    const text = inner
-      .replace(/<[^>]+>/g, "")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&nbsp;/g, "\u00a0");
+    const text = decodeEntities(inner.replace(/<[^>]+>/g, ""));
     if (!text.trim()) continue;
     result.push({
-      type: "TEXT",
-      id: "",
-      nodes: [],
+      type: "TEXT", id: "", nodes: [],
       textData: {
-        text, // spaces preserved
+        text,
         decorations: boldMatch ? [{ type: "BOLD" }] : italicMatch ? [{ type: "ITALIC" }] : [],
       },
     });
