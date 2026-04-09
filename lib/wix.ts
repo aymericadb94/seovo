@@ -55,7 +55,17 @@ type TableNode = {
   tableData: { dimensions: { colsWidthRatio: number[]; rowsHeight: number[] } };
 };
 
-type RicosNode = ParagraphNode | HeadingNode | ListNode | TableNode;
+type ImageNode = {
+  type: "IMAGE";
+  id: string;
+  nodes: [];
+  imageData: {
+    containerData: { width: { size: string }; alignment: string };
+    image: { src: { url: string }; width: number; height: number; altText?: string };
+  };
+};
+
+type RicosNode = ParagraphNode | HeadingNode | ListNode | TableNode | ImageNode;
 
 // ─── Convertisseur HTML → Ricos ───────────────────────────────────────────────
 
@@ -165,6 +175,18 @@ function makeTable(html: string): TableNode {
   };
 }
 
+function makeImage(src: string, alt?: string): ImageNode {
+  return {
+    type: "IMAGE",
+    id: genId(),
+    nodes: [],
+    imageData: {
+      containerData: { width: { size: "CONTENT" }, alignment: "CENTER" },
+      image: { src: { url: src }, width: 1200, height: 630, altText: alt ?? "" },
+    },
+  };
+}
+
 export function htmlToRicos(html: string): object {
   _idCounter = 0;
   const nodes: RicosNode[] = [];
@@ -181,29 +203,66 @@ export function htmlToRicos(html: string): object {
     });
   }
 
-  // Remove tables from html before processing blocks
-  let htmlWithoutTables = html;
-  for (const t of [...tables].reverse()) {
-    htmlWithoutTables = htmlWithoutTables.slice(0, t.index) + `<TABLE_PLACEHOLDER_${tables.indexOf(t)}>` + htmlWithoutTables.slice(t.index + t.length);
+  // Extract standalone images (outside of <p> tags)
+  const images: { index: number; length: number; node: ImageNode }[] = [];
+  const figureRegex = /<figure[^>]*>[\s\S]*?<img\s+[^>]*src="([^"]+)"[^>]*(?:alt="([^"]*)")?[^>]*\/>?[\s\S]*?<\/figure>/gi;
+  let figMatch;
+  while ((figMatch = figureRegex.exec(html)) !== null) {
+    images.push({ index: figMatch.index, length: figMatch[0].length, node: makeImage(figMatch[1], figMatch[2]) });
+  }
+  const standaloneImgRegex = /<img\s+[^>]*src="([^"]+)"[^>]*(?:alt="([^"]*)")?[^>]*\/?>/gi;
+  let imgMatch;
+  while ((imgMatch = standaloneImgRegex.exec(html)) !== null) {
+    // Skip if already captured by figure
+    const alreadyCaptured = images.some(img => imgMatch!.index >= img.index && imgMatch!.index < img.index + img.length);
+    if (!alreadyCaptured) {
+      images.push({ index: imgMatch.index, length: imgMatch[0].length, node: makeImage(imgMatch[1], imgMatch[2]) });
+    }
   }
 
-  const blockRegex = /<(h2|h3|h4|p|ul|ol)([^>]*)>([\s\S]*?)<\/\1>|<TABLE_PLACEHOLDER_(\d+)>/gi;
+  // Remove tables and images from html before processing blocks
+  let processed = html;
+  const allReplacements = [
+    ...tables.map((t, i) => ({ index: t.index, length: t.length, placeholder: `<TABLE_PLACEHOLDER_${i}>` })),
+    ...images.map((img, i) => ({ index: img.index, length: img.length, placeholder: `<IMG_PLACEHOLDER_${i}>` })),
+  ].sort((a, b) => b.index - a.index);
+
+  for (const r of allReplacements) {
+    processed = processed.slice(0, r.index) + r.placeholder + processed.slice(r.index + r.length);
+  }
+
+  const blockRegex = /<(h[1-6]|p|ul|ol|blockquote|div)([^>]*)>([\s\S]*?)<\/\1>|<TABLE_PLACEHOLDER_(\d+)>|<IMG_PLACEHOLDER_(\d+)>/gi;
   let match;
 
-  while ((match = blockRegex.exec(htmlWithoutTables)) !== null) {
+  while ((match = blockRegex.exec(processed)) !== null) {
     if (match[4] !== undefined) {
-      // Table placeholder
       nodes.push(tables[parseInt(match[4])].node);
+      continue;
+    }
+    if (match[5] !== undefined) {
+      nodes.push(images[parseInt(match[5])].node);
       continue;
     }
     const tag = match[1].toLowerCase();
     const inner = match[3].trim();
-    if (tag === "h2") nodes.push(makeHeading(inner, 2));
-    else if (tag === "h3") nodes.push(makeHeading(inner, 3));
-    else if (tag === "h4") nodes.push(makeHeading(inner, 4));
+    // Check if inner contains an image placeholder
+    const innerImgMatch = inner.match(/<IMG_PLACEHOLDER_(\d+)>/);
+    if (innerImgMatch) {
+      nodes.push(images[parseInt(innerImgMatch[1])].node);
+      // Also add remaining text if any
+      const textPart = inner.replace(/<IMG_PLACEHOLDER_\d+>/, "").trim();
+      if (textPart) nodes.push(makeParagraph(textPart));
+      continue;
+    }
+    if (tag.startsWith("h")) {
+      const level = parseInt(tag[1]);
+      nodes.push(makeHeading(inner, level));
+    }
     else if (tag === "p") nodes.push(makeParagraph(inner));
     else if (tag === "ul") nodes.push(makeList(inner, false));
     else if (tag === "ol") nodes.push(makeList(inner, true));
+    else if (tag === "blockquote") nodes.push(makeParagraph(inner));
+    else if (tag === "div" && inner) nodes.push(makeParagraph(inner));
   }
 
   if (nodes.length === 0) {
