@@ -234,6 +234,7 @@ export async function collectRankpillContext(
     type CocoonCluster = { name: string; pillar: string; pages: { keyword: string; role: string }[] };
     const clusters = ((cocoonResult.data.data as { clusters?: CocoonCluster[] }).clusters ?? []);
     for (const c of clusters) {
+      if (!Array.isArray(c.pages)) continue;
       const page = c.pages.find(p => p.keyword.toLowerCase() === keyword.toLowerCase());
       if (page) {
         const isPillar = page.role === "pillar" || c.pillar.toLowerCase() === keyword.toLowerCase();
@@ -248,16 +249,32 @@ export async function collectRankpillContext(
     }
   }
 
-  // Roadmap
+  // Roadmap (supports both "phases" and "articles" format from DB)
   let roadmap: RoadmapInfo | null = null;
   if (roadmapResult.data?.data) {
-    type Phase = { phase: number; actions: { keyword?: string; priority?: string; objective?: string }[] };
-    const phases = ((roadmapResult.data.data as { phases?: Phase[] }).phases ?? []);
-    for (const phase of phases) {
-      const action = phase.actions.find(a => a.keyword?.toLowerCase() === keyword.toLowerCase());
-      if (action) {
-        roadmap = { phase: phase.phase, priority: action.priority ?? "moyenne", objective: action.objective ?? "" };
-        break;
+    const rmData = roadmapResult.data.data as {
+      phases?: { phase: number; actions: { keyword?: string; priority?: string; objective?: string }[] }[];
+      articles?: { keyword?: string; priority?: number | string; objective?: string }[];
+    };
+
+    // Format "phases"
+    if (Array.isArray(rmData.phases)) {
+      for (const phase of rmData.phases) {
+        if (!Array.isArray(phase.actions)) continue;
+        const action = phase.actions.find(a => a.keyword?.toLowerCase() === keyword.toLowerCase());
+        if (action) {
+          roadmap = { phase: phase.phase, priority: action.priority ?? "moyenne", objective: action.objective ?? "" };
+          break;
+        }
+      }
+    }
+
+    // Format "articles" (fallback)
+    if (!roadmap && Array.isArray(rmData.articles)) {
+      const article = rmData.articles.find(a => a.keyword?.toLowerCase() === keyword.toLowerCase());
+      if (article) {
+        const pri = typeof article.priority === "number" ? (article.priority <= 3 ? "haute" : article.priority <= 6 ? "moyenne" : "faible") : String(article.priority ?? "moyenne");
+        roadmap = { phase: 1, priority: pri, objective: article.objective ?? "" };
       }
     }
   }
