@@ -182,6 +182,7 @@ export default function GeneratePage() {
   const [result, setResult] = useState<{ title: string; url: string; meta?: string } | null>(null);
   const [error, setError] = useState("");
   const [kwFilter, setKwFilter] = useState<"all" | "roadmap" | "cocoon" | "gsc">("all");
+  const [showAllKw, setShowAllKw] = useState(false);
 
   useEffect(() => {
     // Load site config + smart keywords in parallel
@@ -569,148 +570,166 @@ export default function GeneratePage() {
         {(status === "idle" || status === "error") ? (
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
-            {/* Keyword picker — Smart suggestions */}
+            {/* Keyword picker — Top recommendations + dropdown */}
             <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-3">
-                1. Mot-clé cible
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-4">
+                1. Mot-cl\u00e9 cible
               </label>
 
-              {/* Source filters */}
+              {/* Top 5 recommendations */}
               {smartKeywords.length > 0 && (
-                <div className="flex items-center gap-2 mb-4 flex-wrap">
-                  {([
-                    { key: "all" as const, label: "Tous", count: smartKeywords.length, color: "" },
-                    { key: "roadmap" as const, label: "Roadmap", count: smartKeywords.filter(k => k.source === "roadmap").length, color: "orange" },
-                    { key: "cocoon" as const, label: "Cocon", count: smartKeywords.filter(k => k.source === "cocoon").length, color: "blue" },
-                    { key: "gsc" as const, label: "GSC", count: smartKeywords.filter(k => k.source === "gsc").length, color: "green" },
-                  ]).filter(f => f.count > 0).map(f => (
-                    <button
-                      key={f.key}
-                      type="button"
-                      onClick={() => setKwFilter(f.key)}
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
-                        kwFilter === f.key
-                          ? "bg-orange-500/15 text-orange-400 border border-orange-500/30"
-                          : "bg-white/[0.04] text-gray-500 border border-white/[0.06] hover:text-gray-300"
-                      }`}
-                    >
-                      {f.label} ({f.count})
-                    </button>
-                  ))}
+                <div className="flex flex-col gap-2 mb-4">
+                  {smartKeywords.slice(0, 5).map((kw, i) => {
+                    const badge = SOURCE_BADGES[kw.source];
+                    const isSelected = keyword === kw.keyword && !customKeyword.trim();
+                    const bars = scoreBars(kw.score);
+                    const sColor = scoreColor(kw.score);
+                    return (
+                      <button
+                        key={kw.keyword}
+                        type="button"
+                        onClick={() => { setKeyword(kw.keyword); setCustomKeyword(""); setShowAllKw(false); }}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
+                          isSelected
+                            ? "bg-orange-500/15 border-orange-500/40 shadow-[0_0_15px_rgba(249,115,22,0.1)]"
+                            : "bg-white/[0.02] border-white/[0.06] hover:border-orange-500/25 hover:bg-white/[0.04]"
+                        }`}
+                      >
+                        {/* Rank */}
+                        <span className={`text-xs font-black w-5 text-center flex-shrink-0 ${isSelected ? "text-orange-400" : "text-gray-600"}`}>
+                          {i + 1}
+                        </span>
+                        {/* Score bars */}
+                        <span className="flex items-end gap-[2px] flex-shrink-0" title={`Score: ${kw.score}/100`}>
+                          {[1, 2, 3, 4, 5].map(b => (
+                            <span
+                              key={b}
+                              className="w-[3px] rounded-full"
+                              style={{ height: `${4 + b * 2}px`, background: b <= bars ? sColor : "rgba(255,255,255,0.06)" }}
+                            />
+                          ))}
+                        </span>
+                        {/* Keyword + meta */}
+                        <div className="flex-1 min-w-0">
+                          <span className={`text-sm font-bold block truncate ${isSelected ? "text-orange-300" : "text-white"}`}>
+                            {kw.keyword}
+                          </span>
+                          <span className="text-[10px] text-gray-600 block mt-0.5 truncate">
+                            {kw.reason}
+                            {kw.gsc ? ` \u00b7 pos ${kw.gsc.position} \u00b7 ${kw.gsc.impressions} imp` : ""}
+                          </span>
+                        </div>
+                        {/* Badges */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase" style={{ background: badge.bg, color: badge.color }}>
+                            {badge.label}
+                          </span>
+                          {ROLE_LABELS[kw.role] && (
+                            <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase bg-white/[0.05] text-gray-500">
+                              {ROLE_LABELS[kw.role]}
+                            </span>
+                          )}
+                        </div>
+                        {/* Check */}
+                        {isSelected && (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
-              {/* Keywords grouped by priority tier */}
-              {filteredKeywords.length > 0 ? (
-                <div className="space-y-4 mb-4">
-                  {(["haute", "moyenne", "faible"] as const).map(tier => {
-                    const tierKws = filteredKeywords.filter(k => k.priority === tier);
-                    if (tierKws.length === 0) return null;
-                    const tierLabel = tier === "haute" ? "Priorit\u00e9 haute" : tier === "moyenne" ? "Priorit\u00e9 moyenne" : "Autres";
-                    const tierIcon = tier === "haute" ? "\u25CF" : tier === "moyenne" ? "\u25CB" : "";
-                    const tierColor = tier === "haute" ? "text-green-400" : tier === "moyenne" ? "text-orange-400" : "text-gray-500";
-                    return (
-                      <div key={tier}>
-                        <div className={`flex items-center gap-1.5 mb-2 ${tierColor}`}>
-                          {tierIcon && <span className="text-[8px]">{tierIcon}</span>}
-                          <span className="text-[10px] font-bold uppercase tracking-wider">{tierLabel}</span>
-                          <span className="text-[9px] text-gray-600">({tierKws.length})</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {tierKws.map((kw) => {
+              {/* "Voir plus" dropdown */}
+              {smartKeywords.length > 5 && (
+                <div className="relative mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllKw(!showAllKw)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] text-gray-500 hover:text-gray-300 text-xs font-bold transition-all"
+                  >
+                    <span>{smartKeywords.length - 5} autres mots-cl\u00e9s disponibles</span>
+                    <svg
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                      className={`w-3.5 h-3.5 transition-transform ${showAllKw ? "rotate-180" : ""}`}
+                    >
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </button>
+
+                  {showAllKw && (
+                    <div
+                      className="mt-2 rounded-xl border border-white/[0.06] bg-[#0c0c0c] overflow-hidden"
+                      style={{ maxHeight: "280px", overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "rgba(249,115,22,0.2) transparent" }}
+                    >
+                      {/* Source filters inside dropdown */}
+                      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/[0.04] sticky top-0 bg-[#0c0c0c] z-10">
+                        {([
+                          { key: "all" as const, label: "Tous", count: smartKeywords.length - 5 },
+                          { key: "roadmap" as const, label: "Roadmap", count: smartKeywords.slice(5).filter(k => k.source === "roadmap").length },
+                          { key: "cocoon" as const, label: "Cocon", count: smartKeywords.slice(5).filter(k => k.source === "cocoon").length },
+                          { key: "gsc" as const, label: "GSC", count: smartKeywords.slice(5).filter(k => k.source === "gsc").length },
+                        ]).filter(f => f.key === "all" || f.count > 0).map(f => (
+                          <button
+                            key={f.key}
+                            type="button"
+                            onClick={() => setKwFilter(f.key)}
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold transition-all ${
+                              kwFilter === f.key
+                                ? "bg-orange-500/15 text-orange-400 border border-orange-500/30"
+                                : "text-gray-600 hover:text-gray-400"
+                            }`}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Remaining keywords list */}
+                      <div className="py-1">
+                        {smartKeywords.slice(5)
+                          .filter(k => kwFilter === "all" || k.source === kwFilter)
+                          .map((kw) => {
                             const badge = SOURCE_BADGES[kw.source];
-                            const roleLabel = ROLE_LABELS[kw.role];
                             const isSelected = keyword === kw.keyword && !customKeyword.trim();
-                            const bars = scoreBars(kw.score);
-                            const sColor = scoreColor(kw.score);
                             return (
                               <button
                                 key={kw.keyword}
                                 type="button"
-                                onClick={() => { setKeyword(kw.keyword); setCustomKeyword(""); }}
-                                className={`group relative px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                                onClick={() => { setKeyword(kw.keyword); setCustomKeyword(""); setShowAllKw(false); }}
+                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all ${
                                   isSelected
-                                    ? "bg-orange-500/20 border-orange-500/50 text-orange-300 shadow-[0_0_12px_rgba(249,115,22,0.15)]"
-                                    : "bg-white/[0.04] border-white/[0.08] text-gray-400 hover:border-orange-500/30 hover:text-orange-400"
+                                    ? "bg-orange-500/10"
+                                    : "hover:bg-white/[0.03]"
                                 }`}
                               >
-                                <span className="flex items-center gap-1.5">
-                                  {/* Score bars */}
-                                  <span className="flex items-end gap-[2px] mr-0.5" title={`Score: ${kw.score}/100`}>
-                                    {[1, 2, 3, 4, 5].map(i => (
-                                      <span
-                                        key={i}
-                                        className="w-[3px] rounded-full"
-                                        style={{
-                                          height: `${6 + i * 2}px`,
-                                          background: i <= bars ? sColor : "rgba(255,255,255,0.08)",
-                                        }}
-                                      />
-                                    ))}
-                                  </span>
+                                <span className={`text-xs font-bold truncate flex-1 ${isSelected ? "text-orange-300" : "text-gray-300"}`}>
                                   {kw.keyword}
-                                  {/* Source badge */}
-                                  <span
-                                    className="text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase"
-                                    style={{ background: badge.bg, color: badge.color }}
-                                  >
-                                    {badge.label}
-                                  </span>
-                                  {/* Role badge */}
-                                  {roleLabel && (
-                                    <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase bg-white/[0.06] text-gray-500">
-                                      {roleLabel}
-                                    </span>
-                                  )}
                                 </span>
-                                {/* GSC position indicator */}
-                                {kw.gsc && (
-                                  <span className="flex items-center gap-1 mt-1 text-[9px] text-gray-600">
-                                    <span style={{ color: kw.gsc.position <= 10 ? "#22c55e" : kw.gsc.position <= 20 ? "#f97316" : "#6b7280" }}>
-                                      pos {kw.gsc.position}
-                                    </span>
-                                    <span>·</span>
-                                    <span>{kw.gsc.impressions} imp</span>
-                                    {kw.gsc.clicks > 0 && <><span>·</span><span>{kw.gsc.clicks} clics</span></>}
-                                  </span>
-                                )}
-                                {/* Tooltip */}
-                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#111] border border-white/10 text-gray-300 text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                  Score {kw.score}/100 — {kw.reason}{kw.cluster ? ` · ${kw.cluster}` : ""}
+                                <span className="text-[10px] text-gray-600 flex-shrink-0">
+                                  {kw.score}/100
+                                </span>
+                                <span className="text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase flex-shrink-0" style={{ background: badge.bg, color: badge.color }}>
+                                  {badge.label}
                                 </span>
                               </button>
                             );
                           })}
-                        </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
                 </div>
-              ) : site && site.keywords.length > 0 ? (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {site.keywords.map((kw) => (
-                    <button
-                      key={kw}
-                      type="button"
-                      onClick={() => { setKeyword(kw); setCustomKeyword(""); }}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                        keyword === kw && !customKeyword.trim()
-                          ? "bg-orange-500/20 border-orange-500/50 text-orange-300"
-                          : "bg-white/[0.04] border-white/[0.1] text-gray-400 hover:border-orange-500/30 hover:text-orange-400"
-                      }`}
-                    >
-                      {kw}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              )}
 
+              {/* Custom keyword input */}
               <div className="relative">
                 <input
                   type="text"
                   value={customKeyword}
                   onChange={(e) => setCustomKeyword(e.target.value)}
-                  placeholder="Ou saisir un mot-clé personnalisé..."
+                  placeholder="Ou saisir un mot-cl\u00e9 personnalis\u00e9..."
                   className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors text-sm"
                 />
                 {customKeyword && (
@@ -719,13 +738,13 @@ export default function GeneratePage() {
                     onClick={() => setCustomKeyword("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400"
                   >
-                    ×
+                    \u00d7
                   </button>
                 )}
               </div>
               {activeKeyword && (
                 <p className="mt-3 text-xs text-gray-500">
-                  Mot-clé sélectionné : <span className="text-orange-400 font-bold">{activeKeyword}</span>
+                  Mot-cl\u00e9 s\u00e9lectionn\u00e9 : <span className="text-orange-400 font-bold">{activeKeyword}</span>
                 </p>
               )}
             </div>
