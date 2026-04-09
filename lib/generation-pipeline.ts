@@ -228,54 +228,85 @@ export async function collectRankpillContext(
     }
   }
 
-  // Cocoon
+  // Cocoon — real DB format: { clusters: [{ name, priority, pillar: { title, keyword, status }, support_pages: [{ title, keyword, status }] }] }
   let cocoon: CocoonInfo | null = null;
   if (cocoonResult.data?.data) {
-    type CocoonCluster = { name: string; pillar: string; pages: { keyword: string; role: string }[] };
+    type CocoonCluster = {
+      name: string;
+      priority: string;
+      pillar: { title: string; keyword: string; status: string };
+      support_pages: { title: string; keyword: string; status: string }[];
+    };
     const clusters = ((cocoonResult.data.data as { clusters?: CocoonCluster[] }).clusters ?? []);
+    const kwLower = keyword.toLowerCase();
+
     for (const c of clusters) {
-      if (!Array.isArray(c.pages)) continue;
-      const page = c.pages.find(p => p.keyword.toLowerCase() === keyword.toLowerCase());
-      if (page) {
-        const isPillar = page.role === "pillar" || c.pillar.toLowerCase() === keyword.toLowerCase();
+      const pillarKw = c.pillar?.keyword?.toLowerCase() ?? "";
+      const supportPages = Array.isArray(c.support_pages) ? c.support_pages : [];
+      const allKeywords = [
+        ...(pillarKw ? [{ keyword: c.pillar.keyword, role: "pillar" }] : []),
+        ...supportPages.map(p => ({ keyword: p.keyword, role: "support" })),
+      ];
+
+      const match = allKeywords.find(p => p.keyword?.toLowerCase() === kwLower);
+      if (match) {
         cocoon = {
-          page_type: isPillar ? "pillar" : "support",
+          page_type: match.role === "pillar" ? "pillar" : "support",
           cluster: c.name,
-          pillar_relation: isPillar ? "self" : c.pillar,
-          sibling_keywords: c.pages.filter(p => p.keyword.toLowerCase() !== keyword.toLowerCase()).map(p => p.keyword),
+          pillar_relation: match.role === "pillar" ? "self" : c.pillar.keyword,
+          sibling_keywords: allKeywords.filter(p => p.keyword?.toLowerCase() !== kwLower).map(p => p.keyword),
         };
         break;
       }
     }
+
+    // Fallback: if keyword not found in any cluster, use the first cluster for context
+    if (!cocoon && clusters.length > 0) {
+      const first = clusters[0];
+      const supportPages = Array.isArray(first.support_pages) ? first.support_pages : [];
+      cocoon = {
+        page_type: "complementary",
+        cluster: first.name,
+        pillar_relation: first.pillar?.keyword ?? first.name,
+        sibling_keywords: [
+          ...(first.pillar?.keyword ? [first.pillar.keyword] : []),
+          ...supportPages.map(p => p.keyword),
+        ].filter(Boolean).slice(0, 10),
+      };
+    }
   }
 
-  // Roadmap (supports both "phases" and "articles" format from DB)
+  // Roadmap — real DB format: { articles: [{id, title, keyword, role, cluster, priority}], phases: [{phase, label, ids}] }
   let roadmap: RoadmapInfo | null = null;
   if (roadmapResult.data?.data) {
-    const rmData = roadmapResult.data.data as {
-      phases?: { phase: number; actions: { keyword?: string; priority?: string; objective?: string }[] }[];
-      articles?: { keyword?: string; priority?: number | string; objective?: string }[];
-    };
+    type RoadmapArticle = { id: number; title: string; keyword: string; role: string; cluster?: string; priority: number };
+    type RoadmapPhase = { phase: number; label: string; ids: number[] };
+    const rmData = roadmapResult.data.data as { articles?: RoadmapArticle[]; phases?: RoadmapPhase[] };
+    const articles = Array.isArray(rmData.articles) ? rmData.articles : [];
+    const phases = Array.isArray(rmData.phases) ? rmData.phases : [];
 
-    // Format "phases"
-    if (Array.isArray(rmData.phases)) {
-      for (const phase of rmData.phases) {
-        if (!Array.isArray(phase.actions)) continue;
-        const action = phase.actions.find(a => a.keyword?.toLowerCase() === keyword.toLowerCase());
-        if (action) {
-          roadmap = { phase: phase.phase, priority: action.priority ?? "moyenne", objective: action.objective ?? "" };
-          break;
-        }
+    // Build article → phase map
+    const phaseMap = new Map<number, number>();
+    for (const phase of phases) {
+      if (Array.isArray(phase.ids)) {
+        for (const id of phase.ids) phaseMap.set(id, phase.phase);
       }
     }
 
-    // Format "articles" (fallback)
-    if (!roadmap && Array.isArray(rmData.articles)) {
-      const article = rmData.articles.find(a => a.keyword?.toLowerCase() === keyword.toLowerCase());
-      if (article) {
-        const pri = typeof article.priority === "number" ? (article.priority <= 3 ? "haute" : article.priority <= 6 ? "moyenne" : "faible") : String(article.priority ?? "moyenne");
-        roadmap = { phase: 1, priority: pri, objective: article.objective ?? "" };
-      }
+    // Find exact keyword match
+    const kwLower = keyword.toLowerCase();
+    const match = articles.find(a => a.keyword?.toLowerCase() === kwLower);
+    if (match) {
+      const phase = phaseMap.get(match.id) ?? 1;
+      const pri = match.priority <= 10 ? "haute" : match.priority <= 20 ? "moyenne" : "faible";
+      roadmap = { phase, priority: pri, objective: `${match.role} — ${match.title}` };
+    } else if (articles.length > 0) {
+      // Fallback: give the global roadmap context (total articles, phases)
+      roadmap = {
+        phase: 0,
+        priority: "contexte",
+        objective: `${articles.length} articles planifiés sur ${phases.length} phases`,
+      };
     }
   }
 
