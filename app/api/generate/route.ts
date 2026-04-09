@@ -1,3 +1,5 @@
+export const maxDuration = 300;
+
 import { createClient } from "@/lib/supabase/server";
 import { aiCall, aiCallStream, parseAiJson } from "@/lib/ai-router";
 import { rateLimit } from "@/lib/rate-limit";
