@@ -16,7 +16,6 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
-import { getValidAccessToken } from "@/lib/google";
 
 // ── Types d'entrée / sortie ──────────────────────────────────────────────────
 
@@ -141,6 +140,40 @@ function daysAgo(n: number): string {
   return d.toISOString().split("T")[0];
 }
 
+async function getValidGscToken(
+  supabase: SupabaseClient,
+  userId: string,
+  site: { google_access_token: string; google_refresh_token?: string; google_token_expiry?: number },
+): Promise<string | null> {
+  // Token still valid (60s margin)
+  if (site.google_token_expiry && Date.now() < site.google_token_expiry - 60000) {
+    return site.google_access_token;
+  }
+  // Refresh
+  if (!site.google_refresh_token) return site.google_access_token; // try anyway
+  try {
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        refresh_token: site.google_refresh_token,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        grant_type: "refresh_token",
+      }),
+    });
+    const tokens = await res.json() as { access_token?: string; expires_in?: number };
+    if (!tokens.access_token) return site.google_access_token;
+    await supabase.from("sites").update({
+      google_access_token: tokens.access_token,
+      google_token_expiry: Date.now() + (tokens.expires_in ?? 3600) * 1000,
+    }).eq("user_id", userId);
+    return tokens.access_token;
+  } catch {
+    return site.google_access_token; // use current token as fallback
+  }
+}
+
 export async function collectRankpillContext(
   supabase: SupabaseClient,
   userId: string,
@@ -148,7 +181,7 @@ export async function collectRankpillContext(
 ): Promise<RankpillContext> {
   // Fetch site, cocoon, roadmap, publications in parallel
   const [siteResult, cocoonResult, roadmapResult, pubsResult] = await Promise.all([
-    supabase.from("sites").select("google_access_token, gsc_site_url").eq("user_id", userId).maybeSingle(),
+    supabase.from("sites").select("google_access_token, google_refresh_token, google_token_expiry, gsc_site_url").eq("user_id", userId).maybeSingle(),
     supabase.from("semantic_cocoons").select("data").eq("user_id", userId).maybeSingle(),
     supabase.from("roadmaps").select("data").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("publications").select("title, keyword, wordpress_url").eq("user_id", userId),
@@ -158,7 +191,7 @@ export async function collectRankpillContext(
   let gsc_data: GscData | null = null;
   const site = siteResult.data;
   if (site?.google_access_token && site?.gsc_site_url) {
-    const token = await getValidAccessToken(userId);
+    const token = await getValidGscToken(supabase, userId, site);
     if (token) {
       const siteUrl = encodeURIComponent(site.gsc_site_url);
       const body = {

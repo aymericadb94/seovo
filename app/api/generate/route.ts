@@ -82,7 +82,7 @@ function formatResult(result: PipelineResult) {
       insights: result.content.insights,
       mistakes: result.content.mistakes,
       faq: result.content.faq,
-      cta: result.content.cta,
+      cta: { text: result.content.cta ?? "", button_text: "", button_url: null },
       internal_links: result.linking.links.map(l => ({ anchor: l.anchor, target: l.target_url })),
     },
     // Pipeline metadata
