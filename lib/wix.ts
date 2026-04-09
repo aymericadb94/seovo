@@ -98,7 +98,7 @@ function parseInline(html: string): TextNode[] {
         type: "TEXT", id: "", nodes: [],
         textData: {
           text: linkText,
-          decorations: [{ type: "LINK", linkData: { link: { url: href, target: "_blank" } } }],
+          decorations: [{ type: "LINK", linkData: { link: { url: href, target: "BLANK" } } }],
         },
       });
       continue;
