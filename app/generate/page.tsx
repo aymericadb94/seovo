@@ -205,25 +205,6 @@ export default function GeneratePage() {
   async function runGeneration() {
     setCurrentStep(0);
 
-    const genRes = await fetch("/api/generate?stream=1", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        keyword: activeKeyword,
-        businessName: site?.business_name ?? "",
-        industry: site?.industry ?? "",
-        language,
-      }),
-    });
-
-    if (!genRes.ok) {
-      const data = await genRes.json();
-      throw new Error(data.error || "Erreur lors de la génération");
-    }
-
-    const reader = genRes.body?.getReader();
-    const decoder = new TextDecoder();
-
     type ApiResult = {
       title: string;
       content: string;
@@ -243,61 +224,128 @@ export default function GeneratePage() {
       };
     };
 
+    // Use SSE streaming for progress, fallback to non-streaming
     let apiResult: ApiResult | null = null;
-    if (reader) {
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          let event: {
-            type: string;
-            step?: number;
-            agent?: string;
-            result?: ApiResult;
-            error?: string;
-          };
-          try {
-            event = JSON.parse(line.slice(6));
-          } catch {
-            // Incomplete JSON chunk — skip, will be completed in next read
-            continue;
-          }
-          if (event.type === "progress" && event.agent) {
-            const idx = AGENT_TO_STEP[event.agent];
-            if (idx !== undefined) {
+
+    try {
+      const genRes = await fetch("/api/generate?stream=1", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: activeKeyword,
+          businessName: site?.business_name ?? "",
+          industry: site?.industry ?? "",
+          language,
+        }),
+      });
+
+      if (!genRes.ok) {
+        const data = await genRes.json();
+        throw new Error(data.error || "Erreur lors de la génération");
+      }
+
+      const reader = genRes.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            let event: {
+              type: string;
+              step?: number;
+              agent?: string;
+              result?: ApiResult;
+              error?: string;
+            };
+            try {
+              event = JSON.parse(line.slice(6));
+            } catch {
+              continue;
+            }
+            if (event.type === "progress" && event.agent) {
+              const idx = AGENT_TO_STEP[event.agent];
+              if (idx !== undefined) {
+                setStepOutcomes(prev => {
+                  const next = { ...prev };
+                  for (let i = 0; i < idx; i++) {
+                    if (!next[i]) next[i] = "success";
+                  }
+                  return next;
+                });
+                setCurrentStep(idx);
+              }
+            } else if (event.type === "done" && event.result) {
+              apiResult = event.result;
               setStepOutcomes(prev => {
                 const next = { ...prev };
-                for (let i = 0; i < idx; i++) {
+                for (let i = 0; i < STEPS.length; i++) {
                   if (!next[i]) next[i] = "success";
                 }
                 return next;
               });
-              setCurrentStep(idx);
+              setCurrentStep(STEPS.length);
+            } else if (event.type === "error") {
+              throw new Error(event.error || "Erreur de génération");
             }
-          } else if (event.type === "done" && event.result) {
-            apiResult = event.result;
-            setStepOutcomes(prev => {
-              const next = { ...prev };
-              for (let i = 0; i < STEPS.length; i++) {
-                if (!next[i]) next[i] = "success";
-              }
-              return next;
-            });
-            setCurrentStep(STEPS.length);
-          } else if (event.type === "error") {
-            throw new Error(event.error || "Erreur de génération");
           }
         }
       }
+    } catch (streamErr) {
+      // If it's a real error from the pipeline, rethrow
+      if (streamErr instanceof Error && streamErr.message !== "Failed to fetch") {
+        throw streamErr;
+      }
     }
 
+    // Fallback: non-streaming call if SSE failed silently
     if (!apiResult) {
-      throw new Error("Aucune réponse reçue du pipeline de génération");
+      console.warn("[generate] SSE stream returned no result, falling back to non-streaming API");
+
+      // Simulate step progression during non-streaming call
+      const progressInterval = setInterval(() => {
+        setCurrentStep(prev => Math.min(prev + 1, STEPS.length - 1));
+      }, 8000);
+
+      let fallbackRes: Response;
+      try {
+        fallbackRes = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            keyword: activeKeyword,
+            businessName: site?.business_name ?? "",
+            industry: site?.industry ?? "",
+            language,
+          }),
+        });
+      } catch (fetchErr) {
+        clearInterval(progressInterval);
+        throw fetchErr;
+      }
+
+      clearInterval(progressInterval);
+
+      if (!fallbackRes.ok) {
+        const data = await fallbackRes.json();
+        throw new Error(data.error || "Erreur lors de la génération");
+      }
+
+      apiResult = await fallbackRes.json() as ApiResult;
+
+      // Mark all steps done
+      setStepOutcomes(Object.fromEntries(STEPS.map((_, i) => [i, "success" as const])));
+      setCurrentStep(STEPS.length);
+    }
+
+    if (!apiResult?.title) {
+      throw new Error("Réponse invalide du pipeline de génération");
     }
 
     const structured: StructuredData | null = apiResult.structured ? {
