@@ -150,23 +150,31 @@ export async function POST(request: Request) {
     }
 
     let url = "";
+    let coverImageUrl: string | null = null;
+
+    // Fetch cover image from Pexels (shared across all CMS)
+    if (cover_image_query) {
+      try {
+        const pexelsImg = await fetchPexelsImage(cover_image_query);
+        if (pexelsImg) coverImageUrl = pexelsImg.url;
+      } catch (imgErr) {
+        console.error("[publish] cover image fetch failed (non-fatal):", imgErr);
+      }
+    }
 
     if (site.cms === "wordpress") {
       if (!site.wp_username || !site.wp_app_password) {
         return Response.json({ error: "Identifiants WordPress manquants dans la configuration." }, { status: 400 });
       }
       let featuredMediaId: number | null = null;
-      if (cover_image_query) {
+      if (coverImageUrl) {
         try {
-          const pexelsImg = await fetchPexelsImage(cover_image_query);
-          if (pexelsImg) {
-            featuredMediaId = await uploadImageToWordPress(
-              site.site_url, site.wp_username, site.wp_app_password,
-              pexelsImg.url, cover_alt_text || title
-            );
-          }
+          featuredMediaId = await uploadImageToWordPress(
+            site.site_url, site.wp_username, site.wp_app_password,
+            coverImageUrl, cover_alt_text || title
+          );
         } catch (imgErr) {
-          console.error("[publish] image fetch/upload failed (non-fatal):", imgErr);
+          console.error("[publish] WP image upload failed (non-fatal):", imgErr);
         }
       }
       url = await publishToWordPress(site.site_url, site.wp_username, site.wp_app_password, title, content, meta_description, featuredMediaId);
@@ -174,16 +182,7 @@ export async function POST(request: Request) {
       if (!site.shopify_api_key) {
         return Response.json({ error: "Clé API Shopify manquante dans la configuration." }, { status: 400 });
       }
-      let shopifyImageUrl: string | null = null;
-      if (cover_image_query) {
-        try {
-          const pexelsImg = await fetchPexelsImage(cover_image_query);
-          if (pexelsImg) shopifyImageUrl = pexelsImg.url;
-        } catch (imgErr) {
-          console.error("[publish] shopify image fetch failed (non-fatal):", imgErr);
-        }
-      }
-      url = await publishToShopify(site.shopify_store_url || site.site_url, site.shopify_api_key, title, content, meta_description, shopifyImageUrl, cover_alt_text, site.site_url);
+      url = await publishToShopify(site.shopify_store_url || site.site_url, site.shopify_api_key, title, content, meta_description, coverImageUrl, cover_alt_text, site.site_url);
     } else if (site.cms === "wix") {
       if (!site.wix_api_key || !site.wix_site_id) {
         return Response.json({ error: "Clé API ou Site ID Wix manquants dans la configuration." }, { status: 400 });
@@ -198,13 +197,14 @@ export async function POST(request: Request) {
       return Response.json({ error: `CMS non supporté : ${site.cms}` }, { status: 400 });
     }
 
-    // Enregistrer la publication en base
+    // Enregistrer la publication en base (avec l'URL de l'image)
     const { error: insertError } = await supabase.from("publications").insert({
       site_id: site.id,
       user_id: user.id,
       title,
       keyword,
       wordpress_url: url,
+      cover_image_url: coverImageUrl,
       published_at: new Date().toISOString(),
     });
 

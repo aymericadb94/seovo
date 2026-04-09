@@ -43,17 +43,18 @@ export async function GET() {
     // 2. Fetch existing publications for metadata enrichment
     const { data: publications } = await supabase
       .from("publications")
-      .select("id, title, keyword, wordpress_url, published_at")
+      .select("id, title, keyword, wordpress_url, published_at, cover_image_url")
       .eq("user_id", user.id);
 
-    const pubsByUrl = new Map<string, { id: string; keyword: string; published_at: string }>();
-    const pubsByTitle = new Map<string, { id: string; keyword: string; published_at: string }>();
+    const pubsByUrl = new Map<string, { id: string; keyword: string; published_at: string; cover_image_url: string | null }>();
+    const pubsByTitle = new Map<string, { id: string; keyword: string; published_at: string; cover_image_url: string | null }>();
     for (const pub of publications ?? []) {
       if (pub.wordpress_url) {
         pubsByUrl.set(pub.wordpress_url.replace(/\/$/, "").toLowerCase(), {
           id: pub.id,
           keyword: pub.keyword,
           published_at: pub.published_at,
+          cover_image_url: pub.cover_image_url ?? null,
         });
       }
       if (pub.title) {
@@ -61,6 +62,7 @@ export async function GET() {
           id: pub.id,
           keyword: pub.keyword,
           published_at: pub.published_at,
+          cover_image_url: pub.cover_image_url ?? null,
         });
       }
     }
@@ -70,6 +72,8 @@ export async function GET() {
       const normUrl = item.url.replace(/\/$/, "").toLowerCase();
       const normTitle = item.title.toLowerCase();
       const match = pubsByUrl.get(normUrl) ?? pubsByTitle.get(normTitle);
+      // Image priority: CMS featured image > DB stored image > null
+      const cover_image = item.featured_image ?? match?.cover_image_url ?? null;
       return {
         id: match?.id ?? `cms-${i}`,
         title: item.title,
@@ -77,6 +81,7 @@ export async function GET() {
         keyword: (match?.keyword && match.keyword !== "__page__") ? match.keyword : "",
         published_at: match?.published_at ?? new Date().toISOString(),
         page_type: item.page_type ?? "article",
+        cover_image,
         in_db: !!match,
       };
     });

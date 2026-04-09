@@ -37,6 +37,7 @@ export type CmsPost = {
   url: string;
   excerpt?: string;
   page_type?: CmsPageType;
+  featured_image?: string | null;
 };
 
 export type UpdateResult = {
@@ -122,7 +123,7 @@ async function wpListPosts(
       const count = Math.min(perPage, remaining);
 
       const res = await fetch(
-        `${siteUrl}/wp-json/wp/v2/posts?per_page=${count}&page=${page}&orderby=date&order=desc&_fields=id,title,content,link,excerpt`,
+        `${siteUrl}/wp-json/wp/v2/posts?per_page=${count}&page=${page}&orderby=date&order=desc&_fields=id,title,content,link,excerpt,featured_media&_embed=wp:featuredmedia`,
         { headers: { Authorization: auth, "ngrok-skip-browser-warning": "true" } }
       );
       if (!res.ok) break;
@@ -132,6 +133,7 @@ async function wpListPosts(
         content: { rendered: string };
         link: string;
         excerpt: { rendered: string };
+        _embedded?: { "wp:featuredmedia"?: { source_url?: string }[] };
       }[];
 
       if (posts.length === 0) break;
@@ -141,6 +143,7 @@ async function wpListPosts(
         content: p.content.rendered,
         url: p.link,
         excerpt: p.excerpt.rendered,
+        featured_image: p._embedded?.["wp:featuredmedia"]?.[0]?.source_url ?? null,
       })));
 
       if (posts.length < count) break; // No more pages
@@ -219,10 +222,10 @@ async function shopifyListArticles(
 
     const articles: (CmsPost & { blog_id: number })[] = [];
     for (const blog of blogsData.blogs) {
-      const res = await shopifyFetch(storeUrl, apiKey, `blogs/${blog.id}/articles.json?limit=${limit}&fields=id,title,body_html,handle,summary_html`);
+      const res = await shopifyFetch(storeUrl, apiKey, `blogs/${blog.id}/articles.json?limit=${limit}&fields=id,title,body_html,handle,summary_html,image`);
       if (!res.ok) continue;
       const data = await res.json() as {
-        articles: { id: number; title: string; body_html: string; handle: string; summary_html: string }[];
+        articles: { id: number; title: string; body_html: string; handle: string; summary_html: string; image?: { src: string } | null }[];
       };
       for (const a of data.articles ?? []) {
         articles.push({
@@ -232,6 +235,7 @@ async function shopifyListArticles(
           content: a.body_html,
           url: `${publicBase}/blogs/${blog.handle}/${a.handle}`,
           excerpt: a.summary_html,
+          featured_image: a.image?.src ?? null,
         });
       }
     }
@@ -401,6 +405,10 @@ async function wixListPosts(
         html = `<p>${excerpt}</p>`;
       }
 
+      // Extract cover image from Wix coverMedia
+      const coverMedia = p.coverMedia as { image?: { url?: string }; imageUrl?: string } | undefined;
+      const featuredImage = coverMedia?.image?.url ?? coverMedia?.imageUrl ?? null;
+
       return {
         id: (p.id as string) ?? "",
         wix_id: (p.id as string) ?? "",
@@ -408,6 +416,7 @@ async function wixListPosts(
         content: html,
         url: postUrl,
         excerpt,
+        featured_image: featuredImage,
       };
     });
   } catch {

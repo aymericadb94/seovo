@@ -76,7 +76,7 @@ export default function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [pubFilter, setPubFilter] = useState<"all" | "articles" | "pages" | "indexed" | "not_indexed">("all");
-  const [cmsPages, setCmsPages] = useState<{ id: string; title: string; url: string; keyword: string; published_at: string; page_type: "article" | "page" }[]>([]);
+  const [cmsPages, setCmsPages] = useState<{ id: string; title: string; url: string; keyword: string; published_at: string; page_type: "article" | "page"; cover_image?: string | null }[]>([]);
   const [cmsPagesLoading, setCmsPagesLoading] = useState(false);
 
   // ── Tutorial (0=score, 1=cocon, 2=potentiel, 3=roadmap, 4=libre) ─────────────
@@ -2100,51 +2100,70 @@ export default function Dashboard() {
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b border-white/[0.05]">
-                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Titre</th>
-                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Type</th>
-                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Mot-clé</th>
-                              <th className="text-left text-gray-600 text-xs font-bold px-6 py-3 uppercase tracking-wider">Indexation</th>
-                              <th className="px-6 py-3" />
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filtered.map((pub, i) => {
-                              const idx = pub.url ? indexationResults[pub.url] : null;
-                              return (
-                                <tr key={pub.id} className={`border-b border-white/[0.04] hover:bg-white/[0.03] transition-all animate-fade-in-up ${i === filtered.length - 1 ? "border-b-0" : ""}`} style={{animationDelay: `${i * 40}ms`}}>
-                                  <td className="px-6 py-4 text-white font-medium max-w-xs truncate text-sm">{pub.title}</td>
-                                  <td className="px-6 py-4">
-                                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${pub.page_type === "page" ? "bg-blue-500/10 text-blue-400" : "bg-orange-500/10 text-orange-400"}`}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                          {filtered.map((pub, i) => {
+                            const idx = pub.url ? indexationResults[pub.url] : null;
+                            return (
+                              <a
+                                key={pub.id}
+                                href={pub.url || "#"}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group block rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-orange-500/30 hover:bg-white/[0.04] transition-all overflow-hidden animate-fade-in-up"
+                                style={{ animationDelay: `${i * 50}ms` }}
+                              >
+                                {/* Thumbnail */}
+                                <div className="relative w-full aspect-[16/9] bg-white/[0.03] overflow-hidden">
+                                  {pub.cover_image ? (
+                                    <img
+                                      src={pub.cover_image}
+                                      alt={pub.title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-10 h-10 text-white/[0.06]">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+                                      </svg>
+                                    </div>
+                                  )}
+                                  {/* Type badge overlay */}
+                                  <div className="absolute top-2 left-2">
+                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase backdrop-blur-sm ${pub.page_type === "page" ? "bg-blue-500/20 text-blue-300 border border-blue-500/20" : "bg-orange-500/20 text-orange-300 border border-orange-500/20"}`}>
                                       {pub.page_type === "page" ? "Page" : "Article"}
                                     </span>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    {pub.keyword ? (
-                                      <span className="bg-orange-500/10 text-orange-400 text-xs font-bold px-2.5 py-1 rounded-full">{pub.keyword}</span>
-                                    ) : (
-                                      <span className="text-gray-700 text-xs">—</span>
+                                  </div>
+                                  {/* Indexation badge overlay */}
+                                  {idx && (
+                                    <div className="absolute top-2 right-2">
+                                      <span className={`flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${idx.indexed ? "bg-green-500/20 text-green-300 border border-green-500/20" : "bg-red-500/20 text-red-300 border border-red-500/20"}`}>
+                                        <span className={`w-1 h-1 rounded-full ${idx.indexed ? "bg-green-400" : "bg-red-400"}`} />
+                                        {idx.indexed ? "Index\u00e9" : "Non index\u00e9"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                {/* Content */}
+                                <div className="p-3.5">
+                                  <h3 className="text-white font-bold text-sm leading-snug line-clamp-2 group-hover:text-orange-400 transition-colors mb-2">
+                                    {pub.title}
+                                  </h3>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {pub.keyword && (
+                                      <span className="bg-orange-500/10 text-orange-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                        {pub.keyword}
+                                      </span>
                                     )}
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    {!idx ? (<span className="text-gray-700 text-xs">—</span>) : idx.indexed === true ? (
-                                      <span className="flex items-center gap-1.5 text-xs font-bold text-green-400"><span className="w-1.5 h-1.5 bg-green-400 rounded-full" /> Indexé</span>
-                                    ) : idx.indexed === false ? (
-                                      <span className="flex items-center gap-1.5 text-xs font-bold text-red-400"><span className="w-1.5 h-1.5 bg-red-400 rounded-full" /> Non indexé</span>
-                                    ) : (
-                                      <span className="text-gray-500 text-xs">Inconnu</span>
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4 text-right">
-                                    {pub.url && <a href={pub.url} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors">Voir →</a>}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                                    <span className="text-gray-600 text-[10px]">
+                                      {new Date(pub.published_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                                    </span>
+                                  </div>
+                                </div>
+                              </a>
+                            );
+                          })}
+                        </div>
                       </div>
                     );
                   })()}

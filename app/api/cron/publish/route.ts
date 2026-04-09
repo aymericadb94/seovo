@@ -282,31 +282,34 @@ export async function GET(request: Request) {
             }
 
             let publishedUrl = "";
+            let coverImageUrl: string | null = null;
+
+            // Fetch cover image from Pexels (shared across all CMS)
+            if (cover_image_query) {
+              try {
+                const pexelsImg = await fetchPexelsImage(cover_image_query);
+                if (pexelsImg) coverImageUrl = pexelsImg.url;
+              } catch { /* non-fatal */ }
+            }
 
             if (site.cms === "wordpress") {
               let featuredMediaId: number | null = null;
-              if (cover_image_query) {
-                const pexelsImg = await fetchPexelsImage(cover_image_query);
-                if (pexelsImg) {
+              if (coverImageUrl) {
+                try {
                   featuredMediaId = await uploadImageToWordPress(
                     site.site_url, site.wp_username, site.wp_app_password,
-                    pexelsImg.url, cover_alt_text || title
+                    coverImageUrl, cover_alt_text || title
                   );
-                }
+                } catch { /* non-fatal */ }
               }
               publishedUrl = await publishToWordPress(
                 site.site_url, site.wp_username, site.wp_app_password,
                 title, content, meta_description, featuredMediaId
               );
             } else if (site.cms === "shopify") {
-              let shopifyImageUrl: string | null = null;
-              if (cover_image_query) {
-                const pexelsImg = await fetchPexelsImage(cover_image_query);
-                if (pexelsImg) shopifyImageUrl = pexelsImg.url;
-              }
               publishedUrl = await publishToShopify(
                 site.shopify_store_url || site.site_url, site.shopify_api_key,
-                title, content, meta_description, shopifyImageUrl, cover_alt_text ?? null,
+                title, content, meta_description, coverImageUrl, cover_alt_text ?? null,
                 site.site_url
               );
             } else if (site.cms === "wix") {
@@ -331,6 +334,7 @@ export async function GET(request: Request) {
               title,
               keyword,
               wordpress_url: publishedUrl,
+              cover_image_url: coverImageUrl,
               published_at: new Date().toISOString(),
             });
             if (insertError) {
