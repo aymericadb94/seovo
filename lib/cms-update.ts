@@ -960,8 +960,40 @@ async function wixUpdatePostContent(
     }
 
     // Strategy C: Try direct PATCH on published post as last resort
+    // IMPORTANT: fetch existing content first to APPEND, never overwrite
     if (!draftId) {
-      const newNodes: WixRichNode[] = allLinksInHtml.map(link => ({
+      // Fetch existing post content
+      const getRes = await fetch(
+        `https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=CONTENT`,
+        { headers: hdrs }
+      );
+      let existingNodes: WixRichNode[] = [];
+      if (getRes.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const getData = await getRes.json() as any;
+        existingNodes = getData.post?.richContent?.nodes ?? [];
+      }
+
+      // Check which links already exist
+      const existingLinkUrls = new Set<string>();
+      function scanNodes(nodes: WixRichNode[]) {
+        for (const n of nodes) {
+          if (n.textData?.decorations) {
+            for (const d of n.textData.decorations) {
+              if (d.linkData?.link?.url) existingLinkUrls.add(d.linkData.link.url);
+            }
+          }
+          if (n.nodes) scanNodes(n.nodes as WixRichNode[]);
+        }
+      }
+      scanNodes(existingNodes);
+
+      const linksToAdd = allLinksInHtml.filter(l => !existingLinkUrls.has(l.url));
+      if (linksToAdd.length === 0) {
+        return { success: false, post_id: postId, url: "", error: "Liens déjà présents dans l'article" };
+      }
+
+      const newNodes: WixRichNode[] = linksToAdd.map(link => ({
         type: "PARAGRAPH",
         paragraphData: {},
         nodes: [
@@ -970,13 +1002,15 @@ async function wixUpdatePostContent(
         ],
       }));
 
-      // Try PATCH /posts/{postId}
+      // APPEND new links to existing content
+      const mergedNodes = [...existingNodes, ...newNodes];
+
       const directRes = await fetch(
         `https://www.wixapis.com/blog/v3/posts/${postId}`,
         {
           method: "PATCH",
           headers: hdrs,
-          body: JSON.stringify({ post: { richContent: { nodes: newNodes } }, fieldMask: ["richContent"] }),
+          body: JSON.stringify({ post: { richContent: { nodes: mergedNodes } }, fieldMask: ["richContent"] }),
         }
       );
       if (directRes.ok) {
