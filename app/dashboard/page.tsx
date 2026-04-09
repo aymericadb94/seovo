@@ -2032,9 +2032,16 @@ export default function Dashboard() {
                       </button>
                       {syncResult && <span className="text-xs text-blue-400">{syncResult}</span>}
                       {data.site?.gsc_connected && data.site?.gsc_site_url && (
-                        <button onClick={checkIndexation} disabled={indexationLoading} className="group flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 transition-all disabled:opacity-40">
-                          {indexationLoading ? (<><span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" /> Vérification...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Vérifier l&apos;indexation</>)}
-                        </button>
+                        <div className="relative group/tip">
+                          <button onClick={checkIndexation} disabled={indexationLoading} className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 transition-all disabled:opacity-40">
+                            {indexationLoading ? (<><span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" /> Vérification...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Vérifier l&apos;indexation</>)}
+                          </button>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 px-4 py-3 bg-gray-900 border border-white/10 rounded-xl shadow-2xl opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity duration-200 z-50">
+                            <p className="text-white text-xs font-bold mb-1">Qu&apos;est-ce que l&apos;indexation ?</p>
+                            <p className="text-gray-400 text-[11px] leading-relaxed">L&apos;indexation, c&apos;est quand Google ajoute votre page dans sa base de donn&eacute;es. Une page index&eacute;e peut appara&icirc;tre dans les r&eacute;sultats de recherche. Une page non index&eacute;e est invisible sur Google.</p>
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-gray-900 border-r border-b border-white/10 rotate-45 -mt-[5px]" />
+                          </div>
+                        </div>
                       )}
                       <Link href="/generate" className="group relative overflow-hidden flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 hover:border-orange-500/50 text-orange-400 hover:text-orange-300 transition-all">
                         <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.15), transparent)" }} />
