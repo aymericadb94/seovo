@@ -325,10 +325,36 @@ export async function POST(request: Request) {
       const kwStrat = keyword_strategy as { primary_keyword: string; secondary_keywords: string[]; semantic_field: string[]; seo_angle: string } | undefined;
       const intentData = body.intent_analysis as { intent_type: string; user_intent: string; recommended_content_type: string; angle: string } | undefined;
 
-      // SERP optionnelle en parallèle
+      // SERP avec cache 48h
       let serpData: PageContext["serp"] = null;
       try {
-        const serp = await analyzeSERP(keyword, language, industry ?? "e-commerce");
+        const { data: engineSite } = await supabase
+          .from("sites")
+          .select("id, serp_cache")
+          .eq("user_id", user.id)
+          .limit(1)
+          .single();
+
+        let serp: SerpAnalysis | null = null;
+        // Check cache
+        if (engineSite?.serp_cache) {
+          const cache = engineSite.serp_cache as Record<string, { data: SerpAnalysis; at: string }>;
+          const entry = cache[keyword];
+          if (entry?.at && Date.now() - new Date(entry.at).getTime() < 48 * 60 * 60 * 1000) {
+            serp = entry.data;
+          }
+        }
+        if (!serp) {
+          serp = await analyzeSERP(keyword, language, industry ?? "e-commerce");
+          // Persist cache
+          if (serp && engineSite?.id) {
+            const existing = (engineSite.serp_cache as Record<string, unknown> | null) ?? ({} as Record<string, unknown>);
+            const updated = { ...existing, [keyword]: { data: serp, at: new Date().toISOString() } };
+            const keys = Object.keys(updated);
+            if (keys.length > 50) { const k = keys[0]; if (k !== undefined) delete (updated as Record<string, unknown>)[k]; }
+            await supabase.from("sites").update({ serp_cache: updated }).eq("id", engineSite.id);
+          }
+        }
         if (serp) {
           serpData = {
             patterns: serp.serp_patterns,
@@ -425,30 +451,64 @@ export async function POST(request: Request) {
 
     // ── Mode legacy (prompt direct) ─────────────────────────────────────────
 
-    // Récupérer les credentials WP pour analyser la DA du site
-    let styleGuide = "";
-    try {
-      const { data: site } = await supabase
-        .from("sites")
-        .select("cms, site_url, shopify_store_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id")
-        .eq("user_id", user.id)
-        .limit(1)
-        .single();
-      if (site?.cms === "wordpress" && site.wp_username && site.wp_app_password) {
-        styleGuide = await fetchStyleGuideWordPress(site.site_url, site.wp_username, site.wp_app_password);
-      } else if (site?.cms === "shopify" && site.shopify_api_key) {
-        styleGuide = await fetchStyleGuideShopify(site.shopify_store_url || site.site_url, site.shopify_api_key);
-      }
-      // Wix : DA non disponible via API publique, on génère sans style guide
-    } catch {
-      // DA optionnelle, on continue sans
-    }
+    // Fetch site credentials
+    const { data: site } = await supabase
+      .from("sites")
+      .select("id, cms, site_url, shopify_store_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, style_guide_cache, style_guide_cached_at, serp_cache")
+      .eq("user_id", user.id)
+      .limit(1)
+      .single();
 
-    // ── Analyse SERP concurrentielle (en parallèle) ─────────────────────────
-    let serpAnalysis: SerpAnalysis | null = null;
-    try {
-      serpAnalysis = await analyzeSERP(keyword, language, industry ?? "e-commerce");
-    } catch { /* SERP analysis optionnelle */ }
+    // ── Paralléliser Style Guide + SERP (les 2 sont indépendants) ───────────
+    const styleGuidePromise = (async (): Promise<string> => {
+      try {
+        if (!site) return "";
+        // Check cache (style guide change rarement → cache 7 jours)
+        if (site.style_guide_cache && site.style_guide_cached_at) {
+          const cachedAt = new Date(site.style_guide_cached_at).getTime();
+          if (Date.now() - cachedAt < 7 * 24 * 60 * 60 * 1000) return site.style_guide_cache;
+        }
+        let guide = "";
+        if (site.cms === "wordpress" && site.wp_username && site.wp_app_password) {
+          guide = await fetchStyleGuideWordPress(site.site_url, site.wp_username, site.wp_app_password);
+        } else if (site.cms === "shopify" && site.shopify_api_key) {
+          guide = await fetchStyleGuideShopify(site.shopify_store_url || site.site_url, site.shopify_api_key);
+        }
+        // Persist cache
+        if (guide && site.id) {
+          await supabase.from("sites").update({ style_guide_cache: guide, style_guide_cached_at: new Date().toISOString() }).eq("id", site.id);
+        }
+        return guide;
+      } catch { return ""; }
+    })();
+
+    const serpPromise = (async (): Promise<SerpAnalysis | null> => {
+      try {
+        // Check cache (SERP → cache 48h par keyword)
+        if (site?.serp_cache) {
+          const cache = site.serp_cache as Record<string, { data: SerpAnalysis; at: string }>;
+          const entry = cache[keyword];
+          if (entry?.at) {
+            const cachedAt = new Date(entry.at).getTime();
+            if (Date.now() - cachedAt < 48 * 60 * 60 * 1000) return entry.data;
+          }
+        }
+        const serp = await analyzeSERP(keyword, language, industry ?? "e-commerce");
+        // Persist cache
+        if (serp && site?.id) {
+          const existing = (site.serp_cache as Record<string, unknown> | null) ?? ({} as Record<string, unknown>);
+          const updated = { ...existing, [keyword]: { data: serp, at: new Date().toISOString() } };
+          // Keep max 50 entries to avoid bloating
+          const keys = Object.keys(updated);
+          if (keys.length > 50) { const k = keys[0]; if (k !== undefined) delete (updated as Record<string, unknown>)[k]; }
+          await supabase.from("sites").update({ serp_cache: updated }).eq("id", site.id);
+        }
+        return serp;
+      } catch { return null; }
+    })();
+
+    // Await both in parallel
+    const [styleGuide, serpAnalysis] = await Promise.all([styleGuidePromise, serpPromise]);
 
     const otherKeywords = (allKeywords ?? []).filter((k: string) => k !== keyword).slice(0, 5);
     const internalLinksContext = otherKeywords.length > 0
