@@ -251,7 +251,8 @@ export async function aiCall(
   const selection = selectModel(ctx);
   const maxTokens = params.max_tokens ?? selection.max_tokens;
 
-  const msg = await _client.messages.create({
+  // Use streaming internally to avoid Anthropic SDK timeout on long requests
+  const stream = _client.messages.stream({
     model: selection.model,
     max_tokens: maxTokens,
     ...(params.system ? { system: params.system } : {}),
@@ -259,6 +260,7 @@ export async function aiCall(
     ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
   });
 
+  const msg = await stream.finalMessage();
   const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
 
   return {
