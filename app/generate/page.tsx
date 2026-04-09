@@ -800,192 +800,276 @@ export default function GeneratePage() {
           </form>
 
         ) : status === "generating" || status === "publishing" ? (
-          /* ── Chargement ── */
-          <div
-            className="rounded-2xl overflow-hidden"
-            style={{ background: "#090909", border: "1px solid rgba(249,115,22,0.15)" }}
-          >
-            {/* Top gradient bar */}
-            <div className="h-0.5 w-full bg-gradient-to-r from-orange-500 via-red-500 to-orange-400" />
+          /* ── Animation de génération ── */
+          <div className="relative">
+            {/* Glow background */}
+            <div className="absolute -inset-8 pointer-events-none">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-20" style={{ background: "radial-gradient(circle, rgba(249,115,22,0.15) 0%, transparent 70%)", animation: "pulse 4s ease-in-out infinite" }} />
+            </div>
 
-            <div className="p-7">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ background: "#f97316", boxShadow: "0 0 8px rgba(249,115,22,0.8)", animation: "pulse 1.2s ease-in-out infinite" }}
-                  />
-                  <span className="text-orange-400 font-black text-sm uppercase tracking-widest">
-                    {status === "publishing" ? "Publication" : "Rédaction"} en cours
-                  </span>
-                </div>
-                {/* Live timer */}
-                <div
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg"
-                  style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.12)" }}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-3 h-3 text-orange-400/60">
-                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                  </svg>
-                  <span className="text-orange-400 font-black text-xs tabular-nums">{elapsed}s</span>
-                </div>
-              </div>
+            <div className="relative rounded-2xl overflow-hidden" style={{ background: "rgba(8,8,8,0.95)", border: "1px solid rgba(249,115,22,0.12)", backdropFilter: "blur(20px)" }}>
 
-              {/* Context */}
-              <p className="text-gray-500 text-sm mb-5">
-                Article sur{" "}
-                <span className="text-white font-black">&ldquo;{activeKeyword}&rdquo;</span>
-                {" "}— {localeNames[language]}
-              </p>
-
-              {/* Overall progress bar */}
-              <div className="relative h-1.5 rounded-full mb-6 overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+              {/* Animated top bar */}
+              <div className="relative h-1 w-full overflow-hidden" style={{ background: "rgba(255,255,255,0.03)" }}>
                 <div
                   className="absolute inset-y-0 left-0 rounded-full"
                   style={{
-                    width: `${Math.min((currentStep / STEPS.length) * 100, 100)}%`,
-                    background: "linear-gradient(90deg, #f97316, #ef4444)",
-                    transition: "width 0.8s cubic-bezier(0.34,1.56,0.64,1)",
-                    boxShadow: "0 0 8px rgba(249,115,22,0.5)",
+                    width: `${Math.min(((currentStep + 1) / STEPS.length) * 100, 100)}%`,
+                    background: "linear-gradient(90deg, #f97316, #ef4444, #f97316)",
+                    backgroundSize: "200% 100%",
+                    animation: "gradientShift 2s ease infinite",
+                    transition: "width 1s cubic-bezier(0.34,1.56,0.64,1)",
+                    boxShadow: "0 0 20px rgba(249,115,22,0.6), 0 0 60px rgba(249,115,22,0.2)",
                   }}
                 />
               </div>
 
-              {/* Steps */}
-              <div className="flex flex-col gap-1">
-                {STEPS.map((step, i) => {
-                  const isDone = i < currentStep;
-                  const isActive = i === currentStep;
-                  const outcome = stepOutcomes[i];
-                  const isFailed = isDone && outcome === "failed";
-                  const isSkipped = isDone && outcome === "skipped";
-                  const details = stepDetails[i] ?? [];
-                  const visibleCount = visibleDetails[i] ?? (isDone ? details.length : 0);
+              <div className="p-8">
+                {/* Header row */}
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    {/* Animated orb */}
+                    <div className="relative w-10 h-10 flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full" style={{ background: "rgba(249,115,22,0.1)", animation: "ringPulse 2s ease-out infinite" }} />
+                      <div className="absolute inset-1 rounded-full" style={{ background: "rgba(249,115,22,0.08)", animation: "ringPulse 2s ease-out 0.5s infinite" }} />
+                      <div className="w-5 h-5 rounded-full" style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 0 15px rgba(249,115,22,0.5)" }} />
+                    </div>
+                    <div>
+                      <h2 className="text-white font-black text-base tracking-tight">
+                        {status === "publishing" ? "Publication" : "G\u00e9n\u00e9ration"} en cours
+                      </h2>
+                      <p className="text-gray-500 text-xs mt-0.5">
+                        <span className="text-orange-400 font-bold">&ldquo;{activeKeyword}&rdquo;</span>
+                        {" "}&middot; {localeNames[language]}
+                      </p>
+                    </div>
+                  </div>
 
-                  return (
-                    <div
-                      key={step.id}
-                      className="rounded-xl transition-all duration-500 overflow-hidden"
-                      style={{
-                        background: isFailed
-                          ? "rgba(239,68,68,0.06)"
-                          : isSkipped
-                          ? "rgba(234,179,8,0.06)"
-                          : isActive
-                          ? "rgba(249,115,22,0.04)"
-                          : isDone
-                          ? "rgba(249,115,22,0.03)"
-                          : "transparent",
-                        borderLeft: isFailed
-                          ? "2px solid rgba(239,68,68,0.5)"
-                          : isActive ? "2px solid #f97316" : "2px solid transparent",
-                        opacity: !isDone && !isActive ? 0.3 : 1,
-                      }}
-                    >
-                      {/* Step header */}
-                      <div className="flex items-center gap-3 px-4 py-3">
-                        {/* Icon */}
+                  {/* Timer */}
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl" style={{ background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.1)" }}>
+                    <div className="relative w-4 h-4">
+                      <svg viewBox="0 0 24 24" className="w-4 h-4 text-orange-400/50">
+                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+                        <line x1="12" y1="12" x2="12" y2="7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ transformOrigin: "12px 12px", animation: `spin ${60}s linear infinite` }} />
+                        <line x1="12" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ transformOrigin: "12px 12px", animation: `spin ${3600}s linear infinite` }} />
+                      </svg>
+                    </div>
+                    <span className="text-orange-400 font-black text-sm tabular-nums">{Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")}</span>
+                  </div>
+                </div>
+
+                {/* Central visual — Orbital agent ring */}
+                <div className="relative flex items-center justify-center mb-8" style={{ height: "220px" }}>
+                  {/* Orbit rings */}
+                  <div className="absolute w-44 h-44 rounded-full border border-white/[0.03]" />
+                  <div className="absolute w-64 h-64 rounded-full border border-white/[0.02]" style={{ borderStyle: "dashed" }} />
+
+                  {/* Agent nodes on orbit */}
+                  {STEPS.map((step, i) => {
+                    const isDone = i < currentStep;
+                    const isActive = i === currentStep;
+                    const angle = (i / STEPS.length) * 360 - 90;
+                    const rad = (angle * Math.PI) / 180;
+                    const radius = 110;
+                    const x = Math.cos(rad) * radius;
+                    const y = Math.sin(rad) * radius;
+
+                    return (
+                      <div
+                        key={step.id}
+                        className="absolute flex items-center justify-center transition-all duration-700"
+                        style={{
+                          left: `calc(50% + ${x}px - 18px)`,
+                          top: `calc(50% + ${y}px - 18px)`,
+                          zIndex: isActive ? 10 : 1,
+                        }}
+                      >
+                        {/* Pulse ring for active */}
+                        {isActive && (
+                          <div className="absolute w-12 h-12 rounded-full" style={{ background: "rgba(249,115,22,0.15)", animation: "ringPulse 1.5s ease-out infinite" }} />
+                        )}
                         <div
-                          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-500"
+                          className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-500"
                           style={{
-                            background: isFailed
-                              ? "rgba(239,68,68,0.2)"
-                              : isSkipped
-                              ? "rgba(234,179,8,0.2)"
-                              : isDone
-                              ? "rgba(249,115,22,0.2)"
+                            background: isDone
+                              ? "linear-gradient(135deg, rgba(249,115,22,0.3), rgba(249,115,22,0.15))"
                               : isActive
-                              ? "rgba(249,115,22,0.15)"
+                              ? "linear-gradient(135deg, #f97316, #ef4444)"
                               : "rgba(255,255,255,0.04)",
-                            color: isFailed ? "#ef4444" : isSkipped ? "#eab308" : isDone ? "#f97316" : isActive ? "#fb923c" : "#4b5563",
+                            border: isDone
+                              ? "1px solid rgba(249,115,22,0.4)"
+                              : isActive
+                              ? "1px solid rgba(249,115,22,0.8)"
+                              : "1px solid rgba(255,255,255,0.06)",
+                            boxShadow: isActive ? "0 0 20px rgba(249,115,22,0.4), 0 0 40px rgba(249,115,22,0.15)" : isDone ? "0 0 8px rgba(249,115,22,0.15)" : "none",
+                            transform: isActive ? "scale(1.15)" : "scale(1)",
+                            color: isDone ? "#f97316" : isActive ? "white" : "#4b5563",
                           }}
                         >
-                          {isFailed ? (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-                              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                            </svg>
-                          ) : isDone ? (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                          {isDone ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
                               <polyline points="20 6 9 17 4 12"/>
                             </svg>
                           ) : isActive ? (
-                            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                              <circle cx="12" cy="12" r="9" stroke="rgba(249,115,22,0.2)" strokeWidth="2"/>
-                              <path d="M12 3a9 9 0 019 9" stroke="#f97316" strokeWidth="2" strokeLinecap="round"/>
+                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.2)" strokeWidth="2"/>
+                              <path d="M12 3a9 9 0 019 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
                             </svg>
                           ) : (
-                            step.icon
+                            <span className="text-[10px] font-black">{i + 1}</span>
                           )}
                         </div>
-
-                        {/* Title + sub */}
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className="text-sm font-bold leading-snug transition-colors duration-300"
-                            style={{ color: isFailed ? "#fca5a5" : isDone ? "#fdba74" : isActive ? "white" : "#6b7280" }}
-                          >
-                            {step.label}
-                          </p>
-                        </div>
-
-                        {/* Status */}
-                        {isDone && (
-                          <span className="text-[10px] font-black uppercase tracking-wider flex-shrink-0" style={{ color: isFailed ? "rgba(239,68,68,0.5)" : "rgba(249,115,22,0.4)" }}>
-                            {isFailed ? "Échec" : "OK"}
-                          </span>
-                        )}
+                        {/* Label */}
+                        <span
+                          className="absolute whitespace-nowrap text-[9px] font-bold transition-all duration-500"
+                          style={{
+                            top: y > 20 ? "100%" : y < -20 ? "auto" : "50%",
+                            bottom: y < -20 ? "100%" : "auto",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            marginTop: y > 20 ? "6px" : 0,
+                            marginBottom: y < -20 ? "6px" : 0,
+                            color: isActive ? "#fb923c" : isDone ? "rgba(249,115,22,0.5)" : "rgba(255,255,255,0.15)",
+                          }}
+                        >
+                          {step.label.split(" ").slice(0, 2).join(" ")}
+                        </span>
                       </div>
+                    );
+                  })}
 
-                      {/* Detail lines — terminal-style animation */}
-                      {(isActive || isDone) && details.length > 0 && (
-                        <div className="px-4 pb-3 pl-14">
-                          <div className="flex flex-col gap-1">
-                            {details.slice(0, isDone ? details.length : visibleCount).map((detail, j) => {
-                              const isLastVisible = isActive && j === visibleCount - 1;
-                              return (
-                                <div
-                                  key={j}
-                                  className="flex items-start gap-2 transition-all duration-500"
-                                  style={{
-                                    opacity: isDone ? 0.5 : 1,
-                                    animation: !isDone ? "fadeSlideIn 0.4s ease-out" : undefined,
-                                  }}
-                                >
-                                  <span
-                                    className="flex-shrink-0 mt-0.5 text-[10px] font-mono"
-                                    style={{ color: isLastVisible && isActive ? "#fb923c" : isDone ? "rgba(249,115,22,0.3)" : "rgba(249,115,22,0.5)" }}
-                                  >
-                                    {isDone ? "✓" : isLastVisible ? "▸" : "✓"}
-                                  </span>
-                                  <span
-                                    className="text-[11px] leading-relaxed font-mono"
-                                    style={{ color: isLastVisible && isActive ? "rgba(255,255,255,0.7)" : isDone ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.4)" }}
-                                  >
-                                    {detail}
-                                    {isLastVisible && isActive && (
-                                      <span className="inline-block w-1 h-3 bg-orange-400 ml-1 animate-pulse" style={{ verticalAlign: "text-bottom" }} />
-                                    )}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
+                  {/* Center — active step info */}
+                  <div className="relative z-20 flex flex-col items-center text-center px-4">
+                    <div className="text-orange-400 font-black text-2xl tabular-nums mb-1">
+                      {currentStep + 1}<span className="text-gray-600 text-lg font-bold">/{STEPS.length}</span>
                     </div>
-                  );
-                })}
-              </div>
+                    <p className="text-white font-bold text-sm leading-tight" style={{ animation: "fadeIn 0.5s ease" }} key={currentStep}>
+                      {STEPS[Math.min(currentStep, STEPS.length - 1)]?.label}
+                    </p>
+                    <p className="text-gray-600 text-[10px] mt-1 max-w-[160px]">
+                      {STEPS[Math.min(currentStep, STEPS.length - 1)]?.sub}
+                    </p>
+                  </div>
+                </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                <p className="text-gray-600 text-xs">
-                  Étape {Math.min(currentStep + 1, STEPS.length)} sur {STEPS.length}
-                </p>
-                <p className="text-gray-600 text-xs">
-                  {elapsed < 30 ? "Estimation : 2 – 4 min" : elapsed < 90 ? "Analyse et rédaction..." : elapsed < 180 ? "Optimisation en cours..." : "Finalisation..."}
-                </p>
+                {/* Live terminal — agent actions */}
+                <div
+                  className="rounded-xl overflow-hidden mb-6"
+                  style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.05)" }}
+                >
+                  {/* Terminal header */}
+                  <div className="flex items-center gap-2 px-4 py-2" style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <div className="flex gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-red-500/40" />
+                      <span className="w-2 h-2 rounded-full bg-yellow-500/40" />
+                      <span className="w-2 h-2 rounded-full bg-green-500/40" />
+                    </div>
+                    <span className="text-[10px] text-gray-600 font-mono ml-2">rankpill-agent-pipeline</span>
+                  </div>
+
+                  {/* Terminal body */}
+                  <div className="px-4 py-3 max-h-48 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+                    {STEPS.map((step, i) => {
+                      const isDone = i < currentStep;
+                      const isActive = i === currentStep;
+                      if (!isDone && !isActive) return null;
+
+                      const details = stepDetails[i] ?? [];
+                      const visibleCount = visibleDetails[i] ?? (isDone ? details.length : 0);
+                      const shownDetails = details.slice(0, isDone ? details.length : visibleCount);
+
+                      return (
+                        <div key={step.id} className="mb-2 last:mb-0">
+                          {/* Agent header line */}
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-[10px] font-mono" style={{ color: isDone ? "rgba(34,197,94,0.5)" : "#22c55e" }}>
+                              {isDone ? "\u2713" : "\u25B6"}
+                            </span>
+                            <span className="text-[11px] font-mono font-bold" style={{ color: isDone ? "rgba(249,115,22,0.4)" : "#fb923c" }}>
+                              agent/{step.id}
+                            </span>
+                            {isDone && (
+                              <span className="text-[9px] font-mono text-gray-700">done</span>
+                            )}
+                          </div>
+                          {/* Detail lines */}
+                          {shownDetails.map((detail, j) => {
+                            const isLast = isActive && j === visibleCount - 1;
+                            return (
+                              <div
+                                key={j}
+                                className="flex items-start gap-2 pl-5"
+                                style={{ animation: !isDone ? "fadeSlideIn 0.3s ease-out" : undefined }}
+                              >
+                                <span className="text-[10px] font-mono mt-px" style={{ color: isDone ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.2)" }}>
+                                  {isDone ? "\u2502" : isLast ? "\u2514" : "\u251C"}
+                                </span>
+                                <span
+                                  className="text-[10px] font-mono leading-relaxed"
+                                  style={{ color: isLast ? "rgba(255,255,255,0.6)" : isDone ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.35)" }}
+                                >
+                                  {detail}
+                                  {isLast && isActive && (
+                                    <span className="inline-block w-1.5 h-3 bg-orange-400/80 ml-1 rounded-sm" style={{ verticalAlign: "text-bottom", animation: "glowPulse 1s ease-in-out infinite" }} />
+                                  )}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Data sources recap strip */}
+                <div className="flex items-center gap-3 flex-wrap mb-6">
+                  {[
+                    { label: "GSC", icon: "\uD83D\uDCC8", active: currentStep >= 0 },
+                    { label: "Cocon", icon: "\uD83D\uDD78\uFE0F", active: currentStep >= 2 },
+                    { label: "Roadmap", icon: "\uD83D\uDDFA\uFE0F", active: currentStep >= 2 },
+                    { label: "SERP", icon: "\uD83D\uDD0D", active: currentStep >= 1 },
+                    { label: "Pages existantes", icon: "\uD83D\uDCC4", active: currentStep >= 5 },
+                  ].map((src) => (
+                    <div
+                      key={src.label}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-700"
+                      style={{
+                        background: src.active ? "rgba(249,115,22,0.06)" : "rgba(255,255,255,0.02)",
+                        border: src.active ? "1px solid rgba(249,115,22,0.15)" : "1px solid rgba(255,255,255,0.04)",
+                        color: src.active ? "#fb923c" : "#4b5563",
+                      }}
+                    >
+                      <span className="text-xs">{src.icon}</span>
+                      <span>{src.label}</span>
+                      {src.active && <span className="w-1 h-1 rounded-full bg-green-400 ml-0.5" />}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div className="flex items-center gap-2">
+                    <div className="flex -space-x-1">
+                      {STEPS.map((_, i) => (
+                        <div
+                          key={i}
+                          className="w-2 h-2 rounded-full border border-black transition-all duration-500"
+                          style={{
+                            background: i < currentStep ? "#f97316" : i === currentStep ? "#fb923c" : "rgba(255,255,255,0.06)",
+                            boxShadow: i === currentStep ? "0 0 6px rgba(249,115,22,0.5)" : "none",
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-gray-600 text-[10px] ml-1">
+                      {Math.round(((currentStep + 1) / STEPS.length) * 100)}%
+                    </span>
+                  </div>
+                  <p className="text-gray-600 text-[10px]">
+                    {elapsed < 30 ? "Analyse des donn\u00e9es..." : elapsed < 90 ? "R\u00e9daction de l\u2019article..." : elapsed < 180 ? "Optimisation SEO..." : "Finalisation..."}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
