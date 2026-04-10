@@ -337,3 +337,30 @@ export async function fetchGscData(
 
   return { queries, pages };
 }
+
+/** Fetch GSC queries for a specific date range (for trend comparison) */
+export async function fetchGscQueriesRange(
+  token: string,
+  gscSiteUrl: string,
+  startDate: string,
+  endDate: string
+): Promise<GscSnapshotRow[]> {
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const apiBase = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(gscSiteUrl)}/searchAnalytics/query`;
+
+  const res = await fetch(apiBase, {
+    method: "POST", headers,
+    body: JSON.stringify({ startDate, endDate, dimensions: ["query"], rowLimit: 500 }),
+  });
+
+  if (!res.ok) return [];
+  type Row = { keys: string[]; clicks: number; impressions: number; ctr: number; position: number };
+  const data = await res.json() as { rows?: Row[] };
+  return (data.rows ?? []).map(r => ({
+    query: r.keys[0],
+    clicks: r.clicks,
+    impressions: r.impressions,
+    ctr: r.ctr,
+    position: Math.round(r.position * 10) / 10,
+  }));
+}

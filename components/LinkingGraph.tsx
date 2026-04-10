@@ -39,6 +39,8 @@ type ClusterAnalysis = {
   missing_links: number;
   strength_score: number;
   avg_position: number | null;
+  position_trend?: number | null;
+  impressions_trend?: number | null;
 };
 
 type OrphanPage = { url: string; title: string; reason: string };
@@ -1481,7 +1483,19 @@ export default function LinkingGraph() {
                 <p className="text-gray-600 text-[10px]">{cluster.pages.length} pages</p>
                 <p className="text-gray-600 text-[10px]">{cluster.missing_links} liens manquants</p>
                 {cluster.avg_position && (
-                  <p className="text-gray-600 text-[10px]">pos. moy. #{cluster.avg_position}</p>
+                  <p className="text-gray-600 text-[10px]">
+                    pos. moy. #{cluster.avg_position}
+                    {cluster.position_trend != null && cluster.position_trend !== 0 && (
+                      <span style={{ color: cluster.position_trend < 0 ? "#4ade80" : "#ef4444", marginLeft: 4 }}>
+                        {cluster.position_trend < 0 ? "↑" : "↓"}{Math.abs(cluster.position_trend)}
+                      </span>
+                    )}
+                  </p>
+                )}
+                {cluster.impressions_trend != null && cluster.impressions_trend !== 0 && (
+                  <p className="text-[10px]" style={{ color: cluster.impressions_trend > 0 ? "#4ade80" : "#ef4444" }}>
+                    {cluster.impressions_trend > 0 ? "+" : ""}{cluster.impressions_trend}% impressions
+                  </p>
                 )}
               </div>
             </div>

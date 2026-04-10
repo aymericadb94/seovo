@@ -7,7 +7,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getValidAccessToken } from "@/lib/google";
-import { fetchGscData } from "@/lib/seo-events";
+import { fetchGscData, fetchGscQueriesRange } from "@/lib/seo-events";
 import { listCmsPosts, type CmsCredentials } from "@/lib/cms-update";
 import { analyzeLinking, type LinkingAnalysis } from "@/lib/seo-linking";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
@@ -72,21 +72,25 @@ export async function POST() {
       return Response.json({ error: "Pas assez de pages CMS (minimum 3)" }, { status: 400 });
     }
 
-    // Fetch GSC data if available (current 30j + previous 30j for trend)
+    // Fetch GSC data if available (current J-32→J-2 + previous J-62→J-32 for trend)
     let gscQueries: GSCQuery[] = [];
     let gscQueriesPrev: GSCQuery[] = [];
     if (site.gsc_site_url) {
       try {
         const token = await getValidAccessToken(user.id);
         if (token) {
-          const [gscCurrent, gscPrevious] = await Promise.all([
+          const now = new Date();
+          const fmt = (d: Date) => d.toISOString().split("T")[0];
+          const d2 = new Date(now); d2.setDate(d2.getDate() - 2);
+          const d32 = new Date(now); d32.setDate(d32.getDate() - 32);
+          const d62 = new Date(now); d62.setDate(d62.getDate() - 62);
+
+          const [gscCurrent, prevQueries] = await Promise.all([
             fetchGscData(token, site.gsc_site_url, 30),
-            fetchGscData(token, site.gsc_site_url, 60),
+            fetchGscQueriesRange(token, site.gsc_site_url, fmt(d62), fmt(d32)),
           ]);
           gscQueries = gscCurrent?.queries ?? [];
-          // Les données 60j incluent les 30j récents — on filtre pour n'avoir que J-60→J-30
-          // Approximation : on passe les 60j complets et le moteur calculera le delta
-          gscQueriesPrev = gscPrevious?.queries ?? [];
+          gscQueriesPrev = prevQueries;
         }
       } catch { /* non-fatal — analysis works without GSC */ }
     }
