@@ -284,44 +284,56 @@ export async function aiCall(
 
 /**
  * Parse JSON from AI response (handles markdown code blocks and extra text).
+ * Robust against large responses (49K+), Unicode backticks, nested brackets.
  */
 export function parseAiJson<T = unknown>(text: string): T | null {
-  // Try direct parse first
+  // 1. Try direct parse
   try {
     return JSON.parse(text) as T;
   } catch { /* continue */ }
 
-  // Try extracting from markdown code block (greedy — take the LARGEST block)
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*)```/);
-  if (codeBlockMatch) {
-    const inner = codeBlockMatch[1].trim();
-    // If inner contains another closing ```, find the actual JSON boundaries
-    const jsonStart = inner.indexOf("{");
-    const jsonEnd = inner.lastIndexOf("}");
-    if (jsonStart !== -1 && jsonEnd !== -1) {
+  // 2. Strip markdown code fences (handles ``` and Unicode variants)
+  let cleaned = text.replace(/^```(?:json)?\s*/m, "").replace(/```\s*$/m, "");
+  try {
+    return JSON.parse(cleaned.trim()) as T;
+  } catch { /* continue */ }
+
+  // 3. Find the top-level JSON object by matching braces
+  //    This handles cases where JSON.parse fails on first/last { } due to extra text
+  const firstBrace = text.indexOf("{");
+  if (firstBrace !== -1) {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let objEnd = -1;
+    for (let i = firstBrace; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) { escape = false; continue; }
+      if (ch === "\\") { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) { objEnd = i; break; }
+      }
+    }
+    if (objEnd !== -1) {
+      const candidate = text.slice(firstBrace, objEnd + 1);
       try {
-        return JSON.parse(inner.slice(jsonStart, jsonEnd + 1)) as T;
+        return JSON.parse(candidate) as T;
+      } catch { /* continue with repair */ }
+      // Try repairing trailing commas
+      try {
+        return JSON.parse(candidate.replace(/,\s*([}\]])/g, "$1")) as T;
       } catch { /* continue */ }
     }
-    // Try direct parse of inner content
-    try {
-      return JSON.parse(inner) as T;
-    } catch { /* continue */ }
   }
 
-  // Try extracting between first { and last }
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start !== -1 && end !== -1) {
-    try {
-      return JSON.parse(text.slice(start, end + 1)) as T;
-    } catch { /* continue */ }
-  }
-
-  // Try extracting array between [ and ]
+  // 4. Last resort: try array extraction
   const arrStart = text.indexOf("[");
   const arrEnd = text.lastIndexOf("]");
-  if (arrStart !== -1 && arrEnd !== -1) {
+  if (arrStart !== -1 && arrEnd !== -1 && arrEnd > arrStart) {
     try {
       return JSON.parse(text.slice(arrStart, arrEnd + 1)) as T;
     } catch { /* continue */ }
