@@ -193,7 +193,9 @@ export default function Dashboard() {
       if (json.error) { setCocoonError(json.error); setCocoonProgress(0); return; }
       if (json.result) {
         setCocoonProgress(100);
-        setCocoonData(json.result as CocoonData);
+        // L'API POST renvoie le JSON directement, mais parfois enveloppé dans un objet avec .data
+        const cocoonResult = (json.result.clusters ? json.result : json.result.data ?? json.result) as CocoonData;
+        setCocoonData(cocoonResult);
         setTutorialStep(prev => {
           if (prev === 1) { localStorage.setItem("rankpill_onboarding", "2"); return 2; }
           return prev;
@@ -1231,7 +1233,7 @@ export default function Dashboard() {
                         <>
                         {/* Clusters */}
                         <div className="relative space-y-3 animate-fade-in-up">
-                          {cocoonData.clusters.map((cluster, ci) => {
+                          {(cocoonData.clusters ?? []).map((cluster, ci) => {
                             const isOpen = cocoonExpanded === cluster.name;
                             const existing = [cluster.pillar, ...(cluster.support_pages ?? [])].filter(p => p?.status === "existing").length;
                             const total = 1 + (cluster.support_pages ?? []).length;
@@ -1465,7 +1467,7 @@ export default function Dashboard() {
                               </div>
                               <div className="flex-1 flex flex-col gap-1.5">
                                 <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider mb-1">Top opportunités</p>
-                                {projections.estimated_results.slice(0, 5).map((item, i) => {
+                                {(projections.estimated_results ?? []).slice(0, 5).map((item, i) => {
                                   const diffColor = item.difficulty === "easy" ? "#4ade80" : item.difficulty === "medium" ? "#fb923c" : "#f87171";
                                   return (
                                     <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-all" style={{ borderLeft: `2px solid ${diffColor}30` }}>
@@ -2241,11 +2243,11 @@ export default function Dashboard() {
               // Mapper chaque mot-clé à son cluster du cocon
               type KwCocoonInfo = { cluster: string; role: "pilier" | "support"; priority: string };
               const kwCocoonMap = new Map<string, KwCocoonInfo>();
-              if (cocoonData) {
+              if (cocoonData?.clusters) {
                 for (const cluster of cocoonData.clusters) {
-                  kwCocoonMap.set(cluster.pillar.keyword.toLowerCase(), { cluster: cluster.name, role: "pilier", priority: cluster.priority });
-                  for (const sp of cluster.support_pages) {
-                    kwCocoonMap.set(sp.keyword.toLowerCase(), { cluster: cluster.name, role: "support", priority: cluster.priority });
+                  if (cluster.pillar?.keyword) kwCocoonMap.set(cluster.pillar.keyword.toLowerCase(), { cluster: cluster.name, role: "pilier", priority: cluster.priority });
+                  for (const sp of cluster.support_pages ?? []) {
+                    if (sp.keyword) kwCocoonMap.set(sp.keyword.toLowerCase(), { cluster: cluster.name, role: "support", priority: cluster.priority });
                   }
                 }
               }
@@ -2286,7 +2288,7 @@ export default function Dashboard() {
                 {/* Mots-clés groupés par cluster */}
                 {cocoonData ? (
                   <div className="space-y-4">
-                    {cocoonData.clusters.map((cluster, ci) => {
+                    {(cocoonData.clusters ?? []).map((cluster, ci) => {
                       const orphanedKws = ci === 0 ? enrichedStats.filter(k => !k.cocoonInfo) : [];
                       const priorityColors: Record<string, string> = {
                         haute: "border-red-500/20 bg-red-500/[0.03]",
@@ -2340,7 +2342,7 @@ export default function Dashboard() {
                             })()}
 
                             {/* Pages support */}
-                            {cluster.support_pages.slice(0, 5).map((sp, si) => {
+                            {(cluster.support_pages ?? []).slice(0, 5).map((sp, si) => {
                               const spKw = enrichedStats.find(k => k.keyword.toLowerCase() === sp.keyword.toLowerCase() || k.keyword.toLowerCase().includes(sp.keyword.toLowerCase()));
                               return (
                                 <div key={si} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
