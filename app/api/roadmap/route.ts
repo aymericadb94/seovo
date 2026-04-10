@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getValidAccessToken } from "@/lib/google";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
 import { rateLimit } from "@/lib/rate-limit";
 import { listAllCmsContent, type CmsCredentials } from "@/lib/cms-update";
@@ -36,7 +37,7 @@ export async function POST() {
 
     const { data: site, error: siteError } = await supabase
       .from("sites")
-      .select("id, business_name, industry, site_url, cms, keywords, seo_context, wp_username, wp_app_password, shopify_api_key, shopify_store_url, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
+      .select("id, business_name, industry, site_url, cms, keywords, seo_context, gsc_site_url, google_access_token, wp_username, wp_app_password, shopify_api_key, shopify_store_url, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -52,7 +53,7 @@ export async function POST() {
       custom_api_url: site.custom_api_url, custom_api_key: site.custom_api_key,
     };
 
-    const [cmsContentResult, engineResult, projectionsResult, cocoonResult] = await Promise.all([
+    const [cmsContentResult, engineResult, projectionsResult, cocoonResult, gscQueries] = await Promise.all([
       listAllCmsContent(creds, 200).catch(() => []),
       supabase
         .from("seo_engine_results")
@@ -71,6 +72,30 @@ export async function POST() {
         .select("data")
         .eq("user_id", user.id)
         .maybeSingle(),
+      // GSC direct (données fraîches)
+      (async () => {
+        if (!site.gsc_site_url || !site.google_access_token) return [];
+        try {
+          const token = await getValidAccessToken(user.id);
+          if (!token) return [];
+          const now = new Date();
+          const endDate = new Date(now); endDate.setDate(endDate.getDate() - 2);
+          const startDate = new Date(now); startDate.setDate(startDate.getDate() - 90);
+          const fmt = (d: Date) => d.toISOString().split("T")[0];
+          const res = await fetch(
+            `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site.gsc_site_url)}/searchAnalytics/query`,
+            {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ startDate: fmt(startDate), endDate: fmt(endDate), dimensions: ["query"], rowLimit: 100 }),
+            }
+          );
+          if (!res.ok) return [];
+          type Row = { keys: string[]; clicks: number; impressions: number; position: number };
+          const data = await res.json() as { rows?: Row[] };
+          return (data.rows ?? []).map(r => ({ query: r.keys[0], clicks: r.clicks, impressions: r.impressions, position: Math.round(r.position * 10) / 10 }));
+        } catch { return []; }
+      })(),
     ]);
 
     // CMS = source de vérité pour les titres existants
@@ -96,12 +121,24 @@ export async function POST() {
     const cocoon = (cocoonResult.data?.data ?? null) as CocoonData | null;
 
     // Extract projections data if available
-    type ProjItem = { keyword: string; estimated_gain: number; difficulty: string; action: string; target_position: number; timeframe: string };
+    type ProjItem = { keyword: string; estimated_gain: number; difficulty: string; action: string; target_position: number; timeframe: string; confidence_score?: number; sources?: string[] };
     type ProjData = { estimated_results?: ProjItem[]; total_estimated_gain?: { low: number; high: number }; has_gsc_data?: boolean };
     const proj = (projectionsResult.data?.data ?? null) as ProjData | null;
     const topOpportunities = (proj?.estimated_results ?? [])
       .filter(p => p.estimated_gain > 0)
       .slice(0, 12);
+
+    // Build per-keyword gain map for enriched prompt
+    const kwGainMap = new Map<string, { gain: number; confidence: number; sources: string[] }>();
+    for (const item of proj?.estimated_results ?? []) {
+      if (item.keyword && item.estimated_gain > 0) {
+        kwGainMap.set(item.keyword.toLowerCase(), {
+          gain: item.estimated_gain,
+          confidence: item.confidence_score ?? 0.3,
+          sources: item.sources ?? [],
+        });
+      }
+    }
 
     const projectionsSection = topOpportunities.length > 0 ? `
 ---
@@ -178,6 +215,19 @@ CONTRAINTE SUPPLÉMENTAIRE : La roadmap doit intégrer et développer les gaps, 
 ANALYSE SEO : Moteur SEO non encore exécuté — génère la roadmap à partir des mots-clés configurés et de l'analyse du secteur.
 `;
 
+    // GSC direct section (données fraîches, pas via cocon)
+    type GscRow = { query: string; clicks: number; impressions: number; position: number };
+    const gscRows = gscQueries as GscRow[];
+    const gscSection = gscRows.length > 0 ? `
+---
+
+DONNÉES GOOGLE SEARCH CONSOLE (90 derniers jours — données fraîches) :
+${gscRows.slice(0, 50).map((q, i) => `${i + 1}. "${q.query}" — ${q.clicks} clics, ${q.impressions} impressions, pos. ${q.position}`).join("\n")}
+
+QUICK WINS GSC (requêtes en position 5-20 avec fort volume → articles à prioriser en PHASE 1) :
+${gscRows.filter(q => q.position >= 5 && q.position <= 20 && q.impressions >= 30).slice(0, 10).map(q => `- "${q.query}" — pos. ${q.position}, ${q.impressions} imp/mois`).join("\n") || "Aucun quick win détecté"}
+` : "";
+
     const intentSection = (seoCtx.objective || seoCtx.main_offer || seoCtx.target_customer) ? `
 INTENTION STRATÉGIQUE (onboarding) :
 - Objectif business : ${seoCtx.objective ?? "non renseigné"}
@@ -201,8 +251,8 @@ SITE : ${site.business_name}
 SECTEUR : ${site.industry}
 URL : ${site.site_url}
 MOTS-CLÉS CONFIGURÉS : ${keywords}
-ARTICLES DÉJÀ PUBLIÉS : ${existingTitles.length > 0 ? existingTitles.slice(0, 10).map(t => `"${t}"`).join(", ") : "aucun"}
-${intentSection}${cocoonSection}${projectionsSection}${engineSection}
+${kwGainMap.size > 0 ? `GAINS ESTIMÉS PAR MOT-CLÉ (moteur de projections) :\n${(site.keywords ?? []).filter((k: string) => kwGainMap.has(k.toLowerCase())).slice(0, 20).map((k: string) => { const info = kwGainMap.get(k.toLowerCase())!; return `- "${k}" → +${info.gain} clics/mois (confiance: ${Math.round(info.confidence * 100)}%, sources: ${info.sources.join("+")})`; }).join("\n")}\n` : ""}ARTICLES DÉJÀ PUBLIÉS : ${existingTitles.length > 0 ? existingTitles.slice(0, 10).map(t => `"${t}"`).join(", ") : "aucun"}
+${intentSection}${cocoonSection}${projectionsSection}${gscSection}${engineSection}
 ---
 
 OBJECTIFS :

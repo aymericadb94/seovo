@@ -288,7 +288,7 @@ export function computeProjections(
   })();
 
   // Cocoon: keyword → { clusterName, trafficPotential, isPillar }
-  type CocoonInfo = { cluster: string; trafficPotential: number; isPillar: boolean };
+  type CocoonInfo = { cluster: string; trafficPotential: number; isPillar: boolean; status: string | null };
   const cocoonMap = new Map<string, CocoonInfo>();
   if (cocoon?.clusters) {
     for (const c of cocoon.clusters) {
@@ -297,6 +297,7 @@ export function computeProjections(
           cluster: c.name,
           trafficPotential: c.traffic_potential ?? 0,
           isPillar: true,
+          status: c.pillar.status ?? null,
         });
       }
       for (const sp of c.support_pages ?? []) {
@@ -305,6 +306,7 @@ export function computeProjections(
             cluster: c.name,
             trafficPotential: c.traffic_potential ?? 0,
             isPillar: false,
+            status: sp.status ?? null,
           });
         }
       }
@@ -375,7 +377,13 @@ export function computeProjections(
       return null;
     })();
 
-    const existingPageUrl = (cmsPages && cmsPages.length > 0) ? findExistingPage(keyword) : (gsc ? `${siteUrl}/[existing]` : null);
+    // Cocon status "existing"/"existant" = page already exists (source of truth from cocon audit)
+    const cocoonSaysExisting = cocoonInfo?.status
+      ? ["existing", "existant", "existante", "publié", "publiée", "published"].includes(cocoonInfo.status.toLowerCase())
+      : false;
+    const existingPageUrl = cocoonSaysExisting
+      ? (findExistingPage(keyword) ?? `${siteUrl}/[existing-cocoon]`)
+      : (cmsPages && cmsPages.length > 0) ? findExistingPage(keyword) : (gsc ? `${siteUrl}/[existing]` : null);
     const hasExistingPage = !!existingPageUrl;
 
     // Track sources
