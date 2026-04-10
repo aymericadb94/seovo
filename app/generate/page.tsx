@@ -818,282 +818,268 @@ export default function GeneratePage() {
             </button>
           </form>
 
-        ) : status === "generating" || status === "publishing" ? (
-          /* ── Animation de génération ── */
-          <div className="relative">
-            {/* Glow background */}
-            <div className="absolute -inset-8 pointer-events-none">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-20" style={{ background: "radial-gradient(circle, rgba(249,115,22,0.15) 0%, transparent 70%)", animation: "pulse 4s ease-in-out infinite" }} />
+        ) : status === "generating" || status === "publishing" ? (() => {
+          const clampedStep = Math.min(currentStep, STEPS.length - 1);
+          const allDone = currentStep >= STEPS.length;
+          const pct = allDone ? 100 : Math.round((currentStep / STEPS.length) * 100);
+          const orbitRadius = 180;
+
+          // Active step details
+          const activeDetails = stepDetails[clampedStep] ?? [];
+          const activeVisibleCount = visibleDetails[clampedStep] ?? (allDone ? activeDetails.length : 0);
+
+          return (
+          <div className="relative flex flex-col items-center" style={{ minHeight: "calc(100vh - 200px)" }}>
+
+            {/* Ambient glow */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full" style={{ background: "radial-gradient(circle, rgba(249,115,22,0.08) 0%, transparent 60%)", animation: "pulse 5s ease-in-out infinite" }} />
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full" style={{ background: "radial-gradient(ellipse, rgba(239,68,68,0.05) 0%, transparent 70%)" }} />
             </div>
 
-            <div className="relative rounded-2xl overflow-hidden" style={{ background: "rgba(8,8,8,0.95)", border: "1px solid rgba(249,115,22,0.12)", backdropFilter: "blur(20px)" }}>
+            {/* Header */}
+            <div className="relative z-10 flex items-center justify-between w-full mb-4">
+              <div className="flex items-center gap-3">
+                <div className="relative w-8 h-8 flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full" style={{ background: allDone ? "rgba(34,197,94,0.15)" : "rgba(249,115,22,0.1)", animation: "ringPulse 2s ease-out infinite" }} />
+                  <div className="w-4 h-4 rounded-full" style={{ background: allDone ? "linear-gradient(135deg, #22c55e, #16a34a)" : "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: `0 0 12px ${allDone ? "rgba(34,197,94,0.5)" : "rgba(249,115,22,0.5)"}` }} />
+                </div>
+                <div>
+                  <h2 className="text-white font-black text-sm tracking-tight">
+                    {allDone ? "Finalisation" : status === "publishing" ? "Publication" : "G\u00e9n\u00e9ration"} en cours
+                  </h2>
+                  <p className="text-gray-600 text-[11px]">
+                    <span className="text-orange-400 font-bold">{activeKeyword}</span> &middot; {localeNames[language]}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <span className="text-orange-400/60 text-[10px]">{pct}%</span>
+                <span className="text-gray-600">|</span>
+                <span className="text-orange-400 font-black text-xs tabular-nums">{Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")}</span>
+              </div>
+            </div>
 
-              {/* Animated top bar */}
-              <div className="relative h-1 w-full overflow-hidden" style={{ background: "rgba(255,255,255,0.03)" }}>
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full"
-                  style={{
-                    width: `${Math.min(((currentStep + 1) / STEPS.length) * 100, 100)}%`,
-                    background: "linear-gradient(90deg, #f97316, #ef4444, #f97316)",
-                    backgroundSize: "200% 100%",
-                    animation: "gradientShift 2s ease infinite",
-                    transition: "width 1s cubic-bezier(0.34,1.56,0.64,1)",
-                    boxShadow: "0 0 20px rgba(249,115,22,0.6), 0 0 60px rgba(249,115,22,0.2)",
-                  }}
+            {/* ── Orbital ring — full width ── */}
+            <div className="relative z-10 flex items-center justify-center" style={{ width: `${orbitRadius * 2 + 120}px`, height: `${orbitRadius * 2 + 120}px`, maxWidth: "100%" }}>
+
+              {/* Rotating orbit track */}
+              <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${orbitRadius * 2 + 120} ${orbitRadius * 2 + 120}`}>
+                <circle
+                  cx={orbitRadius + 60} cy={orbitRadius + 60} r={orbitRadius}
+                  fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1"
                 />
+                {/* Progress arc */}
+                <circle
+                  cx={orbitRadius + 60} cy={orbitRadius + 60} r={orbitRadius}
+                  fill="none" stroke="url(#orbitGrad)" strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * orbitRadius}`}
+                  strokeDashoffset={`${2 * Math.PI * orbitRadius * (1 - pct / 100)}`}
+                  style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(0.34,1.56,0.64,1)", transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}
+                />
+                <defs>
+                  <linearGradient id="orbitGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#f97316" />
+                    <stop offset="100%" stopColor="#ef4444" />
+                  </linearGradient>
+                </defs>
+              </svg>
+
+              {/* Rotating particle ring */}
+              <div className="absolute inset-0" style={{ animation: "orbitSpin 30s linear infinite" }}>
+                {[0, 45, 120, 200, 280].map((deg) => (
+                  <div
+                    key={deg}
+                    className="absolute w-1 h-1 rounded-full"
+                    style={{
+                      left: `calc(50% + ${Math.cos((deg * Math.PI) / 180) * (orbitRadius + 15)}px)`,
+                      top: `calc(50% + ${Math.sin((deg * Math.PI) / 180) * (orbitRadius + 15)}px)`,
+                      background: "rgba(249,115,22,0.3)",
+                      boxShadow: "0 0 4px rgba(249,115,22,0.4)",
+                    }}
+                  />
+                ))}
               </div>
 
-              <div className="p-8">
-                {/* Header row */}
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-3">
-                    {/* Animated orb */}
-                    <div className="relative w-10 h-10 flex items-center justify-center">
-                      <div className="absolute inset-0 rounded-full" style={{ background: "rgba(249,115,22,0.1)", animation: "ringPulse 2s ease-out infinite" }} />
-                      <div className="absolute inset-1 rounded-full" style={{ background: "rgba(249,115,22,0.08)", animation: "ringPulse 2s ease-out 0.5s infinite" }} />
-                      <div className="w-5 h-5 rounded-full" style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 0 15px rgba(249,115,22,0.5)" }} />
-                    </div>
-                    <div>
-                      <h2 className="text-white font-black text-base tracking-tight">
-                        {status === "publishing" ? "Publication" : "G\u00e9n\u00e9ration"} en cours
-                      </h2>
-                      <p className="text-gray-500 text-xs mt-0.5">
-                        <span className="text-orange-400 font-bold">&ldquo;{activeKeyword}&rdquo;</span>
-                        {" "}&middot; {localeNames[language]}
-                      </p>
-                    </div>
-                  </div>
+              {/* Agent nodes */}
+              {STEPS.map((step, i) => {
+                const isDone = i < currentStep;
+                const isActive = i === clampedStep && !allDone;
+                const angle = (i / STEPS.length) * 360 - 90;
+                const rad = (angle * Math.PI) / 180;
+                const x = Math.cos(rad) * orbitRadius;
+                const y = Math.sin(rad) * orbitRadius;
+                const nodeSize = isActive ? 48 : isDone ? 40 : 36;
 
-                  {/* Timer */}
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl" style={{ background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.1)" }}>
-                    <div className="relative w-4 h-4">
-                      <svg viewBox="0 0 24 24" className="w-4 h-4 text-orange-400/50">
-                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.5"/>
-                        <line x1="12" y1="12" x2="12" y2="7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ transformOrigin: "12px 12px", animation: `spin ${60}s linear infinite` }} />
-                        <line x1="12" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ transformOrigin: "12px 12px", animation: `spin ${3600}s linear infinite` }} />
-                      </svg>
+                return (
+                  <div
+                    key={step.id}
+                    className="absolute flex items-center justify-center"
+                    style={{
+                      left: `calc(50% + ${x}px - ${nodeSize / 2}px)`,
+                      top: `calc(50% + ${y}px - ${nodeSize / 2}px)`,
+                      width: nodeSize, height: nodeSize,
+                      zIndex: isActive ? 20 : 5,
+                      animation: isDone ? `nodeEntry 0.5s ease-out ${i * 0.05}s both` : undefined,
+                      transition: "all 0.6s cubic-bezier(0.34,1.56,0.64,1)",
+                    }}
+                  >
+                    {/* Active pulse rings */}
+                    {isActive && (
+                      <>
+                        <div className="absolute inset-[-8px] rounded-full" style={{ border: "1px solid rgba(249,115,22,0.2)", animation: "ringPulse 2s ease-out infinite" }} />
+                        <div className="absolute inset-[-16px] rounded-full" style={{ border: "1px solid rgba(249,115,22,0.1)", animation: "ringPulse 2s ease-out 0.6s infinite" }} />
+                      </>
+                    )}
+
+                    {/* Node circle */}
+                    <div
+                      className="w-full h-full rounded-full flex items-center justify-center"
+                      style={{
+                        background: allDone
+                          ? "linear-gradient(135deg, rgba(34,197,94,0.25), rgba(34,197,94,0.1))"
+                          : isDone
+                          ? "linear-gradient(135deg, rgba(249,115,22,0.25), rgba(249,115,22,0.1))"
+                          : isActive
+                          ? "linear-gradient(135deg, #f97316, #ef4444)"
+                          : "rgba(255,255,255,0.03)",
+                        border: allDone
+                          ? "2px solid rgba(34,197,94,0.4)"
+                          : isDone
+                          ? "2px solid rgba(249,115,22,0.35)"
+                          : isActive
+                          ? "2px solid rgba(249,115,22,0.8)"
+                          : "1px solid rgba(255,255,255,0.06)",
+                        boxShadow: isActive
+                          ? "0 0 25px rgba(249,115,22,0.4), 0 0 50px rgba(249,115,22,0.1)"
+                          : isDone
+                          ? "0 0 10px rgba(249,115,22,0.1)"
+                          : "none",
+                        color: allDone ? "#22c55e" : isDone ? "#f97316" : isActive ? "white" : "#4b5563",
+                        animation: allDone && i === STEPS.length - 1 ? "completePulse 1.5s ease-out" : undefined,
+                      }}
+                    >
+                      {isDone || allDone ? (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      ) : isActive ? (
+                        <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.15)" strokeWidth="2"/>
+                          <path d="M12 3a9 9 0 019 9" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                        </svg>
+                      ) : (
+                        <span className="text-[10px] font-black">{i + 1}</span>
+                      )}
                     </div>
-                    <span className="text-orange-400 font-black text-sm tabular-nums">{Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")}</span>
+
+                    {/* Label under node */}
+                    <span
+                      className="absolute whitespace-nowrap text-[9px] font-bold pointer-events-none transition-all duration-500"
+                      style={{
+                        top: y > 30 ? "calc(100% + 6px)" : y < -30 ? "auto" : "50%",
+                        bottom: y < -30 ? "calc(100% + 6px)" : "auto",
+                        left: "50%", transform: "translateX(-50%)",
+                        color: isActive ? "#fb923c" : isDone || allDone ? "rgba(249,115,22,0.45)" : "rgba(255,255,255,0.1)",
+                      }}
+                    >
+                      {step.label.length > 16 ? step.label.split(" ").slice(0, 2).join(" ") : step.label}
+                    </span>
                   </div>
+                );
+              })}
+
+              {/* Center hub */}
+              <div className="relative z-30 flex flex-col items-center text-center">
+                <div className="text-3xl font-black tabular-nums mb-1" style={{ color: allDone ? "#22c55e" : "#f97316" }} key={`step-${currentStep}`}>
+                  {Math.min(currentStep + 1, STEPS.length)}<span className="text-gray-700 text-xl font-bold">/{STEPS.length}</span>
                 </div>
+                <p className="text-white font-bold text-sm leading-tight max-w-[140px]" key={`label-${clampedStep}`} style={{ animation: "fadeIn 0.4s ease" }}>
+                  {allDone ? "Termin\u00e9" : STEPS[clampedStep]?.label}
+                </p>
+              </div>
+            </div>
 
-                {/* Central visual — Orbital agent ring */}
-                <div className="relative flex items-center justify-center mb-8" style={{ height: "220px" }}>
-                  {/* Orbit rings */}
-                  <div className="absolute w-44 h-44 rounded-full border border-white/[0.03]" />
-                  <div className="absolute w-64 h-64 rounded-full border border-white/[0.02]" style={{ borderStyle: "dashed" }} />
-
-                  {/* Agent nodes on orbit */}
-                  {STEPS.map((step, i) => {
-                    const isDone = i < currentStep;
-                    const isActive = i === currentStep;
-                    const angle = (i / STEPS.length) * 360 - 90;
-                    const rad = (angle * Math.PI) / 180;
-                    const radius = 110;
-                    const x = Math.cos(rad) * radius;
-                    const y = Math.sin(rad) * radius;
-
+            {/* ── Detail panel — below the orbit ── */}
+            {!allDone && activeDetails.length > 0 && (
+              <div
+                className="relative z-10 w-full mt-6 rounded-xl overflow-hidden"
+                style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(249,115,22,0.1)", animation: "detailSlideIn 0.4s ease-out" }}
+                key={`details-${clampedStep}`}
+              >
+                {/* Header */}
+                <div className="flex items-center gap-2 px-4 py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <svg className="w-3 h-3 animate-spin text-orange-400" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="9" stroke="rgba(249,115,22,0.2)" strokeWidth="2"/>
+                    <path d="M12 3a9 9 0 019 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  <span className="text-[11px] font-bold text-orange-400">
+                    {STEPS[clampedStep]?.label}
+                  </span>
+                  <span className="text-[9px] text-gray-700 ml-auto">agent/{STEPS[clampedStep]?.id}</span>
+                </div>
+                {/* Lines */}
+                <div className="px-4 py-3 flex flex-col gap-1">
+                  {activeDetails.slice(0, activeVisibleCount).map((detail, j) => {
+                    const isLast = j === activeVisibleCount - 1;
                     return (
                       <div
-                        key={step.id}
-                        className="absolute flex items-center justify-center transition-all duration-700"
-                        style={{
-                          left: `calc(50% + ${x}px - 18px)`,
-                          top: `calc(50% + ${y}px - 18px)`,
-                          zIndex: isActive ? 10 : 1,
-                        }}
+                        key={j}
+                        className="flex items-start gap-2"
+                        style={{ animation: "fadeSlideIn 0.3s ease-out" }}
                       >
-                        {/* Pulse ring for active */}
-                        {isActive && (
-                          <div className="absolute w-12 h-12 rounded-full" style={{ background: "rgba(249,115,22,0.15)", animation: "ringPulse 1.5s ease-out infinite" }} />
-                        )}
-                        <div
-                          className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-500"
-                          style={{
-                            background: isDone
-                              ? "linear-gradient(135deg, rgba(249,115,22,0.3), rgba(249,115,22,0.15))"
-                              : isActive
-                              ? "linear-gradient(135deg, #f97316, #ef4444)"
-                              : "rgba(255,255,255,0.04)",
-                            border: isDone
-                              ? "1px solid rgba(249,115,22,0.4)"
-                              : isActive
-                              ? "1px solid rgba(249,115,22,0.8)"
-                              : "1px solid rgba(255,255,255,0.06)",
-                            boxShadow: isActive ? "0 0 20px rgba(249,115,22,0.4), 0 0 40px rgba(249,115,22,0.15)" : isDone ? "0 0 8px rgba(249,115,22,0.15)" : "none",
-                            transform: isActive ? "scale(1.15)" : "scale(1)",
-                            color: isDone ? "#f97316" : isActive ? "white" : "#4b5563",
-                          }}
-                        >
-                          {isDone ? (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-                              <polyline points="20 6 9 17 4 12"/>
-                            </svg>
-                          ) : isActive ? (
-                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                              <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.2)" strokeWidth="2"/>
-                              <path d="M12 3a9 9 0 019 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-                            </svg>
-                          ) : (
-                            <span className="text-[10px] font-black">{i + 1}</span>
+                        <span className="flex-shrink-0 mt-1 text-[10px] font-mono" style={{ color: isLast ? "#fb923c" : "rgba(249,115,22,0.3)" }}>
+                          {isLast ? "\u25B8" : "\u2713"}
+                        </span>
+                        <span className="text-[11px] font-mono leading-relaxed" style={{ color: isLast ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)" }}>
+                          {detail}
+                          {isLast && (
+                            <span className="inline-block w-1.5 h-3.5 bg-orange-400/80 ml-1 rounded-sm" style={{ verticalAlign: "text-bottom", animation: "glowPulse 1s ease-in-out infinite" }} />
                           )}
-                        </div>
-                        {/* Label */}
-                        <span
-                          className="absolute whitespace-nowrap text-[9px] font-bold transition-all duration-500"
-                          style={{
-                            top: y > 20 ? "100%" : y < -20 ? "auto" : "50%",
-                            bottom: y < -20 ? "100%" : "auto",
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                            marginTop: y > 20 ? "6px" : 0,
-                            marginBottom: y < -20 ? "6px" : 0,
-                            color: isActive ? "#fb923c" : isDone ? "rgba(249,115,22,0.5)" : "rgba(255,255,255,0.15)",
-                          }}
-                        >
-                          {step.label.split(" ").slice(0, 2).join(" ")}
                         </span>
                       </div>
                     );
                   })}
-
-                  {/* Center — active step info */}
-                  <div className="relative z-20 flex flex-col items-center text-center px-4">
-                    <div className="text-orange-400 font-black text-2xl tabular-nums mb-1">
-                      {currentStep + 1}<span className="text-gray-600 text-lg font-bold">/{STEPS.length}</span>
-                    </div>
-                    <p className="text-white font-bold text-sm leading-tight" style={{ animation: "fadeIn 0.5s ease" }} key={currentStep}>
-                      {STEPS[Math.min(currentStep, STEPS.length - 1)]?.label}
-                    </p>
-                    <p className="text-gray-600 text-[10px] mt-1 max-w-[160px]">
-                      {STEPS[Math.min(currentStep, STEPS.length - 1)]?.sub}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Live terminal — agent actions */}
-                <div
-                  className="rounded-xl overflow-hidden mb-6"
-                  style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.05)" }}
-                >
-                  {/* Terminal header */}
-                  <div className="flex items-center gap-2 px-4 py-2" style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                    <div className="flex gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-red-500/40" />
-                      <span className="w-2 h-2 rounded-full bg-yellow-500/40" />
-                      <span className="w-2 h-2 rounded-full bg-green-500/40" />
-                    </div>
-                    <span className="text-[10px] text-gray-600 font-mono ml-2">rankpill-agent-pipeline</span>
-                  </div>
-
-                  {/* Terminal body */}
-                  <div className="px-4 py-3 max-h-48 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-                    {STEPS.map((step, i) => {
-                      const isDone = i < currentStep;
-                      const isActive = i === currentStep;
-                      if (!isDone && !isActive) return null;
-
-                      const details = stepDetails[i] ?? [];
-                      const visibleCount = visibleDetails[i] ?? (isDone ? details.length : 0);
-                      const shownDetails = details.slice(0, isDone ? details.length : visibleCount);
-
-                      return (
-                        <div key={step.id} className="mb-2 last:mb-0">
-                          {/* Agent header line */}
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-[10px] font-mono" style={{ color: isDone ? "rgba(34,197,94,0.5)" : "#22c55e" }}>
-                              {isDone ? "\u2713" : "\u25B6"}
-                            </span>
-                            <span className="text-[11px] font-mono font-bold" style={{ color: isDone ? "rgba(249,115,22,0.4)" : "#fb923c" }}>
-                              agent/{step.id}
-                            </span>
-                            {isDone && (
-                              <span className="text-[9px] font-mono text-gray-700">done</span>
-                            )}
-                          </div>
-                          {/* Detail lines */}
-                          {shownDetails.map((detail, j) => {
-                            const isLast = isActive && j === visibleCount - 1;
-                            return (
-                              <div
-                                key={j}
-                                className="flex items-start gap-2 pl-5"
-                                style={{ animation: !isDone ? "fadeSlideIn 0.3s ease-out" : undefined }}
-                              >
-                                <span className="text-[10px] font-mono mt-px" style={{ color: isDone ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.2)" }}>
-                                  {isDone ? "\u2502" : isLast ? "\u2514" : "\u251C"}
-                                </span>
-                                <span
-                                  className="text-[10px] font-mono leading-relaxed"
-                                  style={{ color: isLast ? "rgba(255,255,255,0.6)" : isDone ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.35)" }}
-                                >
-                                  {detail}
-                                  {isLast && isActive && (
-                                    <span className="inline-block w-1.5 h-3 bg-orange-400/80 ml-1 rounded-sm" style={{ verticalAlign: "text-bottom", animation: "glowPulse 1s ease-in-out infinite" }} />
-                                  )}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Data sources recap strip */}
-                <div className="flex items-center gap-3 flex-wrap mb-6">
-                  {[
-                    { label: "GSC", icon: "\uD83D\uDCC8", active: currentStep >= 0 },
-                    { label: "Cocon", icon: "\uD83D\uDD78\uFE0F", active: currentStep >= 2 },
-                    { label: "Roadmap", icon: "\uD83D\uDDFA\uFE0F", active: currentStep >= 2 },
-                    { label: "SERP", icon: "\uD83D\uDD0D", active: currentStep >= 1 },
-                    { label: "Pages existantes", icon: "\uD83D\uDCC4", active: currentStep >= 5 },
-                  ].map((src) => (
-                    <div
-                      key={src.label}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-700"
-                      style={{
-                        background: src.active ? "rgba(249,115,22,0.06)" : "rgba(255,255,255,0.02)",
-                        border: src.active ? "1px solid rgba(249,115,22,0.15)" : "1px solid rgba(255,255,255,0.04)",
-                        color: src.active ? "#fb923c" : "#4b5563",
-                      }}
-                    >
-                      <span className="text-xs">{src.icon}</span>
-                      <span>{src.label}</span>
-                      {src.active && <span className="w-1 h-1 rounded-full bg-green-400 ml-0.5" />}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                  <div className="flex items-center gap-2">
-                    <div className="flex -space-x-1">
-                      {STEPS.map((_, i) => (
-                        <div
-                          key={i}
-                          className="w-2 h-2 rounded-full border border-black transition-all duration-500"
-                          style={{
-                            background: i < currentStep ? "#f97316" : i === currentStep ? "#fb923c" : "rgba(255,255,255,0.06)",
-                            boxShadow: i === currentStep ? "0 0 6px rgba(249,115,22,0.5)" : "none",
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-gray-600 text-[10px] ml-1">
-                      {Math.round(((currentStep + 1) / STEPS.length) * 100)}%
-                    </span>
-                  </div>
-                  <p className="text-gray-600 text-[10px]">
-                    {elapsed < 30 ? "Analyse des donn\u00e9es..." : elapsed < 90 ? "R\u00e9daction de l\u2019article..." : elapsed < 180 ? "Optimisation SEO..." : "Finalisation..."}
-                  </p>
                 </div>
               </div>
+            )}
+
+            {/* Completion message */}
+            {allDone && (
+              <div
+                className="relative z-10 w-full mt-6 rounded-xl px-5 py-4 text-center"
+                style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)", animation: "scaleIn 0.5s cubic-bezier(0.16,1,0.3,1)" }}
+              >
+                <p className="text-green-400 font-bold text-sm">
+                  {status === "publishing" ? "Publication sur votre CMS..." : "Article g\u00e9n\u00e9r\u00e9 avec succ\u00e8s"}
+                </p>
+                <p className="text-gray-600 text-[11px] mt-1">
+                  {status === "publishing" ? "Envoi vers votre site en cours" : "Pr\u00e9paration de la publication"}
+                </p>
+              </div>
+            )}
+
+            {/* Bottom progress dots */}
+            <div className="relative z-10 flex items-center gap-1.5 mt-6">
+              {STEPS.map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-full transition-all duration-500"
+                  style={{
+                    width: i === clampedStep && !allDone ? 20 : 6,
+                    height: 6,
+                    background: allDone ? "#22c55e" : i < currentStep ? "#f97316" : i === clampedStep ? "#fb923c" : "rgba(255,255,255,0.06)",
+                    boxShadow: i === clampedStep && !allDone ? "0 0 8px rgba(249,115,22,0.5)" : "none",
+                  }}
+                />
+              ))}
             </div>
           </div>
+          );
+        })()
 
-        ) : status === "preview" && generated ? (
+        : status === "preview" && generated ? (
           /* ── Preview moderne ── */
           <div className="flex flex-col gap-5">
             {/* Bandeau */}
