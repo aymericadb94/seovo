@@ -183,8 +183,13 @@ export default function Dashboard() {
     }, 500);
     try {
       const res = await fetch("/api/semantic-cocoon", { method: "POST" });
-      const json = await res.json();
       if (cocoonProgressRef.current) clearInterval(cocoonProgressRef.current);
+      if (!res.ok) {
+        let msg = `Erreur serveur (${res.status})`;
+        try { const j = await res.json(); if (j.error) msg = j.error; } catch { /* non-JSON response */ }
+        setCocoonError(msg); setCocoonProgress(0); return;
+      }
+      const json = await res.json();
       if (json.error) { setCocoonError(json.error); setCocoonProgress(0); return; }
       if (json.result) {
         setCocoonProgress(100);

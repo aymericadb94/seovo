@@ -114,7 +114,7 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
 // ── Max tokens per task type ────────────────────────────────────────────────
 
 const TASK_MAX_TOKENS: Record<TaskType, number> = {
-  semantic_cocoon: 8000,
+  semantic_cocoon: 16000,
   roadmap_strategy: 8000,
   seo_analysis: 6000,
   seo_audit: 6000,
@@ -252,23 +252,34 @@ export async function aiCall(
   const maxTokens = params.max_tokens ?? selection.max_tokens;
 
   // Use streaming internally to avoid Anthropic SDK timeout on long requests
-  const stream = _client.messages.stream({
-    model: selection.model,
-    max_tokens: maxTokens,
-    ...(params.system ? { system: params.system } : {}),
-    messages: params.messages,
-    ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
-  });
+  try {
+    const stream = _client.messages.stream({
+      model: selection.model,
+      max_tokens: maxTokens,
+      ...(params.system ? { system: params.system } : {}),
+      messages: params.messages,
+      ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
+    });
 
-  const msg = await stream.finalMessage();
-  const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+    const msg = await stream.finalMessage();
+    const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
 
-  return {
-    text,
-    model: selection.model,
-    tier: selection.tier,
-    reason: selection.reason,
-  };
+    return {
+      text,
+      model: selection.model,
+      tier: selection.tier,
+      reason: selection.reason,
+    };
+  } catch (err) {
+    const rawMsg = err instanceof Error ? err.message : "Erreur IA inconnue";
+    // Re-throw with clean message for route handlers to catch
+    throw new Error(
+      rawMsg.includes("overloaded") ? "L'IA est temporairement surchargée — réessayez dans 30 secondes"
+      : rawMsg.includes("rate_limit") ? "Limite de requêtes IA atteinte — réessayez dans quelques minutes"
+      : rawMsg.includes("context") || rawMsg.includes("too many tokens") ? "Contexte trop volumineux pour l'analyse — contactez le support"
+      : `Erreur IA : ${rawMsg.slice(0, 200)}`
+    );
+  }
 }
 
 /**
