@@ -221,8 +221,8 @@ export async function GET() {
       scoreTraffic = Math.min(20, Math.round((totalClicks / 50) * 20));
     }
 
-    // Contenu : nombre d'articles vs objectif (40 articles roadmap = 100%)
-    const contentTarget = 40;
+    // Contenu : nombre d'articles vs objectif (20 articles roadmap = 100%)
+    const contentTarget = 20;
     const scoreContent = Math.min(25, Math.round((totalArticles / contentTarget) * 25));
 
     // Keywords : couverture des mots-clés configurés

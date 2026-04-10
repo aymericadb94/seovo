@@ -1409,13 +1409,13 @@ export default function Dashboard() {
                               </div>
                               <div>
                                 <p className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: "#a78bfa" }}>Roadmap SEO</p>
-                                <p className="text-white font-black text-xl">Plan éditorial — 40 articles</p>
+                                <p className="text-white font-black text-xl">Plan éditorial — 20 articles</p>
                               </div>
                             </div>
                             <div className="relative group flex-shrink-0">
                               <button className="w-7 h-7 rounded-full flex items-center justify-center text-gray-600 hover:text-violet-400 transition-colors text-xs font-black" style={{ background: "rgba(255,255,255,0.04)" }}>?</button>
                               <div className="absolute right-0 top-9 w-64 bg-[#111] border border-violet-500/20 rounded-xl p-3 text-xs text-gray-400 leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-30 shadow-xl">
-                                Générez votre plan éditorial SEO sur 40 articles, priorisés selon votre cocon sémantique. RankPill publie automatiquement chaque article selon la roadmap.
+                                Générez votre plan éditorial SEO sur 20 articles, priorisés selon votre cocon sémantique. RankPill publie automatiquement chaque article selon la roadmap.
                               </div>
                             </div>
                           </div>
@@ -1428,7 +1428,7 @@ export default function Dashboard() {
                                 <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 3 / 4</span>
                               </div>
                               <p className="text-white/70 text-xs leading-relaxed mb-3">
-                                Générez votre plan éditorial sur <span className="text-white font-bold">40 articles</span>, structurés selon votre cocon sémantique. RankPill les publiera automatiquement.
+                                Générez votre plan éditorial sur <span className="text-white font-bold">20 articles</span>, structurés selon votre cocon sémantique. RankPill les publiera automatiquement.
                               </p>
                               {roadmapRecord ? (
                                 <button
@@ -1513,11 +1513,11 @@ export default function Dashboard() {
                             <div className="flex flex-col gap-5 flex-1 justify-between">
                               <div className="flex flex-col gap-4">
                                 <p className="text-gray-400 text-sm leading-relaxed">
-                                  Générez votre plan éditorial sur <span className="text-white font-bold">40 articles SEO</span>, structurés selon votre cocon sémantique et priorisés par potentiel de trafic.
+                                  Générez votre plan éditorial sur <span className="text-white font-bold">20 articles SEO</span>, structurés selon votre cocon sémantique et priorisés par potentiel de trafic.
                                 </p>
                                 <div className="grid grid-cols-3 gap-3">
                                   {[
-                                    { label: "Articles planifiés", value: "40", color: "#a78bfa" },
+                                    { label: "Articles planifiés", value: "20", color: "#a78bfa" },
                                     { label: "Mots-clés ciblés", value: String(kpis?.totalKeywords ?? 0), color: "#818cf8" },
                                     { label: "Phases SEO", value: "3", color: "#60a5fa" },
                                   ].map(s => (

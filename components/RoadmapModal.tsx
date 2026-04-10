@@ -164,7 +164,7 @@ export default function RoadmapModal({ roadmapRecord, publications = [], cmsTitl
             <div>
               <h2 className="text-lg font-black tracking-tight"
                 style={{ background: "linear-gradient(90deg, #e9d5ff, #c4b5fd, #a5b4fc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                Roadmap SEO — 40 articles
+                Roadmap SEO — 20 articles
               </h2>
               {roadmapRecord && (
                 <p className="text-xs text-white/30 mt-0.5">
@@ -192,7 +192,7 @@ export default function RoadmapModal({ roadmapRecord, publications = [], cmsTitl
             </div>
             <h3 className="text-white font-bold text-lg mb-2">Votre Roadmap SEO n'a pas encore été générée</h3>
             <p className="text-white/40 text-sm mb-6 max-w-md mx-auto">
-              RankPill va analyser votre secteur, vos concurrents et vos mots-clés pour générer un plan éditorial stratégique de 40 articles optimisé pour dominer Google.
+              RankPill va analyser votre secteur, vos concurrents et vos mots-clés pour générer un plan éditorial stratégique de 20 articles optimisé pour dominer Google.
             </p>
             {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
             <button
@@ -254,7 +254,7 @@ export default function RoadmapModal({ roadmapRecord, publications = [], cmsTitl
                     color: activeTab === tab ? "#c4b5fd" : "rgba(255,255,255,0.3)",
                   }}
                 >
-                  {tab === "articles" ? `40 Articles (${articles.length})` : tab === "phases" ? "Plan de publication" : "Stratégie éditoriale"}
+                  {tab === "articles" ? `20 Articles (${articles.length})` : tab === "phases" ? "Plan de publication" : "Stratégie éditoriale"}
                 </button>
               ))}
             </div>

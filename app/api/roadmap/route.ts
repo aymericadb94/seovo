@@ -242,7 +242,7 @@ INTENTION STRATÉGIQUE (onboarding) :
     const currentYear = new Date().getFullYear();
     const prompt = `Tu es un expert SEO senior spécialisé en stratégie de contenu avancée et en domination des résultats Google en ${currentYear}.
 
-Ta mission est de générer une roadmap éditoriale de 40 articles raccord avec l'analyse SEO réelle du site.
+Ta mission est de générer une roadmap éditoriale de 20 articles raccord avec l'analyse SEO réelle du site.
 
 DATE ACTUELLE : ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
 ANNÉE EN COURS : ${currentYear} (utilise TOUJOURS cette année si un titre ou mot-clé contient une année, JAMAIS une année passée)
@@ -259,7 +259,7 @@ OBJECTIFS :
 - Construire un cocon sémantique ancré dans les piliers détectés par le moteur SEO
 - Exploiter les quick wins GSC identifiés (articles qui peuvent ranker vite)
 - Couvrir les gaps de contenu détectés par le moteur
-- Générer 40 articles différenciants, utiles, et directement actionnables
+- Générer 20 articles différenciants, utiles, et directement actionnables
 - Attirer du trafic qualifié aligné avec l'offre et la cible déclarées
 - Respecter les critères EEAT
 - Ne jamais dupliquer les articles déjà publiés
@@ -303,23 +303,23 @@ RÉPONSE : JSON uniquement, sans texte avant ou après. Structure exacte :
   "phases": [
     {
       "phase": 1,
-      "label": "Fondations",
+      "label": "Fondations & Quick Wins",
       "weeks": "Semaines 1-4",
-      "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      "ids": [1, 2, 3, 4, 5, 6, 7],
       "rationale": "Pourquoi commencer par ces articles"
     },
     {
       "phase": 2,
       "label": "Expansion",
       "weeks": "Semaines 5-10",
-      "ids": [11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+      "ids": [8, 9, 10, 11, 12, 13, 14],
       "rationale": "Logique de la deuxième phase"
     },
     {
       "phase": 3,
       "label": "Domination",
-      "weeks": "Semaines 11-20",
-      "ids": [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
+      "weeks": "Semaines 11-16",
+      "ids": [15, 16, 17, 18, 19, 20],
       "rationale": "Logique de la phase finale"
     }
   ],
@@ -332,7 +332,7 @@ RÉPONSE : JSON uniquement, sans texte avant ou après. Structure exacte :
 }
 
 IMPORTANT :
-- Génère exactement 40 articles. IDs de 1 à 40. Priorités de 1 (urgent) à 40.
+- Génère exactement 20 articles. IDs de 1 à 20. Priorités de 1 (urgent) à 20.
 - Chaque champ texte = 1 phrase courte maximum (pas de paragraphes).
 - Réponds avec du JSON brut uniquement — aucun bloc markdown, aucun texte avant ou après l'accolade ouvrante.`;
 
