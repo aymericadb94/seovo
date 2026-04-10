@@ -31,13 +31,6 @@ export default function ScoreRing({ score, locked = false, breakdown = null }: {
   const color = locked ? "#374151" : score >= 75 ? "#22c55e" : score >= 50 ? "#f97316" : "#ef4444";
   const label = locked ? "En attente" : score >= 75 ? "Excellent" : score >= 50 ? "En progrès" : "À améliorer";
 
-  const pillars = breakdown ? [
-    { key: "visibility", label: "Visibilité", icon: "👁", ...breakdown.visibility, color: "#60a5fa" },
-    { key: "traffic", label: "Trafic", icon: "📈", ...breakdown.traffic, color: "#4ade80" },
-    { key: "coverage", label: "Couverture", icon: "🎯", ...breakdown.coverage, color: "#f97316" },
-    { key: "structure", label: "Structure", icon: "🏗", ...breakdown.structure, color: "#a78bfa" },
-  ] : [];
-
   const trend = breakdown?.trend;
   const trendArrow = trend ? (trend.clicksDelta > 5 ? "↑" : trend.clicksDelta < -5 ? "↓" : "→") : null;
   const trendColor = trend ? (trend.clicksDelta > 5 ? "#4ade80" : trend.clicksDelta < -5 ? "#ef4444" : "#6b7280") : null;
@@ -111,25 +104,6 @@ export default function ScoreRing({ score, locked = false, breakdown = null }: {
         </div>
       </div>
 
-      {/* 4 piliers */}
-      {!locked && breakdown && (
-        <div className="grid grid-cols-4 gap-2 w-full mt-1">
-          {pillars.map(p => {
-            const pct = p.max > 0 ? Math.round((p.score / p.max) * 100) : 0;
-            const dimmed = !breakdown.hasGsc && (p.key === "visibility" || p.key === "traffic");
-            return (
-              <div key={p.key} className="flex flex-col items-center gap-1 py-1.5 px-1 rounded-lg" style={{ background: "rgba(255,255,255,0.02)", opacity: dimmed ? 0.35 : 1 }}>
-                <span className="text-[10px]">{p.icon}</span>
-                <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: `${p.color}15` }}>
-                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: p.color }} />
-                </div>
-                <span className="text-[9px] font-bold" style={{ color: p.color }}>{p.score}/{p.max}</span>
-                <span className="text-[8px] text-gray-600 leading-tight">{p.label}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

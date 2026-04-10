@@ -921,24 +921,52 @@ export default function Dashboard() {
                       )}
                     </div>
 
-                    {/* Score ring + stats RankPill */}
+                    {/* Score ring + 4 piliers */}
                     <div className="grid grid-cols-12 gap-4 md:gap-6 items-center">
                       <div className="col-span-12 sm:col-span-4 lg:col-span-3 flex justify-center">
                         <ScoreRing score={animScore} locked={tutorialStep < 4} breakdown={kpis?.scoreBreakdown ?? null} />
                       </div>
                       <div className="col-span-12 sm:col-span-8 lg:col-span-9 grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {([
-                          { label: "Ce mois", value: animMonth, sub: "articles publiés" },
-                          { label: "Cette semaine", value: cmsThisWeek, sub: "articles publiés" },
-                          { label: "Mots-clés couverts", value: `${animKw}/${kpis?.totalKeywords ?? 0}`, sub: "configurés" },
-                          { label: "Total publié", value: cmsTotal, sub: "articles" },
-                        ] as const).map((s, i) => (
-                          <div key={s.label} className="flex flex-col gap-1.5 p-4 rounded-xl animate-fade-in-up" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", animationDelay: `${i * 80 + 300}ms` }}>
-                            <span className="text-gray-500 text-xs font-bold truncate">{s.label}</span>
-                            <span className="text-white font-black text-2xl leading-none">{s.value}</span>
-                            <span className="text-gray-600 text-xs">{s.sub}</span>
-                          </div>
-                        ))}
+                        {(() => {
+                          const bd = kpis?.scoreBreakdown;
+                          const locked4 = tutorialStep < 4;
+                          const pillars = [
+                            { key: "visibility", label: "Visibilité", icon: "👁", score: bd?.visibility.score ?? 0, max: bd?.visibility.max ?? 30, color: "#60a5fa", sub: "Position Google", dimmed: !bd?.hasGsc },
+                            { key: "traffic", label: "Trafic", icon: "📈", score: bd?.traffic.score ?? 0, max: bd?.traffic.max ?? 25, color: "#4ade80", sub: "Clics organiques", dimmed: !bd?.hasGsc },
+                            { key: "coverage", label: "Couverture", icon: "🎯", score: bd?.coverage.score ?? 0, max: bd?.coverage.max ?? 25, color: "#f97316", sub: "Contenu publié", dimmed: false },
+                            { key: "structure", label: "Structure", icon: "🏗", score: bd?.structure.score ?? 0, max: bd?.structure.max ?? 20, color: "#a78bfa", sub: "Architecture SEO", dimmed: false },
+                          ];
+                          return pillars.map((p, i) => {
+                            const pct = p.max > 0 ? Math.round((p.score / p.max) * 100) : 0;
+                            return (
+                              <div
+                                key={p.key}
+                                className="flex flex-col gap-2 p-4 rounded-xl animate-fade-in-up"
+                                style={{
+                                  background: locked4 ? "rgba(255,255,255,0.02)" : `linear-gradient(135deg, ${p.color}08, transparent)`,
+                                  border: `1px solid ${locked4 ? "rgba(255,255,255,0.04)" : `${p.color}18`}`,
+                                  animationDelay: `${i * 80 + 300}ms`,
+                                  opacity: locked4 ? 0.4 : p.dimmed ? 0.45 : 1,
+                                }}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm">{p.icon}</span>
+                                  <span className="text-xs font-black" style={{ color: locked4 ? "#374151" : p.color }}>
+                                    {locked4 ? "—" : `${p.score}/${p.max}`}
+                                  </span>
+                                </div>
+                                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: `${p.color}12` }}>
+                                  <div
+                                    className="h-full rounded-full transition-all duration-1000"
+                                    style={{ width: locked4 ? "0%" : `${pct}%`, background: p.color, boxShadow: `0 0 6px ${p.color}40` }}
+                                  />
+                                </div>
+                                <span className="text-white font-bold text-xs leading-none">{p.label}</span>
+                                <span className="text-gray-600 text-[10px] leading-tight">{locked4 ? "—" : p.dimmed ? "Connectez GSC" : p.sub}</span>
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
 
