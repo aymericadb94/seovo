@@ -825,10 +825,14 @@ function computeGlobalScore(
   // 1. Average link score (30%)
   const avgLinkScore = profiles.reduce((s, p) => s + p.link_score, 0) / profiles.length;
 
-  // 2. Cluster strength average (25%)
-  const avgClusterStrength = clusters.length > 0
-    ? clusters.reduce((s, c) => s + c.strength_score, 0) / clusters.length
+  // 2. Cluster strength average (25%) — exclure les clusters sans aucune page publiée
+  const activeClusters = clusters.filter(c => c.published_pages > 0);
+  const avgClusterStrength = activeClusters.length > 0
+    ? activeClusters.reduce((s, c) => s + c.strength_score, 0) / activeClusters.length
     : 0;
+  // Pénalité clusters vides : chaque cluster vide réduit le score cluster de 10pts
+  const emptyClusters = clusters.length - activeClusters.length;
+  const clusterPenalty = Math.min(avgClusterStrength, emptyClusters * 10);
 
   // 3. Orphan penalty (15%)
   const orphanRatio = orphans.length / profiles.length;
@@ -839,7 +843,7 @@ function computeGlobalScore(
   const coverageScore = (wellLinked.length / profiles.length) * 100;
 
   // 5. GSC position quality (15%) — récompense les pages bien positionnées
-  // Score basé sur la distribution des positions : top10=100pts, top20=60pts, top50=25pts, >50=0pts
+  // MAIS plafonné par la couverture maillage : bonnes positions sans maillage = pas de bonus
   const withPosition = profiles.filter(p => p.position !== null);
   let gscScore = 0;
   if (withPosition.length > 0) {
@@ -851,20 +855,26 @@ function computeGlobalScore(
       if (pos <= 50) return 25;
       return 0;
     });
-    gscScore = positionPoints.reduce((s, p) => s + p, 0) / positionPoints.length;
+    const rawGsc = positionPoints.reduce((s, p) => s + p, 0) / positionPoints.length;
+    // Plafonner le bonus GSC par le ratio de pages non-orphelines
+    // Si 80% orphelines, le GSC ne compte que pour 20% de sa valeur
+    const nonOrphanRatio = 1 - orphanRatio;
+    gscScore = rawGsc * nonOrphanRatio;
   } else {
     // Sans GSC, on ne pénalise pas — on redistribue le poids
+    const adjCluster = Math.max(0, avgClusterStrength - clusterPenalty);
     return Math.round(
       avgLinkScore * 0.35 +
-      avgClusterStrength * 0.30 +
+      adjCluster * 0.30 +
       orphanScore * 0.175 +
       coverageScore * 0.175
     );
   }
 
+  const adjCluster = Math.max(0, avgClusterStrength - clusterPenalty);
   return Math.round(
     avgLinkScore * 0.30 +
-    avgClusterStrength * 0.25 +
+    adjCluster * 0.25 +
     orphanScore * 0.15 +
     coverageScore * 0.15 +
     gscScore * 0.15
