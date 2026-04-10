@@ -339,32 +339,27 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
             <div className="py-2">
               <div className="text-center mb-6">
                 {/* Animated pill */}
-                <div
-                  className="inline-flex items-center justify-center mb-4 relative"
-                  style={{
-                    width: `${56 + scanLines.length * 4}px`,
-                    height: `${56 + scanLines.length * 4}px`,
-                    transition: "width 0.6s cubic-bezier(0.34,1.56,0.64,1), height 0.6s cubic-bezier(0.34,1.56,0.64,1)",
-                  }}
-                >
+                <div className="inline-flex items-center justify-center mb-4 relative w-20 h-20">
                   {/* Glow pulse */}
                   <div
-                    className="absolute inset-0 rounded-full animate-pulse"
+                    className="absolute inset-0 rounded-full"
                     style={{
-                      background: `radial-gradient(circle, rgba(249,115,22,${0.08 + scanLines.length * 0.03}) 0%, transparent 70%)`,
-                      animationDuration: "2s",
+                      background: `radial-gradient(circle, rgba(249,115,22,${0.08 + scanLines.length * 0.04}) 0%, transparent 70%)`,
+                      animation: `pulse ${2 - scanLines.length * 0.1}s ease-in-out infinite`,
                     }}
                   />
-                  {/* Spinning pill */}
+                  {/* Pill — no spin, just pulse + grow */}
                   <svg
                     viewBox="0 0 40 40"
                     className="relative z-10"
                     style={{
                       width: `${28 + scanLines.length * 3}px`,
                       height: `${28 + scanLines.length * 3}px`,
-                      animation: "spin 2s linear infinite",
-                      transition: "width 0.6s cubic-bezier(0.34,1.56,0.64,1), height 0.6s cubic-bezier(0.34,1.56,0.64,1)",
-                      filter: `drop-shadow(0 0 ${4 + scanLines.length * 2}px rgba(249,115,22,${0.3 + scanLines.length * 0.05}))`,
+                      maxWidth: 52,
+                      maxHeight: 52,
+                      animation: `pulse ${1.8 - scanLines.length * 0.08}s ease-in-out infinite`,
+                      transition: "width 0.8s cubic-bezier(0.34,1.56,0.64,1), height 0.8s cubic-bezier(0.34,1.56,0.64,1)",
+                      filter: `drop-shadow(0 0 ${6 + scanLines.length * 2}px rgba(249,115,22,${0.35 + scanLines.length * 0.06}))`,
                     }}
                   >
                     <defs>
