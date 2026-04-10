@@ -423,16 +423,16 @@ async function runSerpAgent(input: PipelineInput, ctx: RankpillContext): Promise
   const urls = await fetchGoogleSerpUrls(input.keyword, input.language);
   const scraped = (await Promise.all(urls.map(u => scrapeSerpPage(u)))).filter(Boolean);
 
-  if (scraped.length === 0) {
-    return { patterns: [], weaknesses: [], content_gaps: [] };
-  }
-
   const serpInput = scraped.map(r => ({
     title: r!.title,
     headings: r!.headings.slice(0, 6),
     summary: r!.summary.slice(0, 400),
     wordCount: r!.wordCount,
   }));
+
+  const serpDataBlock = scraped.length > 0
+    ? `RÉSULTATS SERP TOP ${scraped.length} :\n${JSON.stringify(serpInput, null, 2)}`
+    : `Aucun résultat SERP n'a pu être récupéré (blocage Google). Utilise tes connaissances SEO pour analyser ce que les pages positionnées sur "${input.keyword}" font typiquement.`;
 
   const result = await aiCall(
     { task: "content_audit" },
@@ -442,8 +442,10 @@ async function runSerpAgent(input: PipelineInput, ctx: RankpillContext): Promise
         role: "user",
         content: `Analyse les résultats Google pour "${input.keyword}" et identifie patterns, faiblesses et opportunités.
 
-RÉSULTATS SERP TOP ${scraped.length} :
-${JSON.stringify(serpInput, null, 2)}
+${serpDataBlock}
+
+${ctx.roadmap ? `CONTEXTE ROADMAP : phase ${ctx.roadmap.phase}, priorité ${ctx.roadmap.priority}, objectif: ${ctx.roadmap.objective}` : ""}
+${ctx.cluster ? `CLUSTER SEO : ${ctx.cluster}` : ""}
 
 RETOURNE JSON brut uniquement :
 {

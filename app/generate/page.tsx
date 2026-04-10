@@ -974,18 +974,55 @@ export default function GeneratePage() {
                       )}
                     </div>
 
-                    {/* Label under node */}
-                    <span
-                      className="absolute whitespace-nowrap text-[9px] font-bold pointer-events-none transition-all duration-500"
-                      style={{
-                        top: y > 30 ? "calc(100% + 6px)" : y < -30 ? "auto" : "50%",
-                        bottom: y < -30 ? "calc(100% + 6px)" : "auto",
-                        left: "50%", transform: "translateX(-50%)",
+                    {/* Label — positioned outward from orbit center */}
+                    {(() => {
+                      // Place label on the outside of the orbit, away from center
+                      const labelOffset = nodeSize / 2 + 10;
+                      const isTop = y < -40;
+                      const isBottom = y > 40;
+                      const isLeft = x < -40;
+                      const isRight = x > 40;
+
+                      const labelStyle: React.CSSProperties = {
                         color: isActive ? "#fb923c" : isDone || allDone ? "rgba(249,115,22,0.45)" : "rgba(255,255,255,0.1)",
-                      }}
-                    >
-                      {step.label.length > 16 ? step.label.split(" ").slice(0, 2).join(" ") : step.label}
-                    </span>
+                      };
+
+                      if (isTop) {
+                        // Above — label on top
+                        labelStyle.bottom = `calc(100% + 8px)`;
+                        labelStyle.left = "50%";
+                        labelStyle.transform = "translateX(-50%)";
+                      } else if (isBottom) {
+                        // Below — label on bottom
+                        labelStyle.top = `calc(100% + 8px)`;
+                        labelStyle.left = "50%";
+                        labelStyle.transform = "translateX(-50%)";
+                      } else if (isRight) {
+                        // Right side — label to the right
+                        labelStyle.left = `calc(100% + 10px)`;
+                        labelStyle.top = "50%";
+                        labelStyle.transform = "translateY(-50%)";
+                      } else if (isLeft) {
+                        // Left side — label to the left
+                        labelStyle.right = `calc(100% + 10px)`;
+                        labelStyle.top = "50%";
+                        labelStyle.transform = "translateY(-50%)";
+                      } else {
+                        // Fallback — below
+                        labelStyle.top = `calc(100% + 8px)`;
+                        labelStyle.left = "50%";
+                        labelStyle.transform = "translateX(-50%)";
+                      }
+
+                      return (
+                        <span
+                          className="absolute whitespace-nowrap text-[9px] font-bold pointer-events-none transition-all duration-500"
+                          style={labelStyle}
+                        >
+                          {step.label.length > 18 ? step.label.split(" ").slice(0, 2).join(" ") : step.label}
+                        </span>
+                      );
+                    })()}
                   </div>
                 );
               })}
