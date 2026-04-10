@@ -291,11 +291,21 @@ export function parseAiJson<T = unknown>(text: string): T | null {
     return JSON.parse(text) as T;
   } catch { /* continue */ }
 
-  // Try extracting from markdown code block
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  // Try extracting from markdown code block (greedy — take the LARGEST block)
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*)```/);
   if (codeBlockMatch) {
+    const inner = codeBlockMatch[1].trim();
+    // If inner contains another closing ```, find the actual JSON boundaries
+    const jsonStart = inner.indexOf("{");
+    const jsonEnd = inner.lastIndexOf("}");
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      try {
+        return JSON.parse(inner.slice(jsonStart, jsonEnd + 1)) as T;
+      } catch { /* continue */ }
+    }
+    // Try direct parse of inner content
     try {
-      return JSON.parse(codeBlockMatch[1]) as T;
+      return JSON.parse(inner) as T;
     } catch { /* continue */ }
   }
 

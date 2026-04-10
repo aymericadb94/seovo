@@ -312,7 +312,7 @@ FORMAT DE RÉPONSE : JSON valide uniquement, aucun texte avant ou après.
       }
     );
 
-    console.log("[semantic-cocoon] AI response length:", aiResult.text.length, "model:", aiResult.model, "start:", aiResult.text.slice(0, 100));
+    console.log("[semantic-cocoon] AI response length:", aiResult.text.length, "model:", aiResult.model, "start:", aiResult.text.slice(0, 150));
     let result = parseAiJson<Record<string, unknown>>(aiResult.text);
     if (!result) {
       // Tentative de réparation : supprimer les trailing commas
@@ -324,9 +324,32 @@ FORMAT DE RÉPONSE : JSON valide uniquement, aucun texte avant ou après.
       return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
     }
 
+    console.log("[semantic-cocoon] Parsed keys:", Object.keys(result).slice(0, 15), "type:", typeof result, "isArray:", Array.isArray(result));
+
+    // Si le parse a retourné un tableau (clés numériques), tenter d'extraire l'objet depuis le texte brut
+    if (Array.isArray(result) || Object.keys(result).every(k => /^\d+$/.test(k))) {
+      console.warn("[semantic-cocoon] Résultat parsé comme tableau, re-tentative extraction objet...");
+      const brut = aiResult.text;
+      const objStart = brut.indexOf('{"score"');
+      const objEnd = brut.lastIndexOf("}");
+      if (objStart !== -1 && objEnd > objStart) {
+        try {
+          result = JSON.parse(brut.slice(objStart, objEnd + 1)) as Record<string, unknown>;
+          console.log("[semantic-cocoon] Re-parse réussi, clés:", Object.keys(result).slice(0, 10));
+        } catch {
+          // Tenter avec réparation trailing commas
+          try {
+            result = JSON.parse(brut.slice(objStart, objEnd + 1).replace(/,\s*([}\]])/g, "$1")) as Record<string, unknown>;
+          } catch {
+            console.error("[semantic-cocoon] Re-parse échoué aussi");
+          }
+        }
+      }
+    }
+
     // Validation : le résultat doit contenir des clusters
     if (!Array.isArray(result.clusters) || result.clusters.length === 0) {
-      console.error("[semantic-cocoon] JSON valide mais sans clusters. Clés:", Object.keys(result));
+      console.error("[semantic-cocoon] JSON valide mais sans clusters. Clés:", Object.keys(result).slice(0, 15));
       return Response.json({ error: "L'analyse n'a pas généré de clusters — réessayez" }, { status: 500 });
     }
 
