@@ -38,7 +38,7 @@ type GscSnapshotRow = {
   position: number;
 };
 
-type GscPageRow = {
+export type GscPageRow = {
   url: string;
   clicks: number;
   impressions: number;

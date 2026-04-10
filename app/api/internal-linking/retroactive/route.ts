@@ -13,6 +13,8 @@ import { aiCall, parseAiJson } from "@/lib/ai-router";
 import { listCmsPosts, updateCmsPost, injectLinks, type CmsCredentials, type LinkInjection } from "@/lib/cms-update";
 import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { getValidAccessToken } from "@/lib/google";
+import { fetchGscData, type GscPageRow } from "@/lib/seo-events";
 
 export const maxDuration = 120;
 
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
     // Fetch site config
     const { data: site } = await supabase
       .from("sites")
-      .select("id, site_url, cms, wp_username, wp_app_password, shopify_api_key, shopify_store_url, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
+      .select("id, site_url, cms, wp_username, wp_app_password, shopify_api_key, shopify_store_url, wix_api_key, wix_site_id, custom_api_url, custom_api_key, gsc_site_url")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -67,6 +69,24 @@ export async function POST(request: Request) {
     const cmsPosts = await listCmsPosts(creds, 200);
     if (cmsPosts.length === 0) {
       return Response.json({ result: { updated_pages: [], skipped: 0, errors: ["Aucun article CMS trouvé"] } });
+    }
+
+    // Fetch GSC page authority data if available
+    let gscPages: GscPageRow[] = [];
+    if (site.gsc_site_url) {
+      try {
+        const token = await getValidAccessToken(user.id);
+        if (token) {
+          const gsc = await fetchGscData(token, site.gsc_site_url, 30);
+          if (gsc) gscPages = gsc.pages;
+        }
+      } catch { /* non-fatal — works without GSC */ }
+    }
+
+    // Build authority map: normalized URL → GSC metrics
+    const authorityMap = new Map<string, GscPageRow>();
+    for (const p of gscPages) {
+      authorityMap.set(p.url.replace(/\/$/, "").toLowerCase(), p);
     }
 
     // Fetch cocoon for cluster context
@@ -118,7 +138,11 @@ export async function POST(request: Request) {
         }
       }
       const summary = p.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
-      return `${i + 1}. [ID:${p.id}] "${p.title}" (cluster: ${cluster}) — ${summary}`;
+      const gscInfo = authorityMap.get(p.url.replace(/\/$/, "").toLowerCase());
+      const authority = gscInfo
+        ? ` | GSC: ${gscInfo.clicks} clics, ${gscInfo.impressions} impressions, pos ${gscInfo.position}`
+        : "";
+      return `${i + 1}. [ID:${p.id}] "${p.title}" (cluster: ${cluster}${authority}) — ${summary}`;
     }).join("\n");
 
     const aiResult = await aiCall(
@@ -143,10 +167,11 @@ OBJECTIF :
 - Chaque page doit recevoir au moins 2 liens entrants
 - Prioriser le même cluster (${newPageCluster ?? "non classé"})
 - Créer des connexions logiques et sémantiquement pertinentes
+${gscPages.length > 0 ? "- PRIORISER les articles avec une forte autorité GSC (beaucoup de clics/impressions, bonne position) comme sources de liens — un lien depuis une page à forte autorité transmet plus de \"jus SEO\"" : ""}
 
 RÈGLES STRICTES :
 1. Sélectionner 2-4 articles maximum (pas de spam).
-2. PRIORISER : même cluster > forte pertinence sémantique > complémentarité thématique.
+2. PRIORISER : ${gscPages.length > 0 ? "forte autorité GSC >" : ""} même cluster > forte pertinence sémantique > complémentarité thématique.
 3. Ancre de 2-5 mots, naturelle, qui existe dans le texte ou s'y intègre fluidement.
 4. L'ancre ne doit PAS être le mot-clé exact "${keyword}" (risque de sur-optimisation).
 5. NE PAS sélectionner d'articles sans rapport sémantique, même s'ils sont dans le même cluster.
