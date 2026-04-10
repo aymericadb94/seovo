@@ -2225,14 +2225,19 @@ export default function Dashboard() {
                                       alt={pub.title}
                                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                       loading="lazy"
+                                      onError={(e) => {
+                                        const target = e.currentTarget;
+                                        target.style.display = "none";
+                                        const placeholder = target.nextElementSibling as HTMLElement | null;
+                                        if (placeholder) placeholder.style.display = "flex";
+                                      }}
                                     />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-10 h-10 text-white/[0.06]">
-                                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
-                                      </svg>
-                                    </div>
-                                  )}
+                                  ) : null}
+                                  <div className={`w-full h-full ${pub.cover_image ? "hidden" : "flex"} items-center justify-center absolute inset-0`}>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-10 h-10 text-white/[0.06]">
+                                      <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+                                    </svg>
+                                  </div>
                                   {/* Type badge overlay */}
                                   <div className="absolute top-2 left-2">
                                     <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase backdrop-blur-sm ${pub.page_type === "page" ? "bg-blue-500/20 text-blue-300 border border-blue-500/20" : "bg-orange-500/20 text-orange-300 border border-orange-500/20"}`}>

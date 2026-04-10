@@ -41,6 +41,16 @@ export type CmsPost = {
   published_at?: string | null;
 };
 
+/** Extract the first <img src="..."> from HTML content as fallback for missing featured images */
+function extractFirstImage(html: string): string | null {
+  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if (!match?.[1]) return null;
+  const src = match[1];
+  // Skip tiny tracking pixels, spacers, emojis
+  if (src.includes("1x1") || src.includes("pixel") || src.includes("spacer") || src.includes("emoji")) return null;
+  return src;
+}
+
 export type UpdateResult = {
   success: boolean;
   post_id: string | number;
@@ -145,7 +155,7 @@ async function wpListPosts(
         content: p.content.rendered,
         url: p.link,
         excerpt: p.excerpt.rendered,
-        featured_image: p._embedded?.["wp:featuredmedia"]?.[0]?.source_url ?? null,
+        featured_image: p._embedded?.["wp:featuredmedia"]?.[0]?.source_url ?? extractFirstImage(p.content.rendered) ?? null,
         published_at: p.date ? new Date(p.date).toISOString() : null,
       })));
 
@@ -174,7 +184,7 @@ async function wpListPages(
       const count = Math.min(perPage, remaining);
 
       const res = await fetch(
-        `${siteUrl}/wp-json/wp/v2/pages?per_page=${count}&page=${page}&orderby=date&order=desc&_fields=id,title,content,link,excerpt,date`,
+        `${siteUrl}/wp-json/wp/v2/pages?per_page=${count}&page=${page}&orderby=date&order=desc&_fields=id,title,content,link,excerpt,date,featured_media&_embed=wp:featuredmedia`,
         { headers: { Authorization: auth, "ngrok-skip-browser-warning": "true" } }
       );
       if (!res.ok) break;
@@ -185,6 +195,7 @@ async function wpListPages(
         link: string;
         excerpt: { rendered: string };
         date: string;
+        _embedded?: { "wp:featuredmedia"?: { source_url?: string }[] };
       }[];
 
       if (items.length === 0) break;
@@ -195,6 +206,7 @@ async function wpListPages(
         url: p.link,
         excerpt: p.excerpt.rendered,
         page_type: "page" as CmsPageType,
+        featured_image: p._embedded?.["wp:featuredmedia"]?.[0]?.source_url ?? extractFirstImage(p.content.rendered) ?? null,
         published_at: p.date ? new Date(p.date).toISOString() : null,
       })));
 
@@ -240,7 +252,7 @@ async function shopifyListArticles(
           content: a.body_html,
           url: `${publicBase}/blogs/${blog.handle}/${a.handle}`,
           excerpt: a.summary_html,
-          featured_image: a.image?.src ?? null,
+          featured_image: a.image?.src ?? extractFirstImage(a.body_html ?? "") ?? null,
           published_at: a.published_at ?? null,
         });
       }
@@ -294,6 +306,7 @@ async function shopifyListPages(
       content: p.body_html ?? "",
       url: `${publicBase}/pages/${p.handle}`,
       page_type: "page" as CmsPageType,
+      featured_image: extractFirstImage(p.body_html ?? "") ?? null,
       published_at: p.published_at ?? null,
     }));
   } catch {

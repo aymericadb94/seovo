@@ -103,6 +103,7 @@ export async function GET() {
         keyword: p.page_type === "page" ? "__page__" : "",
         wordpress_url: p.url,
         published_at: p.published_at ?? new Date().toISOString(),
+        cover_image_url: p.featured_image ?? null,
       }));
       try { await supabase.from("publications").insert(rows); } catch { /* silent */ }
     }

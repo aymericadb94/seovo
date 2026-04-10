@@ -65,7 +65,8 @@ export async function POST() {
       title: p.title,
       keyword: p.page_type === "page" ? "__page__" : "",
       wordpress_url: p.url,
-      published_at: new Date().toISOString(),
+      published_at: p.published_at ?? new Date().toISOString(),
+      cover_image_url: p.featured_image ?? null,
     }));
 
     const { error: insertError } = await supabase.from("publications").insert(rows);
