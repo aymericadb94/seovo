@@ -40,6 +40,15 @@ type DashboardData = {
     coveredKeywords: number;
     totalKeywords: number;
     seoScore: number;
+    scoreBreakdown: {
+      visibility: { score: number; max: number };
+      traffic: { score: number; max: number };
+      coverage: { score: number; max: number };
+      structure: { score: number; max: number };
+      hasGsc: boolean;
+      maxScore: number;
+      trend: { clicksDelta: number; impressionsDelta: number } | null;
+    };
     nextPublicationAt: string | null;
     pubsToday: number;
     streak: number;
@@ -915,7 +924,7 @@ export default function Dashboard() {
                     {/* Score ring + stats RankPill */}
                     <div className="grid grid-cols-12 gap-4 md:gap-6 items-center">
                       <div className="col-span-12 sm:col-span-4 lg:col-span-3 flex justify-center">
-                        <ScoreRing score={animScore} locked={tutorialStep < 4} />
+                        <ScoreRing score={animScore} locked={tutorialStep < 4} breakdown={kpis?.scoreBreakdown ?? null} />
                       </div>
                       <div className="col-span-12 sm:col-span-8 lg:col-span-9 grid grid-cols-2 md:grid-cols-4 gap-3">
                         {([
@@ -995,18 +1004,19 @@ export default function Dashboard() {
                           {scoreBubbleStep === 0 && (
                             <>
                               <p className="text-white/70 text-xs leading-relaxed mb-3">
-                                Votre score mesure la santé globale de votre stratégie SEO sur <span className="text-white font-bold">3 critères clés</span> :
+                                Votre score mesure la santé SEO réelle de votre site sur <span className="text-white font-bold">4 piliers</span> :
                               </p>
                               <div className="space-y-2 mb-4">
                                 {[
-                                  { icon: "📝", label: "Articles publiés", val: `${cmsTotal} articles` },
-                                  { icon: "🎯", label: "Mots-clés couverts", val: `${kpis?.coveredKeywords ?? 0} / ${kpis?.totalKeywords ?? 0}` },
-                                  { icon: "📅", label: "Régularité de publication", val: `${kpis?.streak ?? 0} jour(s) de streak` },
-                                ].map(({ icon, label, val }) => (
+                                  { icon: "👁", label: "Visibilité Google", val: "Mots-clés dans le top 10", color: "#60a5fa" },
+                                  { icon: "📈", label: "Trafic organique", val: "Clics et CTR réels", color: "#4ade80" },
+                                  { icon: "🎯", label: "Couverture contenu", val: "Pages du cocon publiées", color: "#f97316" },
+                                  { icon: "🏗", label: "Structure SEO", val: "Clusters et maillage", color: "#a78bfa" },
+                                ].map(({ icon, label, val, color: c }) => (
                                   <div key={label} className="flex items-center gap-2.5 text-xs px-3 py-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
                                     <span className="text-sm flex-shrink-0">{icon}</span>
                                     <span className="text-gray-400 flex-1">{label}</span>
-                                    <span className="text-orange-400 font-bold flex-shrink-0">{val}</span>
+                                    <span className="font-bold flex-shrink-0 text-[10px]" style={{ color: c }}>{val}</span>
                                   </div>
                                 ))}
                               </div>
@@ -1023,7 +1033,7 @@ export default function Dashboard() {
                           {scoreBubbleStep === 1 && (
                             <>
                               <p className="text-white/70 text-xs leading-relaxed mb-5">
-                                Votre score s'améliore <span className="text-white font-bold">automatiquement</span> à chaque article publié. La régularité est récompensée : publier régulièrement renforce votre autorité aux yeux de Google et améliore votre positionnement dans les résultats de recherche.
+                                Votre score progresse en <span className="text-white font-bold">publiant les articles de votre roadmap</span>. Chaque article publié améliore votre couverture et structure. Connectez <span className="text-white font-bold">Google Search Console</span> pour débloquer les piliers Visibilité et Trafic (55 pts supplémentaires).
                               </p>
                               <button
                                 onClick={() => setScoreBubbleStep(2)}
@@ -1047,7 +1057,7 @@ export default function Dashboard() {
                                     style={{ width: `${animScore}%` }}
                                   />
                                 </div>
-                                <span className="text-orange-400 font-black text-sm flex-shrink-0">{animScore}/100</span>
+                                <span className="text-orange-400 font-black text-sm flex-shrink-0">{animScore}/{kpis?.scoreBreakdown?.maxScore ?? 100}</span>
                               </div>
                               <div className="flex items-center justify-between mb-5">
                                 <span className="text-gray-600 text-xs">Score actuel</span>

@@ -201,37 +201,175 @@ export async function GET() {
       if (runStreak > bestStreak) bestStreak = runStreak;
     }
 
-    // ── Score SEO intelligent (multi-sources) ─────────────────────────────────
-    // Composantes : Position GSC (0-30) + Trafic GSC (0-20) + Contenu (0-25) + Keywords (0-15) + Régularité (0-10)
-    let scorePosition = 0;
-    let scoreTraffic = 0;
+    // ── Données cocon sémantique (pour score structure + couverture) ────────
+    const { data: cocoonRec } = await supabase
+      .from("semantic_cocoons")
+      .select("data")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
+    type CocoonCluster = {
+      pillar?: { status?: string };
+      support_pages?: { status?: string }[];
+    };
+    type CocoonData = {
+      clusters?: CocoonCluster[];
+      orphan_pages?: unknown[];
+    };
+    const cocoon = cocoonRec?.data as CocoonData | null;
+
+    // ── GSC tendance : 30 derniers jours vs 30 jours précédents ─────────────
+    let gscTrend: { clicksDelta: number; impressionsDelta: number } | null = null;
     const gscEntries = Object.values(gscMap);
-    if (gscEntries.length > 0) {
-      // Position moyenne pondérée par impressions
-      const totalImp = gscEntries.reduce((s, g) => s + g.impressions, 0);
-      const weightedPos = totalImp > 0
-        ? gscEntries.reduce((s, g) => s + g.position * g.impressions, 0) / totalImp
-        : gscEntries.reduce((s, g) => s + g.position, 0) / gscEntries.length;
-      // Position 1 = 30pts, position 10 = 15pts, position 30+ = 0pts
-      scorePosition = Math.max(0, Math.min(30, Math.round(30 - (weightedPos - 1) * (30 / 29))));
+    const hasGsc = gscEntries.length > 0;
 
-      // Trafic : clics totaux, normalisé (50+ clics/mois = max)
-      const totalClicks = gscEntries.reduce((s, g) => s + g.clicks, 0);
-      scoreTraffic = Math.min(20, Math.round((totalClicks / 50) * 20));
+    if (hasGsc && site?.google_access_token && site?.gsc_site_url) {
+      try {
+        const token = await getValidAccessToken(user.id);
+        if (token) {
+          const siteUrl = encodeURIComponent(site.gsc_site_url);
+          // Période récente : J-32 → J-2 (30 jours)
+          const recentEnd = new Date(now); recentEnd.setDate(recentEnd.getDate() - 2);
+          const recentStart = new Date(now); recentStart.setDate(recentStart.getDate() - 32);
+          // Période précédente : J-62 → J-32
+          const prevEnd = new Date(now); prevEnd.setDate(prevEnd.getDate() - 32);
+          const prevStart = new Date(now); prevStart.setDate(prevStart.getDate() - 62);
+          const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+          const [resRecent, resPrev] = await Promise.all([
+            fetch(`https://www.googleapis.com/webmasters/v3/sites/${siteUrl}/searchAnalytics/query`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ startDate: fmt(recentStart), endDate: fmt(recentEnd), rowLimit: 1 }),
+            }),
+            fetch(`https://www.googleapis.com/webmasters/v3/sites/${siteUrl}/searchAnalytics/query`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ startDate: fmt(prevStart), endDate: fmt(prevEnd), rowLimit: 1 }),
+            }),
+          ]);
+
+          if (resRecent.ok && resPrev.ok) {
+            type TrendRow = { rows?: { clicks: number; impressions: number }[] };
+            const recent = await resRecent.json() as TrendRow;
+            const prev = await resPrev.json() as TrendRow;
+            const rc = recent.rows?.[0]?.clicks ?? 0;
+            const ri = recent.rows?.[0]?.impressions ?? 0;
+            const pc = prev.rows?.[0]?.clicks ?? 0;
+            const pi = prev.rows?.[0]?.impressions ?? 0;
+            gscTrend = {
+              clicksDelta: pc > 0 ? Math.round(((rc - pc) / pc) * 100) : (rc > 0 ? 100 : 0),
+              impressionsDelta: pi > 0 ? Math.round(((ri - pi) / pi) * 100) : (ri > 0 ? 100 : 0),
+            };
+          }
+        }
+      } catch { /* tendance non-fatal */ }
     }
 
-    // Contenu : nombre d'articles vs objectif (20 articles roadmap = 100%)
-    const contentTarget = 20;
-    const scoreContent = Math.min(25, Math.round((totalArticles / contentTarget) * 25));
+    // ── Score SEO — 4 piliers réels ──────────────────────────────────────────
+    // Visibilité (0-30) | Trafic (0-25) | Couverture (0-25) | Structure (0-20)
 
-    // Keywords : couverture des mots-clés configurés
-    const scoreKeywords = Math.min(15, Math.round(keywordCoverageRatio * 15));
+    // 1. VISIBILITÉ : nombre de mots-clés par tranche de position
+    let scoreVisibility = 0;
+    if (hasGsc) {
+      const top3 = gscEntries.filter(g => g.position <= 3).length;
+      const top10 = gscEntries.filter(g => g.position > 3 && g.position <= 10).length;
+      const top20 = gscEntries.filter(g => g.position > 10 && g.position <= 20).length;
+      const top50 = gscEntries.filter(g => g.position > 20 && g.position <= 50).length;
+      // top3 = 4pts chacun (max 12), top10 = 2pts (max 10), top20 = 0.5pts (max 5), top50 = 0.15pts (max 3)
+      scoreVisibility = Math.min(30, Math.round(
+        Math.min(12, top3 * 4) +
+        Math.min(10, top10 * 2) +
+        Math.min(5, top20 * 0.5) +
+        Math.min(3, top50 * 0.15)
+      ));
+    }
 
-    // Régularité : streak (7+ jours = max)
-    const scoreRegularity = Math.min(10, Math.round((streak / 7) * 10));
+    // 2. TRAFIC : clics + CTR réel vs CTR attendu par position
+    let scoreTraffic = 0;
+    if (hasGsc) {
+      const totalClicks = gscEntries.reduce((s, g) => s + g.clicks, 0);
+      const totalImpressions = gscEntries.reduce((s, g) => s + g.impressions, 0);
+      // Sous-score clics : normalisé log (10 clics = 5pts, 100 = 10pts, 1000 = 15pts)
+      const clickScore = totalClicks > 0 ? Math.min(15, Math.round(5 * Math.log10(totalClicks) * 2)) : 0;
+      // Sous-score CTR : CTR réel vs CTR attendu
+      // CTR attendu par position : pos1=30%, pos3=10%, pos5=5%, pos10=2%, pos20+=0.5%
+      const expectedCtr = (pos: number) => pos <= 1 ? 0.30 : pos <= 3 ? 0.10 : pos <= 5 ? 0.05 : pos <= 10 ? 0.02 : 0.005;
+      let ctrRatio = 0;
+      if (totalImpressions > 0) {
+        const realCtr = totalClicks / totalImpressions;
+        const avgPos = gscEntries.reduce((s, g) => s + g.position * g.impressions, 0) / totalImpressions;
+        const expected = expectedCtr(avgPos);
+        ctrRatio = expected > 0 ? realCtr / expected : 0;
+      }
+      // ctrRatio >= 1.0 = excellent (10pts), 0.5 = moyen (5pts), 0 = mauvais
+      const ctrScore = Math.min(10, Math.round(ctrRatio * 10));
+      scoreTraffic = Math.min(25, clickScore + ctrScore);
+    }
 
-    const seoScore = Math.min(98, scorePosition + scoreTraffic + scoreContent + scoreKeywords + scoreRegularity);
+    // 3. COUVERTURE : pages du cocon existantes vs totales + keywords couverts
+    let scoreCoverage = 0;
+    if (cocoon?.clusters && cocoon.clusters.length > 0) {
+      // Ratio pages existantes dans le cocon
+      let totalPages = 0;
+      let existingPages = 0;
+      for (const cluster of cocoon.clusters) {
+        totalPages++; // pilier
+        if (cluster.pillar?.status === "existing" || cluster.pillar?.status === "existant") existingPages++;
+        for (const sp of cluster.support_pages ?? []) {
+          totalPages++;
+          if (sp.status === "existing" || sp.status === "existant") existingPages++;
+        }
+      }
+      const cocoonRatio = totalPages > 0 ? existingPages / totalPages : 0;
+      // Cocon coverage : 0-15 pts
+      scoreCoverage += Math.min(15, Math.round(cocoonRatio * 15));
+    }
+    // Keyword coverage : 0-10 pts
+    scoreCoverage += Math.min(10, Math.round(keywordCoverageRatio * 10));
+    scoreCoverage = Math.min(25, scoreCoverage);
+
+    // 4. STRUCTURE : clusters complets + pages orphelines pénalisées
+    let scoreStructure = 0;
+    if (cocoon?.clusters && cocoon.clusters.length > 0) {
+      // Clusters complets : un cluster est "complet" si le pilier + toutes les supports sont "existing"
+      let completeClusters = 0;
+      for (const cluster of cocoon.clusters) {
+        const pillarOk = cluster.pillar?.status === "existing" || cluster.pillar?.status === "existant";
+        const supports = cluster.support_pages ?? [];
+        const allSupportsOk = supports.length > 0 && supports.every(sp => sp.status === "existing" || sp.status === "existant");
+        if (pillarOk && allSupportsOk) completeClusters++;
+      }
+      const clusterRatio = completeClusters / cocoon.clusters.length;
+      // 0-14 pts pour les clusters complets
+      scoreStructure += Math.min(14, Math.round(clusterRatio * 14));
+
+      // Pénalité pages orphelines : -1pt par orpheline (max -6)
+      const orphanCount = cocoon.orphan_pages?.length ?? 0;
+      scoreStructure = Math.max(0, scoreStructure - Math.min(6, orphanCount));
+    }
+    // Bonus : avoir un cocon (6pts)
+    if (cocoon?.clusters && cocoon.clusters.length > 0) scoreStructure += 6;
+    scoreStructure = Math.min(20, scoreStructure);
+
+    // Score final
+    const hasGscData = hasGsc;
+    const maxScore = hasGscData ? 100 : 45; // Sans GSC, seuls couverture + structure comptent
+    const rawScore = hasGscData
+      ? scoreVisibility + scoreTraffic + scoreCoverage + scoreStructure
+      : scoreCoverage + scoreStructure;
+    const seoScore = Math.min(maxScore === 45 ? 44 : 98, rawScore);
+
+    // Détail des piliers pour le frontend
+    const scoreBreakdown = {
+      visibility: { score: scoreVisibility, max: 30 },
+      traffic: { score: scoreTraffic, max: 25 },
+      coverage: { score: scoreCoverage, max: 25 },
+      structure: { score: scoreStructure, max: 20 },
+      hasGsc: hasGscData,
+      maxScore,
+      trend: gscTrend,
+    };
 
     // ── Calendrier (90 jours) ────────────────────────────────────────────────
     const calendarData: { date: string; count: number }[] = [];
@@ -276,6 +414,7 @@ export async function GET() {
         coveredKeywords: coveredKeywords.length,
         totalKeywords: allKeywords.length,
         seoScore,
+        scoreBreakdown,
         nextPublicationAt,
         streak,
         bestStreak,
