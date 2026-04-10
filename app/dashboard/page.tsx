@@ -676,7 +676,7 @@ export default function Dashboard() {
                 <span className="text-gray-700">·</span>
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse flex-shrink-0" />
-                  {kpis?.totalArticles ?? 0} articles publiés
+                  {cmsPages.length > 0 ? cmsPages.length : (kpis?.totalArticles ?? 0)} articles publiés
                 </span>
               </div>
             )}
@@ -886,7 +886,7 @@ export default function Dashboard() {
                           { label: "Ce mois", value: animMonth, sub: "articles publiés" },
                           { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, sub: "articles publiés" },
                           { label: "Mots-clés couverts", value: `${animKw}/${kpis?.totalKeywords ?? 0}`, sub: "configurés" },
-                          { label: "Total publié", value: kpis?.totalArticles ?? 0, sub: "articles" },
+                          { label: "Total publié", value: cmsPages.length > 0 ? cmsPages.length : (kpis?.totalArticles ?? 0), sub: "articles" },
                         ] as const).map((s, i) => (
                           <div key={s.label} className="flex flex-col gap-1.5 p-4 rounded-xl animate-fade-in-up" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", animationDelay: `${i * 80 + 300}ms` }}>
                             <span className="text-gray-500 text-xs font-bold truncate">{s.label}</span>
@@ -963,7 +963,7 @@ export default function Dashboard() {
                               </p>
                               <div className="space-y-2 mb-4">
                                 {[
-                                  { icon: "📝", label: "Articles publiés", val: `${kpis?.totalArticles ?? 0} articles` },
+                                  { icon: "📝", label: "Articles publiés", val: `${cmsPages.length > 0 ? cmsPages.length : (kpis?.totalArticles ?? 0)} articles` },
                                   { icon: "🎯", label: "Mots-clés couverts", val: `${kpis?.coveredKeywords ?? 0} / ${kpis?.totalKeywords ?? 0}` },
                                   { icon: "📅", label: "Régularité de publication", val: `${kpis?.streak ?? 0} jour(s) de streak` },
                                 ].map(({ icon, label, val }) => (
@@ -1570,7 +1570,7 @@ export default function Dashboard() {
                                 const allArticles = (roadmapRecord.data.articles ?? []) as { title: string; keyword: string; priority: number }[];
                                 const remaining = allArticles.filter(a => !publishedKw.has(a.keyword?.toLowerCase())).sort((a, b) => a.priority - b.priority);
                                 const total = allArticles.length;
-                                const done = kpis?.totalArticles ?? 0;
+                                const done = cmsPages.length > 0 ? cmsPages.filter(p => p.page_type === "article").length : (kpis?.totalArticles ?? 0);
                                 const pct = Math.round((done / Math.max(total, 1)) * 100);
                                 return (
                                   <div className="flex flex-col gap-4 flex-1">
