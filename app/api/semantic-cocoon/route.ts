@@ -76,17 +76,6 @@ export async function POST() {
 
     const articles = cmsPages;
 
-    // ── Récupérer la roadmap ──────────────────────────────────────────────────
-    const { data: roadmapRec } = await supabase
-      .from("roadmaps")
-      .select("data")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    type RoadmapArticle = { title: string; keyword: string; role: string; phase?: number };
-    const roadmapArticles: RoadmapArticle[] =
-      (roadmapRec?.data as { articles?: RoadmapArticle[] } | null)?.articles?.slice(0, 40) ?? [];
-
     // ── Récupérer les données GSC ─────────────────────────────────────────────
     type GscRow = { query: string; clicks: number; impressions: number; position: number };
     let gscQueries: GscRow[] = [];
@@ -138,12 +127,6 @@ export async function POST() {
         ).join("\n")
       : "Aucun article publié";
 
-    const roadmapCtx = roadmapArticles.length > 0
-      ? roadmapArticles.map((a, i) =>
-          `${i + 1}. "${a.title}" (${a.keyword}) — rôle: ${a.role}`
-        ).join("\n")
-      : "Aucune roadmap générée";
-
     const gscCtx = gscQueries.length > 0
       ? gscQueries.slice(0, 80).map((q, i) =>
           `${i + 1}. "${q.query}" — ${q.clicks} clics, ${q.impressions} imp, pos. ${q.position}`
@@ -178,9 +161,6 @@ ${gscCtx}
 
 PAGES EXISTANTES (articles publiés) :
 ${existingPagesCtx}
-
-ROADMAP SEO (articles planifiés) :
-${roadmapCtx}
 
 ---
 
