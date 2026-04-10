@@ -62,6 +62,8 @@ export type ClusterStrength = {
   missing_links: number;     // Estimated missing links
   strength_score: number;    // 0-100
   avg_position: number | null;
+  position_trend: number | null; // Delta position (négatif = amélioration, positif = déclin)
+  impressions_trend: number | null; // Delta % impressions (+15 = +15%)
 };
 
 export type ExistingLink = {
@@ -104,7 +106,8 @@ export async function analyzeLinking(
   userId: string,
   cmsPosts: CmsPost[],
   gscQueries: GSCQuery[],
-  siteUrl: string
+  siteUrl: string,
+  gscQueriesPrev?: GSCQuery[]
 ): Promise<LinkingAnalysis> {
   // 1. Fetch cocoon + publications + roadmap
   const [cocoonRes, pubsRes, roadmapRes] = await Promise.all([
@@ -118,8 +121,46 @@ export async function analyzeLinking(
   type RoadmapArticle = { title: string; keyword: string; role: string };
   const roadmapArticles = ((roadmapRes.data?.data as { articles?: RoadmapArticle[] } | null)?.articles ?? []) as RoadmapArticle[];
 
-  // 2. Build GSC lookup
+  // 2. Build GSC lookup (fuzzy-ready)
   const gscByQuery = new Map(gscQueries.map(q => [q.query.toLowerCase(), q]));
+
+  // Fuzzy GSC matcher: exact → inclusion → word overlap ≥60%
+  function findGscMatch(keyword: string): GSCQuery | undefined {
+    if (!keyword) return undefined;
+    const kw = keyword.toLowerCase().trim();
+    // 1. Exact match
+    const exact = gscByQuery.get(kw);
+    if (exact) return exact;
+    // 2. GSC query contains keyword or keyword contains query
+    for (const [q, data] of gscByQuery) {
+      if (q.includes(kw) || kw.includes(q)) return data;
+    }
+    // 3. Word overlap ≥60% (handles word order differences + singular/plural)
+    const kwWords = new Set(kw.split(/\s+/).filter(w => w.length > 2));
+    if (kwWords.size === 0) return undefined;
+    let bestMatch: GSCQuery | undefined;
+    let bestOverlap = 0;
+    for (const [q, data] of gscByQuery) {
+      const qWords = new Set(q.split(/\s+/).filter(w => w.length > 2));
+      if (qWords.size === 0) continue;
+      let common = 0;
+      for (const w of kwWords) {
+        for (const qw of qWords) {
+          // Stem-lite: one word starts with the other (chaussure/chaussures)
+          if (w === qw || (w.length >= 4 && qw.length >= 4 && (w.startsWith(qw.slice(0, -1)) || qw.startsWith(w.slice(0, -1))))) {
+            common++;
+            break;
+          }
+        }
+      }
+      const overlap = common / Math.max(kwWords.size, qWords.size);
+      if (overlap >= 0.6 && overlap > bestOverlap) {
+        bestOverlap = overlap;
+        bestMatch = data;
+      }
+    }
+    return bestMatch;
+  }
 
   // Debug: log data shapes to understand matching failures
   console.log(`[linking] CMS posts: ${cmsPosts.length}, Publications: ${publications.length}, Cocoon clusters: ${cocoon.clusters.length}`);
@@ -135,17 +176,26 @@ export async function analyzeLinking(
     console.log(`[linking] Sample cluster: "${c0.name}", pillar_kw="${c0.pillar.keyword}", pillar_url="${c0.pillar.url}", supports=${c0.support_pages.length}`);
   }
 
-  // 3. Build page profiles
-  const profiles = buildPageProfiles(cmsPosts, publications, cocoon, gscByQuery, siteUrl);
+  // 3. Build page profiles (with fuzzy GSC matching)
+  const profiles = buildPageProfiles(cmsPosts, publications, cocoon, gscByQuery, siteUrl, findGscMatch);
 
-  // Debug: log matching results
+  // Debug: log matching results with GSC match rate
   const matched = profiles.filter(p => p.cluster !== null);
   const withKeyword = profiles.filter(p => p.keyword !== "");
+  const withGsc = profiles.filter(p => p.position !== null);
   const withIncoming = profiles.filter(p => p.incoming_internal > 0);
-  console.log(`[linking] Profiles: ${profiles.length} total, ${matched.length} in cluster, ${withKeyword.length} with keyword, ${withIncoming.length} with incoming links`);
+  const gscMatchRate = withKeyword.length > 0 ? Math.round((withGsc.length / withKeyword.length) * 100) : 0;
+  console.log(`[linking] Profiles: ${profiles.length} total, ${matched.length} in cluster, ${withKeyword.length} with keyword, ${withGsc.length} with GSC data (${gscMatchRate}% match rate), ${withIncoming.length} with incoming links`);
+  if (withGsc.length < withKeyword.length && withKeyword.length > 0) {
+    const missingGsc = profiles.filter(p => p.keyword && p.position === null).slice(0, 5);
+    console.log(`[linking] GSC miss samples: ${missingGsc.map(p => `"${p.keyword}"`).join(", ")}`);
+  }
 
-  // 4. Analyze cluster strengths
-  const clusterStrengths = analyzeClusterStrengths(cocoon, profiles, gscByQuery);
+  // 4. Analyze cluster strengths (with trend data)
+  const gscPrevByQuery = gscQueriesPrev
+    ? new Map(gscQueriesPrev.map(q => [q.query.toLowerCase(), q]))
+    : undefined;
+  const clusterStrengths = analyzeClusterStrengths(cocoon, profiles, gscByQuery, findGscMatch, gscPrevByQuery);
 
   // 5. Detect orphans and underlinked pages
   const orphans = detectOrphans(profiles, cocoon);
@@ -183,8 +233,9 @@ function buildPageProfiles(
   cmsPosts: CmsPost[],
   publications: { title: string; keyword: string; wordpress_url: string | null }[],
   cocoon: CocoonData,
-  gscByQuery: Map<string, GSCQuery>,
-  siteUrl: string
+  _gscByQuery: Map<string, GSCQuery>,
+  siteUrl: string,
+  findGscMatch?: (keyword: string) => GSCQuery | undefined
 ): PageLinkProfile[] {
   const profiles: PageLinkProfile[] = [];
   const allUrls = cmsPosts.map(p => p.url);
@@ -216,8 +267,8 @@ function buildPageProfiles(
     const incoming = countIncomingLinks(post.url, cmsPosts, siteUrl);
     const wordCount = countWords(post.content);
 
-    // GSC data
-    const gsc = gscByQuery.get(keyword.toLowerCase());
+    // GSC data (fuzzy matching)
+    const gsc = findGscMatch ? findGscMatch(keyword) : _gscByQuery.get(keyword.toLowerCase());
 
     // Compute scores
     const idealLinks = Math.max(2, Math.min(5, Math.floor(wordCount / 300)));
@@ -264,7 +315,9 @@ function buildPageProfiles(
 function analyzeClusterStrengths(
   cocoon: CocoonData,
   profiles: PageLinkProfile[],
-  gscByQuery: Map<string, GSCQuery>
+  _gscByQuery: Map<string, GSCQuery>,
+  findGscMatch?: (keyword: string) => GSCQuery | undefined,
+  gscPrevByQuery?: Map<string, GSCQuery>
 ): ClusterStrength[] {
   return cocoon.clusters.map(cluster => {
     const clusterProfiles = profiles.filter(p => p.cluster === cluster.name);
@@ -281,6 +334,35 @@ function analyzeClusterStrengths(
     const avgPosition = withPosition.length > 0
       ? Math.round(withPosition.reduce((s, p) => s + (p.position ?? 0), 0) / withPosition.length * 10) / 10
       : null;
+
+    // Trend: compare current vs previous period for cluster keywords
+    let positionTrend: number | null = null;
+    let impressionsTrend: number | null = null;
+    if (gscPrevByQuery && clusterProfiles.length > 0) {
+      const clusterKeywords = clusterProfiles.map(p => p.keyword).filter(Boolean);
+      let currentPosSum = 0, prevPosSum = 0, posCount = 0;
+      let currentImpSum = 0, prevImpSum = 0, impCount = 0;
+      for (const kw of clusterKeywords) {
+        const current = findGscMatch ? findGscMatch(kw) : _gscByQuery.get(kw.toLowerCase());
+        const prev = gscPrevByQuery.get(kw.toLowerCase());
+        if (current && prev) {
+          currentPosSum += current.position;
+          prevPosSum += prev.position;
+          posCount++;
+          currentImpSum += current.impressions;
+          prevImpSum += prev.impressions;
+          impCount++;
+        }
+      }
+      if (posCount > 0) {
+        // Position trend : négatif = amélioration (ex: 15→8 = -7)
+        positionTrend = Math.round((currentPosSum / posCount - prevPosSum / posCount) * 10) / 10;
+      }
+      if (impCount > 0 && prevImpSum > 0) {
+        // Impressions trend : % de variation
+        impressionsTrend = Math.round(((currentImpSum - prevImpSum) / prevImpSum) * 100);
+      }
+    }
 
     // Strength score
     let strength = 0;
@@ -301,6 +383,8 @@ function analyzeClusterStrengths(
       missing_links: missingLinks,
       strength_score: Math.round(Math.min(100, strength)),
       avg_position: avgPosition,
+      position_trend: positionTrend,
+      impressions_trend: impressionsTrend,
     };
   });
 }
@@ -343,16 +427,29 @@ function detectOrphans(
 function detectUnderlinked(
   profiles: PageLinkProfile[]
 ): { url: string; title: string; incoming: number; needed: number }[] {
+  // Seuils dynamiques basés sur : rôle + trafic GSC + taille du cluster
+  function computeNeeded(p: PageLinkProfile): number {
+    let base = p.role === "pillar" ? 3 : 2;
+    // Pages à fort trafic GSC méritent plus de liens entrants (jus SEO)
+    if (p.impressions > 1000) base += 2;
+    else if (p.impressions > 200) base += 1;
+    // Pages en striking distance (pos 5-20) : un lien de plus peut les faire monter
+    if (p.position !== null && p.position > 5 && p.position <= 20) base += 1;
+    // Plafonner selon les sources disponibles dans le cluster
+    const clusterPeers = profiles.filter(pp => pp.cluster === p.cluster && pp.url !== p.url);
+    return Math.min(base, Math.max(2, clusterPeers.length));
+  }
+
   return profiles
     .filter(p => {
-      const needed = p.role === "pillar" ? 3 : 2;
+      const needed = computeNeeded(p);
       return p.incoming_internal < needed;
     })
     .map(p => ({
       url: p.url,
       title: p.title,
       incoming: p.incoming_internal,
-      needed: p.role === "pillar" ? 3 : 2,
+      needed: computeNeeded(p),
     }))
     .sort((a, b) => (a.incoming - a.needed) - (b.incoming - b.needed));
 }
@@ -628,11 +725,20 @@ async function generateSuggestions(
     }
   }
 
-  // Sort by priority then risk
+  // Dedup final: une seule suggestion par paire from→to (garder la plus haute priorité)
+  const seenPairs = new Set<string>();
+  const deduped: LinkSuggestion[] = [];
+  // Trier d'abord pour que la meilleure priorité passe en premier
   const priorityOrder = { haute: 0, moyenne: 1, faible: 2 };
   suggestions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority] || a.risk_score - b.risk_score);
+  for (const s of suggestions) {
+    const key = `${normalizeUrl(s.from_url)}|${normalizeUrl(s.to_url)}`;
+    if (seenPairs.has(key)) continue;
+    seenPairs.add(key);
+    deduped.push(s);
+  }
 
-  return suggestions;
+  return deduped;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -716,10 +822,10 @@ function computeGlobalScore(
 ): number {
   if (profiles.length === 0) return 0;
 
-  // 1. Average link score (40%)
+  // 1. Average link score (30%)
   const avgLinkScore = profiles.reduce((s, p) => s + p.link_score, 0) / profiles.length;
 
-  // 2. Cluster strength average (30%)
+  // 2. Cluster strength average (25%)
   const avgClusterStrength = clusters.length > 0
     ? clusters.reduce((s, c) => s + c.strength_score, 0) / clusters.length
     : 0;
@@ -732,11 +838,36 @@ function computeGlobalScore(
   const wellLinked = profiles.filter(p => p.incoming_internal > 0 && p.outgoing_internal > 0);
   const coverageScore = (wellLinked.length / profiles.length) * 100;
 
+  // 5. GSC position quality (15%) — récompense les pages bien positionnées
+  // Score basé sur la distribution des positions : top10=100pts, top20=60pts, top50=25pts, >50=0pts
+  const withPosition = profiles.filter(p => p.position !== null);
+  let gscScore = 0;
+  if (withPosition.length > 0) {
+    const positionPoints: number[] = withPosition.map(p => {
+      const pos = p.position!;
+      if (pos <= 3) return 100;
+      if (pos <= 10) return 80;
+      if (pos <= 20) return 60;
+      if (pos <= 50) return 25;
+      return 0;
+    });
+    gscScore = positionPoints.reduce((s, p) => s + p, 0) / positionPoints.length;
+  } else {
+    // Sans GSC, on ne pénalise pas — on redistribue le poids
+    return Math.round(
+      avgLinkScore * 0.35 +
+      avgClusterStrength * 0.30 +
+      orphanScore * 0.175 +
+      coverageScore * 0.175
+    );
+  }
+
   return Math.round(
-    avgLinkScore * 0.40 +
-    avgClusterStrength * 0.30 +
+    avgLinkScore * 0.30 +
+    avgClusterStrength * 0.25 +
     orphanScore * 0.15 +
-    coverageScore * 0.15
+    coverageScore * 0.15 +
+    gscScore * 0.15
   );
 }
 

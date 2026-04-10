@@ -15,6 +15,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { getValidAccessToken } from "@/lib/google";
 import { fetchGscData, type GscPageRow } from "@/lib/seo-events";
+import { assessRisk, getModificationHistory } from "@/lib/seo-risk";
 
 export const maxDuration = 120;
 
@@ -99,6 +100,18 @@ export async function POST(request: Request) {
     type CocoonCluster = { name: string; pillar: { keyword: string }; support_pages?: { keyword: string }[]; pages?: { keyword: string }[] };
     const cocoonData = cocoonRow?.data as { clusters?: CocoonCluster[] } | null;
 
+    // Fetch publications for keyword metadata
+    const { data: pubs } = await supabase
+      .from("publications")
+      .select("keyword, wordpress_url")
+      .eq("user_id", user.id);
+    const pubByUrl = new Map<string, string>();
+    for (const pub of pubs ?? []) {
+      if (pub.wordpress_url) {
+        pubByUrl.set(pub.wordpress_url.replace(/\/$/, "").toLowerCase(), pub.keyword);
+      }
+    }
+
     // Find the cluster of the new page
     let newPageCluster: string | null = null;
     if (cocoonData?.clusters) {
@@ -142,7 +155,9 @@ export async function POST(request: Request) {
       const authority = gscInfo
         ? ` | GSC: ${gscInfo.clicks} clics, ${gscInfo.impressions} impressions, pos ${gscInfo.position}`
         : "";
-      return `${i + 1}. [ID:${p.id}] "${p.title}" (cluster: ${cluster}${authority}) — ${summary}`;
+      const pubKeyword = pubByUrl.get(p.url.replace(/\/$/, "").toLowerCase());
+      const kwInfo = pubKeyword ? ` | mot-clé: "${pubKeyword}"` : "";
+      return `${i + 1}. [ID:${p.id}] "${p.title}" (cluster: ${cluster}${kwInfo}${authority}) — ${summary}`;
     }).join("\n");
 
     const aiResult = await aiCall(
@@ -206,6 +221,31 @@ Si aucun article n'est pertinent, retourne [].`
     for (const suggestion of suggestions.slice(0, 8)) {
       const post = candidates.find(p => String(p.id) === String(suggestion.post_id));
       if (!post) {
+        result.skipped++;
+        continue;
+      }
+
+      // Risk assessment: skip if modifying this page is too risky
+      const gscInfo = authorityMap.get(post.url.replace(/\/$/, "").toLowerCase());
+      const history = await getModificationHistory(supabase, user.id, post.url);
+      const riskResult = assessRisk({
+        action_type: "add_internal_links",
+        target_url: post.url,
+        target_title: post.title,
+        keyword: keyword,
+        position: gscInfo?.position ?? null,
+        impressions: gscInfo?.impressions ?? 0,
+        clicks: gscInfo?.clicks ?? 0,
+        ctr: gscInfo?.ctr ?? 0,
+        is_homepage: false,
+        is_pillar: false,
+        content_length: post.content.replace(/<[^>]+>/g, " ").split(/\s+/).length,
+        existing_internal_links: (post.content.match(/<a\s/gi) ?? []).length,
+        links_to_add: 1,
+      }, history);
+
+      if (riskResult.risk_score >= 70) {
+        logger.warn("Retroactive link skipped (high risk)", { context: "retroactive-linking", userId: user.id, error: new Error(`Risk ${riskResult.risk_score} for ${post.url}`) });
         result.skipped++;
         continue;
       }

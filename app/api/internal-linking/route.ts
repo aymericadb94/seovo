@@ -67,19 +67,26 @@ export async function POST() {
     };
 
     // Fetch CMS posts
-    const cmsPosts = await listCmsPosts(creds, 100);
+    const cmsPosts = await listCmsPosts(creds, 200);
     if (cmsPosts.length < 3) {
       return Response.json({ error: "Pas assez de pages CMS (minimum 3)" }, { status: 400 });
     }
 
-    // Fetch GSC data if available
+    // Fetch GSC data if available (current 30j + previous 30j for trend)
     let gscQueries: GSCQuery[] = [];
+    let gscQueriesPrev: GSCQuery[] = [];
     if (site.gsc_site_url) {
       try {
         const token = await getValidAccessToken(user.id);
         if (token) {
-          const gsc = await fetchGscData(token, site.gsc_site_url, 30);
-          gscQueries = gsc.queries;
+          const [gscCurrent, gscPrevious] = await Promise.all([
+            fetchGscData(token, site.gsc_site_url, 30),
+            fetchGscData(token, site.gsc_site_url, 60),
+          ]);
+          gscQueries = gscCurrent?.queries ?? [];
+          // Les données 60j incluent les 30j récents — on filtre pour n'avoir que J-60→J-30
+          // Approximation : on passe les 60j complets et le moteur calculera le delta
+          gscQueriesPrev = gscPrevious?.queries ?? [];
         }
       } catch { /* non-fatal — analysis works without GSC */ }
     }
@@ -90,7 +97,8 @@ export async function POST() {
       user.id,
       cmsPosts,
       gscQueries,
-      site.site_url
+      site.site_url,
+      gscQueriesPrev.length > 0 ? gscQueriesPrev : undefined
     );
 
     // ── Enrich with Claude for opportunities & commentary ─────────────────
@@ -110,6 +118,8 @@ export async function POST() {
         missing_links: c.missing_links,
         strength_score: c.strength_score,
         avg_position: c.avg_position,
+        position_trend: c.position_trend,
+        impressions_trend: c.impressions_trend,
       })),
       suggestions: analysis.suggestions.map(s => ({
         from_title: s.from_title,

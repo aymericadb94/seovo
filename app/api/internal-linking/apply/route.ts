@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     };
 
     // Fetch all CMS posts to match URLs to post IDs
-    const cmsPosts = await listCmsPosts(creds, 100);
+    const cmsPosts = await listCmsPosts(creds, 200);
     if (cmsPosts.length === 0) {
       return Response.json({ error: "Aucun article CMS trouvé" }, { status: 400 });
     }
