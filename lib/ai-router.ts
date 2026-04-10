@@ -114,7 +114,7 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
 // ── Max tokens per task type ────────────────────────────────────────────────
 
 const TASK_MAX_TOKENS: Record<TaskType, number> = {
-  semantic_cocoon: 16000,
+  semantic_cocoon: 32000,
   roadmap_strategy: 8000,
   seo_analysis: 6000,
   seo_audit: 6000,
@@ -247,7 +247,7 @@ export async function aiCall(
     max_tokens?: number;
     temperature?: number;
   }
-): Promise<{ text: string; model: ModelId; tier: ModelTier; reason: string }> {
+): Promise<{ text: string; model: ModelId; tier: ModelTier; reason: string; stop_reason: string }> {
   const selection = selectModel(ctx);
   const maxTokens = params.max_tokens ?? selection.max_tokens;
 
@@ -263,12 +263,14 @@ export async function aiCall(
 
     const msg = await stream.finalMessage();
     const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+    const stopReason = msg.stop_reason ?? "unknown";
 
     return {
       text,
       model: selection.model,
       tier: selection.tier,
       reason: selection.reason,
+      stop_reason: stopReason,
     };
   } catch (err) {
     const rawMsg = err instanceof Error ? err.message : "Erreur IA inconnue";

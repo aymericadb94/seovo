@@ -230,7 +230,8 @@ CONTRAINTES :
 - Qualité > quantité
 - Penser comme un expert SEO humain senior
 
-FORMAT DE RÉPONSE : JSON valide uniquement, aucun texte avant ou après.
+FORMAT DE RÉPONSE : JSON valide uniquement, aucun texte avant ou après. PAS de bloc markdown (pas de \`\`\`json). JSON brut directement.
+IMPORTANT : Sois CONCIS dans les valeurs textuelles (1 phrase courte max par champ). Limite à 4-6 clusters maximum. Max 4 pages support par cluster. Max 4 liens internes par cluster. Cela garantit un JSON compact.
 
 {
   "score": <number 0-100, score de maturité du cocon actuel>,
@@ -308,11 +309,17 @@ FORMAT DE RÉPONSE : JSON valide uniquement, aucun texte avant ou après.
       },
       {
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 16000,
+        max_tokens: 32000,
       }
     );
 
-    console.log("[semantic-cocoon] AI response length:", aiResult.text.length, "model:", aiResult.model, "start:", aiResult.text.slice(0, 150));
+    console.log("[semantic-cocoon] AI response length:", aiResult.text.length, "model:", aiResult.model, "stop_reason:", aiResult.stop_reason, "start:", aiResult.text.slice(0, 150));
+
+    // Détection troncation : si max_tokens atteint, le JSON est incomplet
+    if (aiResult.stop_reason === "max_tokens") {
+      console.error("[semantic-cocoon] RÉPONSE TRONQUÉE (max_tokens atteint). Longueur:", aiResult.text.length);
+      return Response.json({ error: "L'analyse est trop volumineuse — réessayez (la réponse a été tronquée)" }, { status: 500 });
+    }
     let result = parseAiJson<Record<string, unknown>>(aiResult.text);
     if (!result) {
       // Tentative de réparation : supprimer les trailing commas
