@@ -108,81 +108,6 @@ function ScrambleLine({ text, isLast }: { text: string; isLast: boolean }) {
   );
 }
 
-function ScoreCircle({ score }: { score: number }) {
-  const [animated, setAnimated] = useState(0);
-  const r = 38;
-  const circumference = 2 * Math.PI * r;
-  const color = score >= 66 ? "#22c55e" : score >= 40 ? "#f97316" : "#ef4444";
-  const label = score >= 66 ? "Bon" : score >= 40 ? "Moyen" : "Faible";
-
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(score), 100);
-    return () => clearTimeout(t);
-  }, [score]);
-
-  const offset = circumference * (1 - animated / 100);
-
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width={96} height={96} viewBox="0 0 96 96">
-        {/* Track */}
-        <circle cx={48} cy={48} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={7} />
-        {/* Progress */}
-        <circle
-          cx={48}
-          cy={48}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={7}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          transform="rotate(-90 48 48)"
-          style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(0.34,1.56,0.64,1), stroke 0.5s" }}
-        />
-        <text x={48} y={44} textAnchor="middle" fill="white" fontSize={20} fontWeight="900" fontFamily="inherit">
-          {animated}
-        </text>
-        <text x={48} y={60} textAnchor="middle" fill="rgba(156,163,175,0.8)" fontSize={10} fontFamily="inherit">
-          / 100
-        </text>
-      </svg>
-      <span className="text-xs font-bold" style={{ color }}>{label}</span>
-    </div>
-  );
-}
-
-function BreakdownBar({ label, score }: { label: string; score: number }) {
-  const [width, setWidth] = useState(0);
-  const color = score >= 66 ? "#22c55e" : score >= 40 ? "#f97316" : "#ef4444";
-
-  useEffect(() => {
-    const t = setTimeout(() => setWidth(score), 200);
-    return () => clearTimeout(t);
-  }, [score]);
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-1">
-        <span className="text-gray-500 text-xs">{label}</span>
-        <span className="text-xs font-bold" style={{ color }}>{score}</span>
-      </div>
-      <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${width}%`,
-            background: color,
-            transition: "width 1s cubic-bezier(0.34,1.56,0.64,1)",
-            boxShadow: `0 0 8px ${color}60`,
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
 export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", prefilledDifferentiators = "" }: Props) {
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
@@ -413,30 +338,48 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
           {step === 1 && (
             <div className="py-2">
               <div className="text-center mb-6">
-                {/* Animated logo */}
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 relative"
-                  style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.15), rgba(239,68,68,0.1))", border: "1px solid rgba(249,115,22,0.25)" }}
+                {/* Animated pill */}
+                <div
+                  className="inline-flex items-center justify-center mb-4 relative"
+                  style={{
+                    width: `${56 + scanLines.length * 4}px`,
+                    height: `${56 + scanLines.length * 4}px`,
+                    transition: "width 0.6s cubic-bezier(0.34,1.56,0.64,1), height 0.6s cubic-bezier(0.34,1.56,0.64,1)",
+                  }}
                 >
-                  {/* Rotating ring */}
-                  <svg className="absolute inset-0" width={64} height={64} viewBox="0 0 64 64">
-                    <circle cx={32} cy={32} r={28} fill="none" stroke="rgba(249,115,22,0.15)" strokeWidth={2} />
-                    <circle
-                      cx={32} cy={32} r={28} fill="none"
-                      stroke="url(#ringGrad)" strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeDasharray="40 136"
-                      style={{ animation: "spin 1.2s linear infinite", transformOrigin: "32px 32px" }}
-                    />
+                  {/* Glow pulse */}
+                  <div
+                    className="absolute inset-0 rounded-full animate-pulse"
+                    style={{
+                      background: `radial-gradient(circle, rgba(249,115,22,${0.08 + scanLines.length * 0.03}) 0%, transparent 70%)`,
+                      animationDuration: "2s",
+                    }}
+                  />
+                  {/* Spinning pill */}
+                  <svg
+                    viewBox="0 0 40 40"
+                    className="relative z-10"
+                    style={{
+                      width: `${28 + scanLines.length * 3}px`,
+                      height: `${28 + scanLines.length * 3}px`,
+                      animation: "spin 2s linear infinite",
+                      transition: "width 0.6s cubic-bezier(0.34,1.56,0.64,1), height 0.6s cubic-bezier(0.34,1.56,0.64,1)",
+                      filter: `drop-shadow(0 0 ${4 + scanLines.length * 2}px rgba(249,115,22,${0.3 + scanLines.length * 0.05}))`,
+                    }}
+                  >
                     <defs>
-                      <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="0">
+                      <linearGradient id="pillGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#f97316" />
                         <stop offset="100%" stopColor="#ef4444" />
                       </linearGradient>
                     </defs>
+                    {/* Capsule shape */}
+                    <rect x="14" y="4" width="12" height="32" rx="6" fill="url(#pillGrad)" />
+                    {/* Dividing line */}
+                    <line x1="14" y1="20" x2="26" y2="20" stroke="rgba(255,255,255,0.3)" strokeWidth="0.8" />
+                    {/* Highlight */}
+                    <rect x="17" y="7" width="3" height="10" rx="1.5" fill="rgba(255,255,255,0.25)" />
                   </svg>
-                  <span className="text-2xl font-black" style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                    R
-                  </span>
                 </div>
                 <h2 className="text-xl font-black text-white mb-2">Analyse en cours</h2>
                 <div className="flex items-center justify-center gap-3">
@@ -539,35 +482,6 @@ export default function SeoAnalysisModal({ onComplete, prefilledStrengths = "", 
               </div>
 
               <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1" style={{ scrollbarWidth: "thin", scrollbarColor: "#333 transparent" }}>
-
-                {/* SEO Score Card */}
-                {result.seo_score && (
-                  <div
-                    className="rounded-2xl p-5"
-                    style={{
-                      background: "linear-gradient(135deg, rgba(15,15,15,1), rgba(20,20,20,1))",
-                      border: "1px solid rgba(255,255,255,0.07)",
-                    }}
-                  >
-                    <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">
-                      Score SEO actuel — avant RankPill
-                    </p>
-                    <div className="flex items-start gap-6">
-                      <ScoreCircle score={result.seo_score.overall} />
-                      <div className="flex-1 space-y-2.5">
-                        <BreakdownBar label="Qualité du contenu" score={result.seo_score.breakdown.qualite_contenu} />
-                        <BreakdownBar label="Optimisation meta" score={result.seo_score.breakdown.optimisation_meta} />
-                        <BreakdownBar label="Ciblage mots-clés" score={result.seo_score.breakdown.ciblage_mots_cles} />
-                        <BreakdownBar label="Potentiel de croissance" score={result.seo_score.breakdown.potentiel_croissance} />
-                      </div>
-                    </div>
-                    {result.seo_score.verdict && (
-                      <p className="text-gray-500 text-xs mt-4 pt-4 border-t border-white/[0.05] leading-relaxed">
-                        {result.seo_score.verdict}
-                      </p>
-                    )}
-                  </div>
-                )}
 
                 {/* Strategy summary */}
                 <div className="bg-gradient-to-br from-orange-500/10 to-red-500/5 border border-orange-500/20 rounded-xl p-4">

@@ -915,7 +915,7 @@ export default function Dashboard() {
                     {/* Score ring + stats RankPill */}
                     <div className="grid grid-cols-12 gap-4 md:gap-6 items-center">
                       <div className="col-span-12 sm:col-span-4 lg:col-span-3 flex justify-center">
-                        <ScoreRing score={animScore} />
+                        <ScoreRing score={animScore} locked={tutorialStep < 4} />
                       </div>
                       <div className="col-span-12 sm:col-span-8 lg:col-span-9 grid grid-cols-2 md:grid-cols-4 gap-3">
                         {([
