@@ -59,6 +59,7 @@ type Publication = {
 type Props = {
   roadmapRecord: RoadmapRecord | null;
   publications?: Publication[];
+  cmsTitles?: string[];
   onClose: () => void;
   onGenerate: () => Promise<void>;
 };
@@ -86,7 +87,7 @@ const objectiveIcons: Record<string, string> = {
 
 type FilterType = "all" | "published" | "todo" | "pilier" | "cluster" | "support" | "facile" | "moyen" | "difficile";
 
-export default function RoadmapModal({ roadmapRecord, publications = [], onClose, onGenerate }: Props) {
+export default function RoadmapModal({ roadmapRecord, publications = [], cmsTitles = [], onClose, onGenerate }: Props) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"articles" | "phases" | "strategy">("articles");
@@ -100,12 +101,30 @@ export default function RoadmapModal({ roadmapRecord, publications = [], onClose
   const publishedKeywords = new Set(
     publications.map(p => p.keyword?.toLowerCase()).filter(Boolean)
   );
+  const cmsTitlesLower = cmsTitles.map(t => t.toLowerCase().trim());
+
+  // Check if a roadmap article has been published (keyword match OR title match in CMS)
+  function isArticlePublished(a: { title: string; keyword: string }): boolean {
+    const kwLower = a.keyword?.toLowerCase()?.trim();
+    if (kwLower && publishedKeywords.has(kwLower)) return true;
+    const titleLower = a.title?.toLowerCase()?.trim();
+    if (titleLower && cmsTitlesLower.some(ct =>
+      ct.includes(titleLower) || titleLower.includes(ct) ||
+      (() => {
+        const words = titleLower.split(/\s+/).filter(w => w.length > 3);
+        if (words.length === 0) return false;
+        return words.filter(w => ct.includes(w)).length / words.length >= 0.6;
+      })()
+    )) return true;
+    return false;
+  }
+
   const getPublication = (keyword: string) =>
     publications.find(p => p.keyword?.toLowerCase() === keyword?.toLowerCase());
 
   const filtered = filter === "all" ? articles
-    : filter === "published" ? articles.filter(a => publishedKeywords.has(a.keyword?.toLowerCase()))
-    : filter === "todo" ? articles.filter(a => !publishedKeywords.has(a.keyword?.toLowerCase()))
+    : filter === "published" ? articles.filter(a => isArticlePublished(a))
+    : filter === "todo" ? articles.filter(a => !isArticlePublished(a))
     : articles.filter(a => a.role === filter || a.difficulty === filter);
 
   async function handleGenerate() {
@@ -261,8 +280,8 @@ export default function RoadmapModal({ roadmapRecord, publications = [], onClose
                       }}
                     >
                       {f === "all" ? `Tous (${articles.length})`
-                        : f === "published" ? `Publiés (${articles.filter(a => publishedKeywords.has(a.keyword?.toLowerCase())).length})`
-                        : f === "todo" ? `À créer (${articles.filter(a => !publishedKeywords.has(a.keyword?.toLowerCase())).length})`
+                        : f === "published" ? `Publiés (${articles.filter(a => isArticlePublished(a)).length})`
+                        : f === "todo" ? `À créer (${articles.filter(a => !isArticlePublished(a)).length})`
                         : f.charAt(0).toUpperCase() + f.slice(1)}
                     </button>
                   ))}
@@ -275,7 +294,7 @@ export default function RoadmapModal({ roadmapRecord, publications = [], onClose
                     const conv = conversionConfig[article.conversion] ?? conversionConfig.moyen;
                     const role = roleConfig[article.role] ?? roleConfig.support;
                     const isExpanded = expandedId === article.id;
-                    const isPublished = publishedKeywords.has(article.keyword?.toLowerCase());
+                    const isPublished = isArticlePublished(article);
                     const pub = isPublished ? getPublication(article.keyword) : null;
                     return (
                       <div

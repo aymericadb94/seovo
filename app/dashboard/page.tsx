@@ -487,6 +487,7 @@ export default function Dashboard() {
         <RoadmapModal
           roadmapRecord={roadmapRecord}
           publications={(data?.recentPublications ?? []).map(p => ({ keyword: p.keyword, url: p.url, published_at: p.published_at }))}
+          cmsTitles={cmsPages.map(p => p.title)}
           onClose={() => setShowRoadmapModal(false)}
           onGenerate={generateRoadmap}
         />
@@ -1600,11 +1601,34 @@ export default function Dashboard() {
                             {/* Contenu roadmap */}
                             {roadmapRecord ? (
                               (() => {
-                                const publishedKw = new Set((data?.recentPublications ?? []).map(p => p.keyword?.toLowerCase()));
+                                // Sources pour matcher : titres CMS + keywords DB
+                                const cmsTitlesLower = cmsPages.map(p => p.title.toLowerCase().trim());
+                                const publishedKw = new Set((data?.recentPublications ?? []).map(p => p.keyword?.toLowerCase()).filter(Boolean));
                                 const allArticles = (roadmapRecord.data.articles ?? []) as { title: string; keyword: string; priority: number }[];
-                                const remaining = allArticles.filter(a => !publishedKw.has(a.keyword?.toLowerCase())).sort((a, b) => a.priority - b.priority);
+
+                                // Un article roadmap est "publié" si son titre ou keyword matche une page CMS ou une publication DB
+                                function isPublished(a: { title: string; keyword: string }): boolean {
+                                  const kwLower = a.keyword?.toLowerCase()?.trim();
+                                  const titleLower = a.title?.toLowerCase()?.trim();
+                                  // Match par keyword dans les publications DB
+                                  if (kwLower && publishedKw.has(kwLower)) return true;
+                                  // Match par titre dans les pages CMS (fuzzy: le titre CMS contient le titre roadmap ou vice versa)
+                                  if (titleLower && cmsTitlesLower.some(ct =>
+                                    ct.includes(titleLower) || titleLower.includes(ct) ||
+                                    // Fuzzy: 60%+ des mots en commun
+                                    (() => {
+                                      const words = titleLower.split(/\s+/).filter(w => w.length > 3);
+                                      if (words.length === 0) return false;
+                                      const matched = words.filter(w => ct.includes(w)).length;
+                                      return matched / words.length >= 0.6;
+                                    })()
+                                  )) return true;
+                                  return false;
+                                }
+
+                                const remaining = allArticles.filter(a => !isPublished(a)).sort((a, b) => a.priority - b.priority);
                                 const total = allArticles.length;
-                                const done = cmsPages.length > 0 ? cmsPages.filter(p => p.page_type === "article").length : (kpis?.totalArticles ?? 0); // CMS source of truth
+                                const done = total - remaining.length;
                                 const pct = Math.round((done / Math.max(total, 1)) * 100);
                                 return (
                                   <div className="flex flex-col gap-4 flex-1">
