@@ -1200,10 +1200,10 @@ export default function Dashboard() {
                         {/* Stats rapides avec animations */}
                         <div className="relative grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                           {[
-                            { value: cocoonData.clusters.length, label: "Clusters", color: "#fb923c", delay: "0ms" },
-                            { value: cocoonData.clusters.reduce((s, c) => s + 1 + c.support_pages.length, 0), label: "Pages totales", color: "#f97316", delay: "100ms" },
-                            { value: cocoonData.clusters.reduce((s, c) => s + c.support_pages.filter(p => p.status === "to_create").length + (c.pillar.status === "to_create" ? 1 : 0), 0), label: "A créer", color: "#ef4444", delay: "200ms" },
-                            { value: cocoonData.traffic_potential.growth_percentage > 999 ? `x${Math.round(cocoonData.traffic_potential.potential_6_months / Math.max(cocoonData.traffic_potential.current_estimated, 1))}` : `+${cocoonData.traffic_potential.growth_percentage}%`, label: "Potentiel", color: "#22c55e", delay: "300ms" },
+                            { value: (cocoonData.clusters ?? []).length, label: "Clusters", color: "#fb923c", delay: "0ms" },
+                            { value: (cocoonData.clusters ?? []).reduce((s, c) => s + 1 + (c.support_pages ?? []).length, 0), label: "Pages totales", color: "#f97316", delay: "100ms" },
+                            { value: (cocoonData.clusters ?? []).reduce((s, c) => s + (c.support_pages ?? []).filter(p => p.status === "to_create").length + (c.pillar?.status === "to_create" ? 1 : 0), 0), label: "A créer", color: "#ef4444", delay: "200ms" },
+                            { value: (cocoonData.traffic_potential?.growth_percentage ?? 0) > 999 ? `x${Math.round((cocoonData.traffic_potential?.potential_6_months ?? 0) / Math.max(cocoonData.traffic_potential?.current_estimated ?? 1, 1))}` : `+${cocoonData.traffic_potential?.growth_percentage ?? 0}%`, label: "Potentiel", color: "#22c55e", delay: "300ms" },
                           ].map((stat) => (
                             <div
                               key={stat.label}
@@ -1224,7 +1224,7 @@ export default function Dashboard() {
                           style={{ border: "1px solid rgba(249,115,22,0.12)", color: "#fb923c" }}
                         >
                           <svg className={`w-3.5 h-3.5 transition-transform ${cocoonDetailsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                          {cocoonDetailsOpen ? "Masquer les détails" : `Voir les ${cocoonData.clusters.length} clusters et actions recommandées`}
+                          {cocoonDetailsOpen ? "Masquer les détails" : `Voir les ${(cocoonData.clusters ?? []).length} clusters et actions recommandées`}
                         </button>
 
                         {cocoonDetailsOpen && (
@@ -1233,8 +1233,8 @@ export default function Dashboard() {
                         <div className="relative space-y-3 animate-fade-in-up">
                           {cocoonData.clusters.map((cluster, ci) => {
                             const isOpen = cocoonExpanded === cluster.name;
-                            const existing = [cluster.pillar, ...cluster.support_pages].filter(p => p.status === "existing").length;
-                            const total = 1 + cluster.support_pages.length;
+                            const existing = [cluster.pillar, ...(cluster.support_pages ?? [])].filter(p => p?.status === "existing").length;
+                            const total = 1 + (cluster.support_pages ?? []).length;
                             const pct = Math.round((existing / total) * 100);
                             const priorityColors: Record<string, string> = {
                               haute: "text-red-400 bg-red-500/10 border-red-500/20",
@@ -1289,9 +1289,9 @@ export default function Dashboard() {
 
                                     {/* Pages support */}
                                     <div className="mb-4">
-                                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-2">Pages support ({cluster.support_pages.length})</p>
+                                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-2">Pages support ({(cluster.support_pages ?? []).length})</p>
                                       <div className="space-y-1.5">
-                                        {cluster.support_pages.map((page, idx) => (
+                                        {(cluster.support_pages ?? []).map((page, idx) => (
                                           <div key={idx} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:border-orange-500/15 transition-colors">
                                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${page.status === "existing" ? "bg-green-400" : "bg-orange-400"}`} />
                                             <div className="flex-1 min-w-0">
@@ -1307,11 +1307,11 @@ export default function Dashboard() {
                                     </div>
 
                                     {/* Liens internes */}
-                                    {cluster.internal_links.length > 0 && (
+                                    {(cluster.internal_links ?? []).length > 0 && (
                                       <div>
-                                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-2">Maillage ({cluster.internal_links.length} liens)</p>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-2">Maillage ({(cluster.internal_links ?? []).length} liens)</p>
                                         <div className="space-y-1">
-                                          {cluster.internal_links.map((link, idx) => (
+                                          {(cluster.internal_links ?? []).map((link, idx) => (
                                             <div key={idx} className="flex items-center gap-2 text-xs text-gray-500">
                                               <span className="text-gray-400 truncate max-w-[35%]">{link.from}</span>
                                               <svg className="w-3 h-3 text-orange-400/50 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
@@ -1330,11 +1330,11 @@ export default function Dashboard() {
                         </div>
 
                         {/* Actions d'optimisation */}
-                        {cocoonData.optimization_actions.length > 0 && (
+                        {(cocoonData.optimization_actions ?? []).length > 0 && (
                           <div className="relative mt-6 pt-5 border-t border-orange-500/10">
                             <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 mb-3">Actions recommandées</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                              {cocoonData.optimization_actions.slice(0, 6).map((action, idx) => {
+                              {(cocoonData.optimization_actions ?? []).slice(0, 6).map((action, idx) => {
                                 const impactColors: Record<string, { bg: string; text: string; border: string }> = {
                                   fort: { bg: "rgba(34,197,94,0.06)", text: "text-green-400", border: "rgba(34,197,94,0.12)" },
                                   moyen: { bg: "rgba(249,115,22,0.06)", text: "text-orange-400", border: "rgba(249,115,22,0.12)" },
@@ -2356,9 +2356,9 @@ export default function Dashboard() {
                                 </div>
                               );
                             })}
-                            {cluster.support_pages.length > 5 && (
+                            {(cluster.support_pages ?? []).length > 5 && (
                               <div className="rounded-xl p-3 flex items-center justify-center" style={{ background: "rgba(255,255,255,0.01)", border: "1px dashed rgba(255,255,255,0.06)" }}>
-                                <span className="text-gray-600 text-xs">+{cluster.support_pages.length - 5} pages support</span>
+                                <span className="text-gray-600 text-xs">+{(cluster.support_pages ?? []).length - 5} pages support</span>
                               </div>
                             )}
                           </div>
@@ -2379,7 +2379,7 @@ export default function Dashboard() {
                     })}
 
                     {/* Mots-clés non mappés si pas de premier cluster */}
-                    {enrichedStats.filter(k => !k.cocoonInfo).length > 0 && cocoonData.clusters.length === 0 && (
+                    {enrichedStats.filter(k => !k.cocoonInfo).length > 0 && (cocoonData.clusters ?? []).length === 0 && (
                       <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
                         <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4">Mots-clés non structurés</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
