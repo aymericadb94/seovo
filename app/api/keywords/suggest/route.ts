@@ -16,6 +16,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getValidGscToken, fetchGscQueries } from "@/lib/gsc-utils";
+import { listAllCmsContent, type CmsCredentials } from "@/lib/cms-update";
 
 type GscMetrics = {
   position: number;
@@ -44,16 +45,37 @@ export async function GET() {
 
     // Fetch all data in parallel
     const [siteRes, pubsRes, roadmapRes, cocoonRes] = await Promise.all([
-      supabase.from("sites").select("keywords, google_access_token, google_refresh_token, google_token_expiry, gsc_site_url").eq("user_id", user.id).maybeSingle(),
+      supabase.from("sites").select("keywords, google_access_token, google_refresh_token, google_token_expiry, gsc_site_url, site_url, cms, wp_username, wp_app_password, shopify_api_key, shopify_store_url, wix_api_key, wix_site_id, custom_api_url, custom_api_key").eq("user_id", user.id).maybeSingle(),
       supabase.from("publications").select("keyword").eq("user_id", user.id),
       supabase.from("roadmaps").select("data").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("semantic_cocoons").select("data").eq("user_id", user.id).maybeSingle(),
     ]);
 
     const siteKeywords: string[] = siteRes.data?.keywords ?? [];
+
+    // Published keywords: CMS (source of truth) + DB fallback
     const publishedKeywords = new Set(
       (pubsRes.data ?? []).map(p => p.keyword?.toLowerCase()).filter(Boolean)
     );
+
+    // Enrich with CMS page titles as "published" context
+    if (siteRes.data?.cms && siteRes.data?.site_url) {
+      try {
+        const creds: CmsCredentials = {
+          cms: siteRes.data.cms, site_url: siteRes.data.site_url,
+          wp_username: siteRes.data.wp_username, wp_app_password: siteRes.data.wp_app_password,
+          shopify_api_key: siteRes.data.shopify_api_key, shopify_store_url: siteRes.data.shopify_store_url,
+          wix_api_key: siteRes.data.wix_api_key, wix_site_id: siteRes.data.wix_site_id,
+          custom_api_url: siteRes.data.custom_api_url, custom_api_key: siteRes.data.custom_api_key,
+        };
+        const cmsContent = await listAllCmsContent(creds, 200);
+        // Add CMS titles (normalized) as published context to avoid suggesting already-covered topics
+        for (const p of cmsContent) {
+          const titleWords = p.title.toLowerCase().replace(/[^a-zàâäéèêëïîôùûüÿçœæ0-9\s]/g, "").trim();
+          if (titleWords.length > 5) publishedKeywords.add(titleWords);
+        }
+      } catch { /* CMS non-fatal */ }
+    }
 
     // ── Fetch GSC data ───────────────────────────────────────────────────
     let gscQueries: { query: string; clicks: number; impressions: number; ctr: number; position: number }[] = [];

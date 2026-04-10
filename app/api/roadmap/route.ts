@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
 import { rateLimit } from "@/lib/rate-limit";
+import { listAllCmsContent, type CmsCredentials } from "@/lib/cms-update";
 
 export const maxDuration = 300;
 
@@ -35,20 +36,24 @@ export async function POST() {
 
     const { data: site, error: siteError } = await supabase
       .from("sites")
-      .select("id, business_name, industry, site_url, keywords, seo_context")
+      .select("id, business_name, industry, site_url, cms, keywords, seo_context, wp_username, wp_app_password, shopify_api_key, shopify_store_url, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (siteError) return Response.json({ error: siteError.message }, { status: 500 });
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
-    const [pubsResult, engineResult, projectionsResult, cocoonResult] = await Promise.all([
-      supabase
-        .from("publications")
-        .select("title, keyword")
-        .eq("user_id", user.id)
-        .order("published_at", { ascending: false })
-        .limit(20),
+    // Fetch CMS pages + DB data in parallel
+    const creds: CmsCredentials = {
+      cms: site.cms, site_url: site.site_url,
+      wp_username: site.wp_username, wp_app_password: site.wp_app_password,
+      shopify_api_key: site.shopify_api_key, shopify_store_url: site.shopify_store_url,
+      wix_api_key: site.wix_api_key, wix_site_id: site.wix_site_id,
+      custom_api_url: site.custom_api_url, custom_api_key: site.custom_api_key,
+    };
+
+    const [cmsContentResult, engineResult, projectionsResult, cocoonResult] = await Promise.all([
+      listAllCmsContent(creds, 200).catch(() => []),
       supabase
         .from("seo_engine_results")
         .select("data")
@@ -68,7 +73,20 @@ export async function POST() {
         .maybeSingle(),
     ]);
 
-    const existingTitles = (pubsResult.data ?? []).map(p => p.title);
+    // CMS = source de vérité pour les titres existants
+    let existingTitles: string[];
+    if (cmsContentResult.length > 0) {
+      existingTitles = cmsContentResult.map(p => p.title);
+    } else {
+      // Fallback DB
+      const { data: pubs } = await supabase
+        .from("publications")
+        .select("title")
+        .eq("user_id", user.id)
+        .order("published_at", { ascending: false })
+        .limit(20);
+      existingTitles = (pubs ?? []).map(p => p.title);
+    }
     const keywords = (site.keywords ?? []).join(", ") || "non configurés";
     const seoCtx = (site.seo_context ?? {}) as Record<string, unknown>;
 

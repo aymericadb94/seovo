@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getValidAccessToken } from "@/lib/google";
 import { aiCall, parseAiJson, assessComplexity } from "@/lib/ai-router";
 import { rateLimit } from "@/lib/rate-limit";
+import { listAllCmsContent, type CmsCredentials } from "@/lib/cms-update";
 
 export const maxDuration = 180;
 
@@ -43,20 +44,37 @@ export async function POST() {
     // ── Récupérer le site ─────────────────────────────────────────────────────
     const { data: site } = await supabase
       .from("sites")
-      .select("business_name, industry, site_url, keywords, seo_context, google_access_token, gsc_site_url")
+      .select("id, business_name, industry, site_url, cms, keywords, seo_context, google_access_token, gsc_site_url, wp_username, wp_app_password, shopify_api_key, shopify_store_url, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
-    // ── Récupérer les publications existantes ─────────────────────────────────
-    const { data: pubs } = await supabase
-      .from("publications")
-      .select("id, title, keyword, wordpress_url, published_at")
-      .eq("user_id", user.id)
-      .order("published_at", { ascending: false });
+    // ── Récupérer les pages RÉELLES du CMS (source de vérité) ─────────────────
+    const creds: CmsCredentials = {
+      cms: site.cms, site_url: site.site_url,
+      wp_username: site.wp_username, wp_app_password: site.wp_app_password,
+      shopify_api_key: site.shopify_api_key, shopify_store_url: site.shopify_store_url,
+      wix_api_key: site.wix_api_key, wix_site_id: site.wix_site_id,
+      custom_api_url: site.custom_api_url, custom_api_key: site.custom_api_key,
+    };
 
-    const articles = pubs ?? [];
+    let cmsPages: { title: string; url: string; page_type: string }[] = [];
+    try {
+      const cmsContent = await listAllCmsContent(creds, 200);
+      cmsPages = cmsContent.map(p => ({ title: p.title, url: p.url, page_type: p.page_type ?? "article" }));
+    } catch { /* CMS non-fatal — fallback to DB */ }
+
+    // Fallback: si CMS échoue, utiliser la DB
+    if (cmsPages.length === 0) {
+      const { data: pubs } = await supabase
+        .from("publications")
+        .select("title, wordpress_url, keyword")
+        .eq("user_id", user.id);
+      cmsPages = (pubs ?? []).map(p => ({ title: p.title, url: p.wordpress_url ?? "", page_type: p.keyword === "__page__" ? "page" : "article" }));
+    }
+
+    const articles = cmsPages;
 
     // ── Récupérer la roadmap ──────────────────────────────────────────────────
     const { data: roadmapRec } = await supabase
@@ -116,7 +134,7 @@ export async function POST() {
 
     const existingPagesCtx = articles.length > 0
       ? articles.map((a, i) =>
-          `${i + 1}. "${a.title}" — mot-clé: "${a.keyword}" — URL: ${a.wordpress_url ?? "/article-" + a.id}`
+          `${i + 1}. "${a.title}" — type: ${a.page_type} — URL: ${a.url}`
         ).join("\n")
       : "Aucun article publié";
 
