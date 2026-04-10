@@ -188,13 +188,22 @@ async function recalcLight(
 
   if (!site) return { ...changes, error: "Site not found" };
 
-  // 2. Recompute projections with fresh GSC data
+  // Fetch cocoon + roadmap for enriched projections
+  const [cocoonRes, roadmapRes] = await Promise.all([
+    supabase.from("semantic_cocoons").select("data").eq("user_id", userId).maybeSingle(),
+    supabase.from("roadmaps").select("data").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+
+  // 2. Recompute projections with fresh GSC data + cocoon + roadmap
   const projections = computeProjections(
     site.keywords ?? [],
     gscQueries,
     site.seo_score_initial ?? 35,
     site.seo_context as Record<string, unknown> | null,
-    site.site_url
+    site.site_url,
+    cocoonRes.data?.data as import("@/lib/seo-projections").CocoonContext | null,
+    roadmapRes.data?.data as import("@/lib/seo-projections").RoadmapContext | null,
+    null, // CMS not loaded in cron context for performance
   );
 
   await supabase

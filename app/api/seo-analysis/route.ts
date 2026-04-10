@@ -219,12 +219,16 @@ RÉPONSE : JSON uniquement, sans texte avant/après.
           }
         } catch (err) { logger.warn("GSC fetch failed during SEO analysis", { context: "seo-analysis", userId: user.id, error: err }); }
       }
+      // Onboarding: cocoon/roadmap not yet available, pass null
       const projections = computeProjections(
         uniqueKeywords,
         gscQueries,
         seoScore,
         (site.seo_context as Record<string, unknown> | null),
-        site.site_url
+        site.site_url,
+        null, // cocoon
+        null, // roadmap
+        null, // cmsPages (not yet loaded during onboarding)
       );
       await supabase
         .from("seo_projections")

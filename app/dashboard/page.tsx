@@ -207,12 +207,16 @@ export default function Dashboard() {
     target_position: number; current_clicks: number; potential_clicks: number;
     estimated_gain: number; confidence_score: number; timeframe: string;
     rationale: string; difficulty: "easy" | "medium" | "hard";
+    sources?: string[];
   };
   type ProjectionsResult = {
     estimated_results: ProjectionItem[];
     total_estimated_gain: { low: number; high: number };
     total_current_clicks: number;
     has_gsc_data: boolean;
+    has_cocoon_data?: boolean;
+    has_roadmap_data?: boolean;
+    has_cms_data?: boolean;
     computed_at: string;
   };
   const [projections, setProjections] = useState<ProjectionsResult | null>(null);
@@ -1438,7 +1442,20 @@ export default function Dashboard() {
                                   <p className="text-gray-500 text-sm font-bold">à +{projections.total_estimated_gain.high.toLocaleString("fr-FR")} clics</p>
                                 </div>
                                 <p className="text-green-400 text-xs font-bold mt-1">clics organiques / mois</p>
-                                <p className="text-gray-600 text-xs mt-1">{projections.has_gsc_data ? "Basé sur vos données GSC" : "Estimation — connectez GSC pour plus de précision"}</p>
+                                <p className="text-gray-600 text-xs mt-1">{[
+                                  projections.has_gsc_data && "GSC",
+                                  projections.has_cocoon_data && "Cocon",
+                                  projections.has_roadmap_data && "Roadmap",
+                                  projections.has_cms_data && "CMS",
+                                ].filter(Boolean).length > 0
+                                  ? `Basé sur : ${[
+                                      projections.has_gsc_data && "GSC",
+                                      projections.has_cocoon_data && "Cocon",
+                                      projections.has_roadmap_data && "Roadmap",
+                                      projections.has_cms_data && "CMS",
+                                    ].filter(Boolean).join(" + ")}`
+                                  : "Estimation — connectez GSC pour plus de précision"
+                                }</p>
                               </div>
                               <div className="flex-1 flex flex-col gap-1.5">
                                 <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider mb-1">Top opportunités</p>

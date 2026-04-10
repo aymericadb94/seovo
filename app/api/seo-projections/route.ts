@@ -1,17 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { getValidAccessToken } from "@/lib/google";
-import { computeProjections, type GSCQuery, type ProjectionsResult } from "@/lib/seo-projections";
+import {
+  computeProjections,
+  type GSCQuery,
+  type ProjectionsResult,
+  type CocoonContext,
+  type RoadmapContext,
+} from "@/lib/seo-projections";
+import { listAllCmsContent, type CmsCredentials } from "@/lib/cms-update";
 
 export const maxDuration = 60;
-
-type SiteData = {
-  keywords: string[];
-  seo_context: Record<string, unknown> | null;
-  seo_score_initial: number | null;
-  site_url: string;
-  gsc_site_url: string | null;
-  google_refresh_token: string | null;
-};
 
 async function fetchGSCQueries(token: string, gscSiteUrl: string): Promise<GSCQuery[]> {
   try {
@@ -25,7 +23,7 @@ async function fetchGSCQueries(token: string, gscSiteUrl: string): Promise<GSCQu
       {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ startDate: fmt(start), endDate: fmt(end), dimensions: ["query"], rowLimit: 100 }),
+        body: JSON.stringify({ startDate: fmt(start), endDate: fmt(end), dimensions: ["query"], rowLimit: 200 }),
       }
     );
     if (!res.ok) return [];
@@ -67,30 +65,56 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
 
-    const { data: site, error: siteError } = await supabase
+    // Fetch site + all context in parallel
+    const { data: site } = await supabase
       .from("sites")
-      .select("keywords, seo_context, seo_score_initial, site_url, gsc_site_url, google_refresh_token")
+      .select("id, keywords, seo_context, seo_score_initial, site_url, cms, gsc_site_url, google_refresh_token, wp_username, wp_app_password, shopify_api_key, shopify_store_url, wix_api_key, wix_site_id, custom_api_url, custom_api_key")
       .eq("user_id", user.id)
-      .maybeSingle() as { data: SiteData | null; error: { message: string } | null };
+      .maybeSingle();
 
-    if (siteError) return Response.json({ error: siteError.message }, { status: 500 });
     if (!site) return Response.json({ error: "Site introuvable" }, { status: 404 });
 
     const keywords: string[] = site.keywords ?? [];
     if (keywords.length === 0) return Response.json({ error: "Aucun mot-clé configuré — lancez d'abord l'analyse SEO" }, { status: 400 });
 
-    let gscQueries: GSCQuery[] = [];
-    if (site.gsc_site_url) {
-      const token = await getValidAccessToken(user.id);
-      if (token) gscQueries = await fetchGSCQueries(token, site.gsc_site_url);
-    }
+    // Fetch all data sources in parallel
+    const creds: CmsCredentials = {
+      cms: site.cms, site_url: site.site_url,
+      wp_username: site.wp_username, wp_app_password: site.wp_app_password,
+      shopify_api_key: site.shopify_api_key, shopify_store_url: site.shopify_store_url,
+      wix_api_key: site.wix_api_key, wix_site_id: site.wix_site_id,
+      custom_api_url: site.custom_api_url, custom_api_key: site.custom_api_key,
+    };
+
+    const [gscQueries, cocoonRes, roadmapRes, cmsContent] = await Promise.all([
+      // GSC
+      (async () => {
+        if (!site.gsc_site_url) return [];
+        const token = await getValidAccessToken(user.id);
+        if (!token) return [];
+        return fetchGSCQueries(token, site.gsc_site_url);
+      })(),
+      // Cocoon
+      supabase.from("semantic_cocoons").select("data").eq("user_id", user.id).maybeSingle(),
+      // Roadmap
+      supabase.from("roadmaps").select("data").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      // CMS pages
+      listAllCmsContent(creds, 200).catch(() => []),
+    ]);
+
+    const cocoon = (cocoonRes.data?.data ?? null) as CocoonContext | null;
+    const roadmap = (roadmapRes.data?.data ?? null) as RoadmapContext | null;
+    const cmsPages = cmsContent.map(p => ({ title: p.title, url: p.url }));
 
     const result = computeProjections(
       keywords.slice(0, 25),
       gscQueries,
       site.seo_score_initial ?? 35,
       site.seo_context as Record<string, unknown> | null,
-      site.site_url
+      site.site_url,
+      cocoon,
+      roadmap,
+      cmsPages,
     );
 
     const { error: upsertError } = await supabase
@@ -101,7 +125,6 @@ export async function POST() {
       );
 
     if (upsertError) {
-      console.error("[seo-projections] upsert failed:", upsertError.message);
       return Response.json({ error: "Projections calculées mais non sauvegardées : " + upsertError.message }, { status: 500 });
     }
 
