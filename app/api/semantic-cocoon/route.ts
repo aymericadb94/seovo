@@ -145,8 +145,8 @@ export async function POST() {
       : "Aucune roadmap générée";
 
     const gscCtx = gscQueries.length > 0
-      ? gscQueries.slice(0, 200).map((q, i) =>
-          `${i + 1}. "${q.query}" — ${q.clicks} clics, ${q.impressions} impressions, pos. ${q.position}`
+      ? gscQueries.slice(0, 80).map((q, i) =>
+          `${i + 1}. "${q.query}" — ${q.clicks} clics, ${q.impressions} imp, pos. ${q.position}`
         ).join("\n")
       : "Pas de données GSC (non connecté ou pas de données)";
 
@@ -312,15 +312,22 @@ FORMAT DE RÉPONSE : JSON valide uniquement, aucun texte avant ou après.
       }
     );
 
-    let result = parseAiJson(aiResult.text);
+    console.log("[semantic-cocoon] AI response length:", aiResult.text.length, "model:", aiResult.model, "start:", aiResult.text.slice(0, 100));
+    let result = parseAiJson<Record<string, unknown>>(aiResult.text);
     if (!result) {
       // Tentative de réparation : supprimer les trailing commas
       const repaired = aiResult.text.replace(/,\s*([}\]])/g, "$1");
-      result = parseAiJson(repaired);
+      result = parseAiJson<Record<string, unknown>>(repaired);
     }
     if (!result) {
       console.error("[semantic-cocoon] Pas de JSON trouvé. Début:", aiResult.text.slice(0, 300));
       return Response.json({ error: "Réponse Claude non parseable" }, { status: 500 });
+    }
+
+    // Validation : le résultat doit contenir des clusters
+    if (!Array.isArray(result.clusters) || result.clusters.length === 0) {
+      console.error("[semantic-cocoon] JSON valide mais sans clusters. Clés:", Object.keys(result));
+      return Response.json({ error: "L'analyse n'a pas généré de clusters — réessayez" }, { status: 500 });
     }
 
     // ── Sauvegarder (upsert) ──────────────────────────────────────────────────

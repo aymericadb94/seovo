@@ -151,7 +151,9 @@ export default function Dashboard() {
     try {
       const res = await fetch("/api/semantic-cocoon");
       const json = await res.json();
-      if (json.result?.data) setCocoonData(json.result.data as CocoonData);
+      const d = json.result?.data as CocoonData | undefined;
+      // Ne charger que si les données contiennent des clusters valides
+      if (d && Array.isArray(d.clusters) && d.clusters.length > 0) setCocoonData(d);
     } catch { /* ignore */ }
   }
 
@@ -193,8 +195,13 @@ export default function Dashboard() {
       if (json.error) { setCocoonError(json.error); setCocoonProgress(0); return; }
       if (json.result) {
         setCocoonProgress(100);
-        // L'API POST renvoie le JSON directement, mais parfois enveloppé dans un objet avec .data
+        // POST renvoie le JSON AI directement (pas wrappé dans .data)
         const cocoonResult = (json.result.clusters ? json.result : json.result.data ?? json.result) as CocoonData;
+        if (!Array.isArray(cocoonResult.clusters) || cocoonResult.clusters.length === 0) {
+          setCocoonError("L'analyse n'a pas généré de données exploitables — réessayez");
+          setCocoonProgress(0);
+          return;
+        }
         setCocoonData(cocoonResult);
         setTutorialStep(prev => {
           if (prev === 1) { localStorage.setItem("rankpill_onboarding", "2"); return 2; }
