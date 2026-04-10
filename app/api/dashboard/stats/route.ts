@@ -44,15 +44,11 @@ export async function GET() {
     // Tous les mots-clés configurés
     const allKeywords: string[] = site?.keywords ?? [];
 
-    // Score SEO : basé sur la couverture des mots-clés et la fréquence de publication
-    const keywordCoverage = allKeywords.length > 0
-      ? (coveredKeywords.length / allKeywords.length) * 100
+    // Score SEO : calcul intelligent multi-sources
+    // Le score final sera calculé après récupération des données GSC (voir plus bas)
+    const keywordCoverageRatio = allKeywords.length > 0
+      ? coveredKeywords.length / allKeywords.length
       : 0;
-    const baseScore = site?.seo_score_initial ?? 20;
-    const seoScore = Math.min(
-      Math.round(baseScore + (totalArticles * 2) + (keywordCoverage * 0.3)),
-      98
-    );
 
     // ── Graphique publications 30 derniers jours ─────────────────────────────
     const pubsChart: { date: string; articles: number }[] = [];
@@ -204,6 +200,38 @@ export async function GET() {
       }
       if (runStreak > bestStreak) bestStreak = runStreak;
     }
+
+    // ── Score SEO intelligent (multi-sources) ─────────────────────────────────
+    // Composantes : Position GSC (0-30) + Trafic GSC (0-20) + Contenu (0-25) + Keywords (0-15) + Régularité (0-10)
+    let scorePosition = 0;
+    let scoreTraffic = 0;
+
+    const gscEntries = Object.values(gscMap);
+    if (gscEntries.length > 0) {
+      // Position moyenne pondérée par impressions
+      const totalImp = gscEntries.reduce((s, g) => s + g.impressions, 0);
+      const weightedPos = totalImp > 0
+        ? gscEntries.reduce((s, g) => s + g.position * g.impressions, 0) / totalImp
+        : gscEntries.reduce((s, g) => s + g.position, 0) / gscEntries.length;
+      // Position 1 = 30pts, position 10 = 15pts, position 30+ = 0pts
+      scorePosition = Math.max(0, Math.min(30, Math.round(30 - (weightedPos - 1) * (30 / 29))));
+
+      // Trafic : clics totaux, normalisé (50+ clics/mois = max)
+      const totalClicks = gscEntries.reduce((s, g) => s + g.clicks, 0);
+      scoreTraffic = Math.min(20, Math.round((totalClicks / 50) * 20));
+    }
+
+    // Contenu : nombre d'articles vs objectif (40 articles roadmap = 100%)
+    const contentTarget = 40;
+    const scoreContent = Math.min(25, Math.round((totalArticles / contentTarget) * 25));
+
+    // Keywords : couverture des mots-clés configurés
+    const scoreKeywords = Math.min(15, Math.round(keywordCoverageRatio * 15));
+
+    // Régularité : streak (7+ jours = max)
+    const scoreRegularity = Math.min(10, Math.round((streak / 7) * 10));
+
+    const seoScore = Math.min(98, scorePosition + scoreTraffic + scoreContent + scoreKeywords + scoreRegularity);
 
     // ── Calendrier (90 jours) ────────────────────────────────────────────────
     const calendarData: { date: string; count: number }[] = [];

@@ -74,12 +74,14 @@ export async function GET() {
       const match = pubsByUrl.get(normUrl) ?? pubsByTitle.get(normTitle);
       // Image priority: CMS featured image > DB stored image > null
       const cover_image = item.featured_image ?? match?.cover_image_url ?? null;
+      // Date priority: CMS real date > DB stored date > now
+      const published_at = item.published_at ?? match?.published_at ?? new Date().toISOString();
       return {
         id: match?.id ?? `cms-${i}`,
         title: item.title,
         url: item.url,
         keyword: (match?.keyword && match.keyword !== "__page__") ? match.keyword : "",
-        published_at: match?.published_at ?? new Date().toISOString(),
+        published_at,
         page_type: item.page_type ?? "article",
         cover_image,
         in_db: !!match,
@@ -100,7 +102,7 @@ export async function GET() {
         title: p.title,
         keyword: p.page_type === "page" ? "__page__" : "",
         wordpress_url: p.url,
-        published_at: new Date().toISOString(),
+        published_at: p.published_at ?? new Date().toISOString(),
       }));
       try { await supabase.from("publications").insert(rows); } catch { /* silent */ }
     }

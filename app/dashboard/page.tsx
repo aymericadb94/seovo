@@ -438,8 +438,25 @@ export default function Dashboard() {
   }
 
   const kpis = data?.kpis;
+
+  // KPIs basés sur CMS (source de vérité) quand disponible
+  const cmsTotal = cmsPages.length > 0 ? cmsPages.length : (kpis?.totalArticles ?? 0);
+  const cmsThisMonth = (() => {
+    if (cmsPages.length === 0) return kpis?.articlesThisMonth ?? 0;
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    return cmsPages.filter(p => new Date(p.published_at) >= startOfMonth).length;
+  })();
+  const cmsThisWeek = (() => {
+    if (cmsPages.length === 0) return kpis?.articlesThisWeek ?? 0;
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    return cmsPages.filter(p => new Date(p.published_at) >= startOfWeek).length;
+  })();
+
   const animScore = useCounter(kpis?.seoScore ?? 0);
-  const animMonth = useCounter(kpis?.articlesThisMonth ?? 0);
+  const animMonth = useCounter(cmsThisMonth);
   const animKw = useCounter(kpis?.coveredKeywords ?? 0);
   const maxKeywordCount = Math.max(...(data?.keywordStats.map(k => k.count) ?? [1]), 1);
 
@@ -676,7 +693,7 @@ export default function Dashboard() {
                 <span className="text-gray-700">·</span>
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse flex-shrink-0" />
-                  {cmsPages.length > 0 ? cmsPages.length : (kpis?.totalArticles ?? 0)} articles publiés
+                  {cmsTotal} articles publiés
                 </span>
               </div>
             )}
@@ -884,9 +901,9 @@ export default function Dashboard() {
                       <div className="col-span-12 sm:col-span-8 lg:col-span-9 grid grid-cols-2 md:grid-cols-4 gap-3">
                         {([
                           { label: "Ce mois", value: animMonth, sub: "articles publiés" },
-                          { label: "Cette semaine", value: kpis?.articlesThisWeek ?? 0, sub: "articles publiés" },
+                          { label: "Cette semaine", value: cmsThisWeek, sub: "articles publiés" },
                           { label: "Mots-clés couverts", value: `${animKw}/${kpis?.totalKeywords ?? 0}`, sub: "configurés" },
-                          { label: "Total publié", value: cmsPages.length > 0 ? cmsPages.length : (kpis?.totalArticles ?? 0), sub: "articles" },
+                          { label: "Total publié", value: cmsTotal, sub: "articles" },
                         ] as const).map((s, i) => (
                           <div key={s.label} className="flex flex-col gap-1.5 p-4 rounded-xl animate-fade-in-up" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", animationDelay: `${i * 80 + 300}ms` }}>
                             <span className="text-gray-500 text-xs font-bold truncate">{s.label}</span>
@@ -963,7 +980,7 @@ export default function Dashboard() {
                               </p>
                               <div className="space-y-2 mb-4">
                                 {[
-                                  { icon: "📝", label: "Articles publiés", val: `${cmsPages.length > 0 ? cmsPages.length : (kpis?.totalArticles ?? 0)} articles` },
+                                  { icon: "📝", label: "Articles publiés", val: `${cmsTotal} articles` },
                                   { icon: "🎯", label: "Mots-clés couverts", val: `${kpis?.coveredKeywords ?? 0} / ${kpis?.totalKeywords ?? 0}` },
                                   { icon: "📅", label: "Régularité de publication", val: `${kpis?.streak ?? 0} jour(s) de streak` },
                                 ].map(({ icon, label, val }) => (
@@ -1570,7 +1587,7 @@ export default function Dashboard() {
                                 const allArticles = (roadmapRecord.data.articles ?? []) as { title: string; keyword: string; priority: number }[];
                                 const remaining = allArticles.filter(a => !publishedKw.has(a.keyword?.toLowerCase())).sort((a, b) => a.priority - b.priority);
                                 const total = allArticles.length;
-                                const done = cmsPages.length > 0 ? cmsPages.filter(p => p.page_type === "article").length : (kpis?.totalArticles ?? 0);
+                                const done = cmsPages.length > 0 ? cmsPages.filter(p => p.page_type === "article").length : (kpis?.totalArticles ?? 0); // CMS source of truth
                                 const pct = Math.round((done / Math.max(total, 1)) * 100);
                                 return (
                                   <div className="flex flex-col gap-4 flex-1">

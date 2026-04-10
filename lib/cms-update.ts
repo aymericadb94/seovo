@@ -38,6 +38,7 @@ export type CmsPost = {
   excerpt?: string;
   page_type?: CmsPageType;
   featured_image?: string | null;
+  published_at?: string | null;
 };
 
 export type UpdateResult = {
@@ -123,7 +124,7 @@ async function wpListPosts(
       const count = Math.min(perPage, remaining);
 
       const res = await fetch(
-        `${siteUrl}/wp-json/wp/v2/posts?per_page=${count}&page=${page}&orderby=date&order=desc&_fields=id,title,content,link,excerpt,featured_media&_embed=wp:featuredmedia`,
+        `${siteUrl}/wp-json/wp/v2/posts?per_page=${count}&page=${page}&orderby=date&order=desc&_fields=id,title,content,link,excerpt,date,featured_media&_embed=wp:featuredmedia`,
         { headers: { Authorization: auth, "ngrok-skip-browser-warning": "true" } }
       );
       if (!res.ok) break;
@@ -133,6 +134,7 @@ async function wpListPosts(
         content: { rendered: string };
         link: string;
         excerpt: { rendered: string };
+        date: string;
         _embedded?: { "wp:featuredmedia"?: { source_url?: string }[] };
       }[];
 
@@ -144,6 +146,7 @@ async function wpListPosts(
         url: p.link,
         excerpt: p.excerpt.rendered,
         featured_image: p._embedded?.["wp:featuredmedia"]?.[0]?.source_url ?? null,
+        published_at: p.date ? new Date(p.date).toISOString() : null,
       })));
 
       if (posts.length < count) break; // No more pages
@@ -171,7 +174,7 @@ async function wpListPages(
       const count = Math.min(perPage, remaining);
 
       const res = await fetch(
-        `${siteUrl}/wp-json/wp/v2/pages?per_page=${count}&page=${page}&orderby=date&order=desc&_fields=id,title,content,link,excerpt`,
+        `${siteUrl}/wp-json/wp/v2/pages?per_page=${count}&page=${page}&orderby=date&order=desc&_fields=id,title,content,link,excerpt,date`,
         { headers: { Authorization: auth, "ngrok-skip-browser-warning": "true" } }
       );
       if (!res.ok) break;
@@ -181,6 +184,7 @@ async function wpListPages(
         content: { rendered: string };
         link: string;
         excerpt: { rendered: string };
+        date: string;
       }[];
 
       if (items.length === 0) break;
@@ -191,6 +195,7 @@ async function wpListPages(
         url: p.link,
         excerpt: p.excerpt.rendered,
         page_type: "page" as CmsPageType,
+        published_at: p.date ? new Date(p.date).toISOString() : null,
       })));
 
       if (items.length < count) break;
@@ -222,10 +227,10 @@ async function shopifyListArticles(
 
     const articles: (CmsPost & { blog_id: number })[] = [];
     for (const blog of blogsData.blogs) {
-      const res = await shopifyFetch(storeUrl, apiKey, `blogs/${blog.id}/articles.json?limit=${limit}&fields=id,title,body_html,handle,summary_html,image`);
+      const res = await shopifyFetch(storeUrl, apiKey, `blogs/${blog.id}/articles.json?limit=${limit}&fields=id,title,body_html,handle,summary_html,image,published_at`);
       if (!res.ok) continue;
       const data = await res.json() as {
-        articles: { id: number; title: string; body_html: string; handle: string; summary_html: string; image?: { src: string } | null }[];
+        articles: { id: number; title: string; body_html: string; handle: string; summary_html: string; image?: { src: string } | null; published_at?: string | null }[];
       };
       for (const a of data.articles ?? []) {
         articles.push({
@@ -236,6 +241,7 @@ async function shopifyListArticles(
           url: `${publicBase}/blogs/${blog.handle}/${a.handle}`,
           excerpt: a.summary_html,
           featured_image: a.image?.src ?? null,
+          published_at: a.published_at ?? null,
         });
       }
     }
@@ -277,10 +283,10 @@ async function shopifyListPages(
 ): Promise<CmsPost[]> {
   const publicBase = (publicUrl ?? storeUrl).replace(/\/$/, "");
   try {
-    const res = await shopifyFetch(storeUrl, apiKey, `pages.json?limit=${limit}&fields=id,title,body_html,handle`);
+    const res = await shopifyFetch(storeUrl, apiKey, `pages.json?limit=${limit}&fields=id,title,body_html,handle,published_at`);
     if (!res.ok) return [];
     const data = await res.json() as {
-      pages: { id: number; title: string; body_html: string; handle: string }[];
+      pages: { id: number; title: string; body_html: string; handle: string; published_at?: string | null }[];
     };
     return (data.pages ?? []).map(p => ({
       id: p.id,
@@ -288,6 +294,7 @@ async function shopifyListPages(
       content: p.body_html ?? "",
       url: `${publicBase}/pages/${p.handle}`,
       page_type: "page" as CmsPageType,
+      published_at: p.published_at ?? null,
     }));
   } catch {
     return [];
@@ -409,6 +416,9 @@ async function wixListPosts(
       const coverMedia = p.coverMedia as { image?: { url?: string }; imageUrl?: string } | undefined;
       const featuredImage = coverMedia?.image?.url ?? coverMedia?.imageUrl ?? null;
 
+      // Extract publish date
+      const firstPublished = (p.firstPublishedDate ?? p.publishedDate ?? p.lastPublishedDate) as string | undefined;
+
       return {
         id: (p.id as string) ?? "",
         wix_id: (p.id as string) ?? "",
@@ -417,6 +427,7 @@ async function wixListPosts(
         url: postUrl,
         excerpt,
         featured_image: featuredImage,
+        published_at: firstPublished ? new Date(firstPublished).toISOString() : null,
       };
     });
   } catch {
