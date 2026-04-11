@@ -380,7 +380,6 @@ export default function Dashboard() {
       const res = await fetch("/api/publications/list");
       const json = await res.json();
       if (json.pages) {
-        console.log("[PAGES] first page sample:", JSON.stringify(json.pages[0]));
         setCmsPages(json.pages);
         if (json.synced > 0) setSyncResult(`${json.synced} page(s) auto-synchronisée(s)`);
       }
@@ -390,10 +389,7 @@ export default function Dashboard() {
 
   async function deletePublication(pub: typeof cmsPages[number]) {
     const uiId = String(pub.id);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawPub = pub as any;
-    const cmsId = String(rawPub.cms_id ?? pub.id);
-    console.log("[DELETE] pub object keys:", Object.keys(pub), "cms_id:", rawPub.cms_id, "id:", pub.id, "resolved cmsId:", cmsId);
+    const cmsId = String(pub.cms_id ?? pub.id);
     setDeletingPostId(uiId);
     try {
       const res = await fetch("/api/publications/delete", {
@@ -405,10 +401,9 @@ export default function Dashboard() {
       if (json.success) {
         setCmsPages(prev => prev.filter(p => String(p.id) !== uiId));
       } else {
-        console.error("Delete failed:", json.error);
         alert(`Erreur de suppression : ${json.error || "Erreur inconnue"}`);
       }
-    } catch (err) { console.error("Delete error:", err); alert("Erreur réseau lors de la suppression"); }
+    } catch { alert("Erreur réseau lors de la suppression"); }
     finally {
       setDeletingPostId(null);
       setConfirmDeleteId(null);
