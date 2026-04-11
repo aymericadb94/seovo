@@ -1087,17 +1087,49 @@ async function wixUpdatePostContent(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let existingDraftJSContent: any = null;
 
-    // STEP 0: Fetch existing content BEFORE reverting (safety measure)
+    // STEP 0: Fetch existing content BEFORE any mutation (critical safety)
     let existingFullNodes: WixRichNode[] = [];
-    const getFullRes = await fetch(
-      `https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=CONTENT`,
-      { headers: hdrs }
-    );
-    if (getFullRes.ok) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const fullData = await getFullRes.json() as any;
-      existingFullNodes = fullData.post?.richContent?.nodes ?? [];
+    let originalNodeCount = 0;
+    let originalBlockCount = 0;
+
+    // Try multiple fieldsets — Wix API is inconsistent about which one returns content
+    for (const fs of ["CONTENT_TEXT", "CONTENT", "GENERATED_CONTENT"]) {
+      if (existingFullNodes.length > 0) break;
+      try {
+        const getFullRes = await fetch(
+          `https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=${fs}`,
+          { headers: hdrs }
+        );
+        if (getFullRes.ok) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const fullData = await getFullRes.json() as any;
+          const nodes = fullData.post?.richContent?.nodes ?? [];
+          if (nodes.length > existingFullNodes.length) {
+            existingFullNodes = nodes;
+          }
+          // Also check DraftJS format
+          if (nodes.length === 0 && fullData.post?.content?.blocks?.length > 0) {
+            contentFormat = "draftJS";
+            existingDraftJSContent = fullData.post.content;
+            originalBlockCount = fullData.post.content.blocks.length;
+          }
+        }
+      } catch { /* try next fieldset */ }
     }
+    originalNodeCount = existingFullNodes.length;
+
+    // SAFETY GATE: Do NOT proceed if we have no content at all — refuse to risk data loss
+    if (existingFullNodes.length === 0 && !existingDraftJSContent) {
+      return { success: false, post_id: postId, url: "", error: "Wix: impossible de récupérer le contenu existant — abandon par sécurité (aucun fieldset n'a retourné de contenu)" };
+    }
+
+    // SAFETY GATE: Content must have substantial content (at least 3 nodes/blocks)
+    const contentSize = existingFullNodes.length || originalBlockCount;
+    if (contentSize < 3) {
+      return { success: false, post_id: postId, url: "", error: `Wix: contenu récupéré trop court (${contentSize} éléments) — abandon par sécurité pour éviter l'écrasement` };
+    }
+
+    console.log(`[wix/update] Post ${postId}: ${originalNodeCount} richContent nodes, ${originalBlockCount} draftJS blocks, format=${contentFormat}`);
 
     // Strategy A: Try revert to get a draft
     const revertRes = await fetch(
@@ -1107,15 +1139,26 @@ async function wixUpdatePostContent(
     if (revertRes.ok) {
       draftData = await revertRes.json();
       draftId = draftData?.draftPost?.id ?? null;
+      // If revert returned content and we didn't have any, use it (but verify it's substantial)
       if (existingFullNodes.length === 0) {
-        existingFullNodes = draftData?.draftPost?.richContent?.nodes ?? [];
+        const revertNodes = draftData?.draftPost?.richContent?.nodes ?? [];
+        if (revertNodes.length >= 3) {
+          existingFullNodes = revertNodes;
+          originalNodeCount = revertNodes.length;
+        }
+      }
+      // Check DraftJS from revert
+      if (existingFullNodes.length === 0 && !existingDraftJSContent && draftData?.draftPost?.content?.blocks?.length >= 3) {
+        contentFormat = "draftJS";
+        existingDraftJSContent = draftData.draftPost.content;
+        originalBlockCount = draftData.draftPost.content.blocks.length;
       }
     }
 
     // Strategy B: Find existing draft
     if (!draftId) {
       const listRes = await fetch(
-        `https://www.wixapis.com/blog/v3/draft-posts?paging.limit=100&fieldsets=CONTENT`,
+        `https://www.wixapis.com/blog/v3/draft-posts?paging.limit=100&fieldsets=CONTENT_TEXT`,
         { headers: hdrs }
       );
       if (listRes.ok) {
@@ -1127,36 +1170,39 @@ async function wixUpdatePostContent(
           draftId = match.id;
           draftData = { draftPost: match };
           if (existingFullNodes.length === 0) {
-            existingFullNodes = match.richContent?.nodes ?? [];
+            const matchNodes = match.richContent?.nodes ?? [];
+            if (matchNodes.length >= 3) {
+              existingFullNodes = matchNodes;
+              originalNodeCount = matchNodes.length;
+            }
           }
         }
       }
     }
 
-    // Check for DraftJS format (old Wix posts: content.blocks instead of richContent)
-    if (existingFullNodes.length === 0 && draftData?.draftPost?.content?.blocks) {
-      contentFormat = "draftJS";
-      existingDraftJSContent = draftData.draftPost.content;
-    }
-
     // If we still have no content from any source, try fetching draft directly
     if (existingFullNodes.length === 0 && !existingDraftJSContent && draftId) {
       const getDraftRes = await fetch(
-        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}?fieldsets=CONTENT`,
+        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}?fieldsets=CONTENT_TEXT`,
         { headers: hdrs }
       );
       if (getDraftRes.ok) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const draftFullData = await getDraftRes.json() as any;
-        existingFullNodes = draftFullData.draftPost?.richContent?.nodes ?? [];
-        if (existingFullNodes.length === 0 && draftFullData.draftPost?.content?.blocks) {
+        const draftNodes = draftFullData.draftPost?.richContent?.nodes ?? [];
+        if (draftNodes.length >= 3) {
+          existingFullNodes = draftNodes;
+          originalNodeCount = draftNodes.length;
+        }
+        if (existingFullNodes.length === 0 && draftFullData.draftPost?.content?.blocks?.length >= 3) {
           contentFormat = "draftJS";
           existingDraftJSContent = draftFullData.draftPost.content;
+          originalBlockCount = draftFullData.draftPost.content.blocks.length;
         }
       }
     }
 
-    // SAFETY: abort if we couldn't fetch existing content from ANY source
+    // FINAL SAFETY: re-verify content after all strategies
     if (existingFullNodes.length === 0 && !existingDraftJSContent) {
       return { success: false, post_id: postId, url: "", error: "Wix: impossible de récupérer le contenu existant — abandon par sécurité" };
     }
@@ -1204,9 +1250,15 @@ async function wixUpdatePostContent(
         nextEntityKey++;
       }
 
+      const updatedBlocks = [...blocks, ...newBlocks];
+      // SAFETY: updated content must be LARGER than original (we only append)
+      if (updatedBlocks.length < blocks.length) {
+        return { success: false, post_id: postId, url: "", error: `Wix: safety check failed — updated blocks (${updatedBlocks.length}) < original (${blocks.length})` };
+      }
+
       const updatedContent = {
         ...existingDraftJSContent,
-        blocks: [...blocks, ...newBlocks],
+        blocks: updatedBlocks,
         entityMap: { ...entityMap, ...newEntities },
       };
 
@@ -1221,6 +1273,18 @@ async function wixUpdatePostContent(
       if (!updateDraftRes.ok) {
         const errText = (await updateDraftRes.text()).slice(0, 300);
         return { success: false, post_id: postId, url: "", error: `Wix update draft failed (${updateDraftRes.status}): ${errText}` };
+      }
+
+      // Verify the draft content before publishing
+      const verifyRes = await fetch(`https://www.wixapis.com/blog/v3/draft-posts/${draftId}?fieldsets=CONTENT_TEXT`, { headers: hdrs });
+      if (verifyRes.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const verifyData = await verifyRes.json() as any;
+        const verifyBlocks = verifyData.draftPost?.content?.blocks?.length ?? 0;
+        if (verifyBlocks < blocks.length) {
+          console.error(`[wix/update] ABORT: draft has ${verifyBlocks} blocks but original had ${blocks.length} — would lose content`);
+          return { success: false, post_id: postId, url: "", error: `Wix: abandon — le brouillon (${verifyBlocks} blocs) a moins de contenu que l'original (${blocks.length} blocs)` };
+        }
       }
 
       // Publish
@@ -1270,7 +1334,13 @@ async function wixUpdatePostContent(
         ],
       }));
 
+      // SAFETY: existingFullNodes must have substantial content
+      if (existingFullNodes.length < 3) {
+        return { success: false, post_id: postId, url: "", error: `Wix: contenu existant trop court (${existingFullNodes.length} nodes) — abandon pour éviter l'écrasement` };
+      }
+
       const mergedNodes = [...existingFullNodes, ...newNodes];
+      console.log(`[wix/update] Direct PATCH: ${existingFullNodes.length} existing + ${newNodes.length} new = ${mergedNodes.length} total`);
 
       const directRes = await fetch(
         `https://www.wixapis.com/blog/v3/posts/${postId}`,
@@ -1323,7 +1393,15 @@ async function wixUpdatePostContent(
 
     // Step 4: Update the draft with appended richContent
     const baseNodes = (existingRc?.nodes?.length ?? 0) > 0 ? existingRc!.nodes! : existingFullNodes;
+
+    // SAFETY: baseNodes must have substantial content
+    if (baseNodes.length < 3) {
+      console.error(`[wix/update] ABORT: baseNodes only has ${baseNodes.length} nodes — would lose content`);
+      return { success: false, post_id: postId, url: "", error: `Wix: contenu de base trop court (${baseNodes.length} nodes) — abandon pour éviter l'écrasement` };
+    }
+
     const updatedNodes = [...baseNodes, ...newNodes];
+    console.log(`[wix/update] Post ${postId}: ${baseNodes.length} base nodes + ${newNodes.length} new = ${updatedNodes.length} total`);
 
     const updateDraftRes = await fetch(
       `https://www.wixapis.com/blog/v3/draft-posts/${draftId}`,
@@ -1336,6 +1414,18 @@ async function wixUpdatePostContent(
     if (!updateDraftRes.ok) {
       const errText = (await updateDraftRes.text()).slice(0, 300);
       return { success: false, post_id: postId, url: "", error: `Wix update draft failed (${updateDraftRes.status}): ${errText}` };
+    }
+
+    // SAFETY: verify draft content before publishing
+    const verifyDraftRes = await fetch(`https://www.wixapis.com/blog/v3/draft-posts/${draftId}?fieldsets=CONTENT_TEXT`, { headers: hdrs });
+    if (verifyDraftRes.ok) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const verifyData = await verifyDraftRes.json() as any;
+      const verifyNodeCount = verifyData.draftPost?.richContent?.nodes?.length ?? 0;
+      if (verifyNodeCount < baseNodes.length) {
+        console.error(`[wix/update] ABORT PUBLISH: draft has ${verifyNodeCount} nodes but original had ${baseNodes.length} — content loss detected`);
+        return { success: false, post_id: postId, url: "", error: `Wix: abandon — le brouillon (${verifyNodeCount} nodes) a moins de contenu que l'original (${baseNodes.length} nodes)` };
+      }
     }
 
     // Step 5: Publish the draft
