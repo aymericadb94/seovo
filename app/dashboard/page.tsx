@@ -91,6 +91,8 @@ export default function Dashboard() {
   const [cmsPagesLoading, setCmsPagesLoading] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [calRange, setCalRange] = useState<7 | 30 | 90>(90);
+  const [calHover, setCalHover] = useState<{ date: string; count: number; x: number; y: number } | null>(null);
 
   // ── Tutorial (0=score, 1=cocon, 2=potentiel, 3=roadmap, 4=libre) ─────────────
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
@@ -2622,50 +2624,181 @@ export default function Dashboard() {
                   })()}
                 </div>
 
-                <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover">
-                  <div className="flex items-center justify-between mb-5">
-                    <div>
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Activité éditoriale</p>
-                      <p className="text-xl font-black text-white">90 derniers jours</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                      <span>Moins</span>
-                      {["bg-white/[0.05]", "bg-orange-900/60", "bg-orange-600/60", "bg-orange-500", "bg-orange-400"].map((c, i) => (
-                        <div key={i} className={`w-3 h-3 rounded-sm ${c}`} />
-                      ))}
-                      <span>Plus</span>
-                    </div>
-                  </div>
-                  <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(13, minmax(0, 1fr))" }}>
-                    {Array.from({ length: 13 }).map((_, weekIdx) => (
-                      <div key={weekIdx} className="flex flex-col gap-1">
-                        {Array.from({ length: 7 }).map((_, dayIdx) => {
-                          const cellIdx = weekIdx * 7 + dayIdx;
-                          const entry = data.calendarData[cellIdx];
-                          if (!entry) return <div key={dayIdx} className="w-full aspect-square" />;
-                          const intensity = entry.count === 0 ? 0 : entry.count === 1 ? 1 : entry.count === 2 ? 2 : 3;
-                          const colors = ["bg-white/[0.05]", "bg-orange-800/70", "bg-orange-600/80", "bg-orange-500"];
-                          const isToday = entry.date === new Date().toISOString().split("T")[0];
-                          return (
-                            <div key={dayIdx} title={`${entry.date} — ${entry.count} article${entry.count !== 1 ? "s" : ""}`} className={`w-full aspect-square rounded-sm ${colors[intensity]} ${isToday ? "ring-1 ring-orange-400" : ""} transition-all hover:scale-125 cursor-default`} />
-                          );
-                        })}
+                {/* ── Calendrier d'activité ──────────────────────────────────── */}
+                {(() => {
+                  const todayStr = new Date().toISOString().split("T")[0];
+                  const sliced = data.calendarData.slice(-(calRange));
+                  const totalPubs = sliced.reduce((s, d) => s + d.count, 0);
+                  const activeDays = sliced.filter(d => d.count > 0).length;
+                  const maxCount = Math.max(...sliced.map(d => d.count), 1);
+                  const weekCount = calRange === 7 ? 1 : calRange === 30 ? 5 : 13;
+                  const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+                  const pubs = data.recentPublications ?? [];
+
+                  return (
+                    <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover overflow-hidden">
+                      {/* Glow background */}
+                      <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full opacity-[0.04] pointer-events-none" style={{ background: "radial-gradient(circle, #f97316, transparent 70%)" }} />
+
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-6 relative">
+                        <div>
+                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Activité éditoriale</p>
+                          <div className="flex items-center gap-3">
+                            <p className="text-xl font-black text-white">{calRange} derniers jours</p>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-orange-400 text-sm font-bold">{totalPubs}</span>
+                              <span className="text-gray-600 text-xs">article{totalPubs !== 1 ? "s" : ""}</span>
+                              <span className="text-gray-700 mx-1">·</span>
+                              <span className="text-green-400/80 text-sm font-bold">{activeDays}</span>
+                              <span className="text-gray-600 text-xs">jour{activeDays !== 1 ? "s" : ""} actif{activeDays !== 1 ? "s" : ""}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {([7, 30, 90] as const).map(r => (
+                            <button key={r} onClick={() => setCalRange(r)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-300 ${calRange === r ? "bg-orange-500/20 text-orange-400 shadow-[0_0_12px_rgba(249,115,22,0.15)]" : "bg-white/[0.04] text-gray-600 hover:bg-white/[0.08] hover:text-gray-400"}`}>
+                              {r}j
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between mt-3 text-xs text-gray-700">
-                    {(() => {
-                      const labels: string[] = [];
-                      const today = new Date();
-                      for (let w = 12; w >= 0; w -= 4) {
-                        const d = new Date(today);
-                        d.setDate(d.getDate() - w * 7);
-                        labels.push(d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }));
-                      }
-                      return labels.map((l, i) => <span key={i}>{l}</span>);
-                    })()}
-                  </div>
-                </div>
+
+                      {/* Heatmap grid */}
+                      <div className="flex gap-0">
+                        {/* Day labels */}
+                        {calRange !== 7 && (
+                          <div className="flex flex-col gap-[3px] mr-2 pt-0">
+                            {dayNames.map((name, i) => (
+                              <div key={i} className="h-0 flex items-center" style={{ height: calRange === 30 ? "28px" : "14px" }}>
+                                {i % 2 === 0 && <span className="text-[10px] text-gray-700 font-medium">{name}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          {calRange === 7 ? (
+                            /* ── Vue 7 jours : barres horizontales ── */
+                            <div className="space-y-2">
+                              {sliced.map((entry, i) => {
+                                const d = new Date(entry.date + "T12:00:00");
+                                const isToday = entry.date === todayStr;
+                                const pct = maxCount > 0 ? (entry.count / maxCount) * 100 : 0;
+                                const dayPubs = pubs.filter(p => p.published_at.startsWith(entry.date));
+                                return (
+                                  <div key={i} className={`group flex items-center gap-3 p-2.5 rounded-xl transition-all duration-300 ${isToday ? "bg-orange-500/[0.08] ring-1 ring-orange-500/20" : "hover:bg-white/[0.03]"}`} style={{ animationDelay: `${i * 60}ms` }}>
+                                    <div className="w-16 flex-shrink-0 text-center">
+                                      <p className={`text-xs font-bold uppercase ${isToday ? "text-orange-400" : "text-gray-500"}`}>
+                                        {d.toLocaleDateString("fr-FR", { weekday: "short" })}
+                                      </p>
+                                      <p className={`text-lg font-black ${isToday ? "text-white" : "text-gray-400"}`}>{d.getDate()}</p>
+                                    </div>
+                                    <div className="flex-1 relative">
+                                      <div className="h-8 bg-white/[0.04] rounded-lg overflow-hidden">
+                                        <div className="h-full rounded-lg transition-all duration-700 ease-out" style={{ width: `${Math.max(pct, entry.count > 0 ? 8 : 0)}%`, background: entry.count === 0 ? "transparent" : `linear-gradient(90deg, rgba(249,115,22,${0.3 + (pct/100)*0.5}), rgba(251,146,60,${0.4 + (pct/100)*0.5}))`, transitionDelay: `${i * 80}ms` }} />
+                                      </div>
+                                    </div>
+                                    <div className="w-8 text-right">
+                                      <span className={`text-sm font-black ${entry.count > 0 ? "text-orange-400" : "text-gray-700"}`}>{entry.count}</span>
+                                    </div>
+                                    {/* Détails au hover */}
+                                    {dayPubs.length > 0 && (
+                                      <div className="hidden group-hover:block absolute left-20 right-12 top-10 z-10 bg-gray-900/95 backdrop-blur-sm border border-white/10 rounded-xl p-3 shadow-2xl">
+                                        {dayPubs.map((p, j) => (
+                                          <div key={j} className="flex items-center gap-2 py-1">
+                                            <div className="w-1 h-1 rounded-full bg-orange-400" />
+                                            <span className="text-xs text-gray-300 truncate">{p.title}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            /* ── Vue 30/90 jours : grille heatmap ── */
+                            <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${weekCount}, minmax(0, 1fr))` }}>
+                              {Array.from({ length: weekCount }).map((_, weekIdx) => (
+                                <div key={weekIdx} className="flex flex-col gap-[3px]">
+                                  {Array.from({ length: 7 }).map((_, dayIdx) => {
+                                    const cellIdx = weekIdx * 7 + dayIdx;
+                                    const entry = sliced[cellIdx];
+                                    if (!entry) return <div key={dayIdx} className="w-full rounded-[3px]" style={{ aspectRatio: "1" }} />;
+                                    const isToday = entry.date === todayStr;
+                                    const ratio = maxCount > 0 ? entry.count / maxCount : 0;
+                                    const dayPubs = pubs.filter(p => p.published_at.startsWith(entry.date));
+                                    const d = new Date(entry.date + "T12:00:00");
+                                    return (
+                                      <div
+                                        key={dayIdx}
+                                        className={`group relative w-full rounded-[3px] cursor-default transition-all duration-200 hover:scale-[1.4] hover:z-10 hover:rounded-md ${isToday ? "ring-1.5 ring-orange-400/80 ring-offset-1 ring-offset-gray-950" : ""}`}
+                                        style={{
+                                          aspectRatio: "1",
+                                          background: entry.count === 0
+                                            ? "rgba(255,255,255,0.03)"
+                                            : `rgba(249, 115, 22, ${0.15 + ratio * 0.75})`,
+                                          boxShadow: entry.count > 0 ? `0 0 ${4 + ratio * 8}px rgba(249,115,22,${ratio * 0.3})` : "none",
+                                        }}
+                                      >
+                                        {/* Tooltip */}
+                                        <div className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
+                                          <div className="bg-gray-900/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 shadow-2xl whitespace-nowrap">
+                                            <p className="text-white text-xs font-bold">{d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</p>
+                                            <p className="text-orange-400 text-[11px] font-semibold mt-0.5">
+                                              {entry.count === 0 ? "Aucune publication" : `${entry.count} article${entry.count > 1 ? "s" : ""} publié${entry.count > 1 ? "s" : ""}`}
+                                            </p>
+                                            {dayPubs.length > 0 && (
+                                              <div className="mt-1.5 pt-1.5 border-t border-white/10">
+                                                {dayPubs.slice(0, 3).map((p, j) => (
+                                                  <p key={j} className="text-gray-400 text-[10px] truncate max-w-[200px]">{p.title}</p>
+                                                ))}
+                                                {dayPubs.length > 3 && <p className="text-gray-600 text-[10px]">+{dayPubs.length - 3} autres</p>}
+                                              </div>
+                                            )}
+                                          </div>
+                                          <div className="w-2 h-2 bg-gray-900/95 border-r border-b border-white/10 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Date labels */}
+                          {calRange !== 7 && (
+                            <div className="flex justify-between mt-2.5 text-[10px] text-gray-700 font-medium">
+                              {(() => {
+                                const labels: string[] = [];
+                                const total = calRange === 30 ? 5 : 13;
+                                const step = calRange === 30 ? 1 : 3;
+                                for (let w = total - 1; w >= 0; w -= step) {
+                                  const idx = w * 7;
+                                  if (sliced[idx]) {
+                                    const d = new Date(sliced[idx].date + "T12:00:00");
+                                    labels.push(d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }));
+                                  }
+                                }
+                                return labels.reverse().map((l, i) => <span key={i}>{l}</span>);
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Legend */}
+                      <div className="flex items-center justify-end gap-1.5 mt-4 text-[10px] text-gray-600">
+                        <span>Moins</span>
+                        {[0, 0.2, 0.4, 0.7, 1].map((opacity, i) => (
+                          <div key={i} className="w-3 h-3 rounded-[2px] transition-transform hover:scale-125" style={{ background: opacity === 0 ? "rgba(255,255,255,0.03)" : `rgba(249, 115, 22, ${0.15 + opacity * 0.75})` }} />
+                        ))}
+                        <span>Plus</span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
                   <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-5">Prochaines publications planifiées</p>
