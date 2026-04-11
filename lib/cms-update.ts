@@ -1043,6 +1043,23 @@ async function wixUpdatePostContent(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let draftData: any = null;
 
+    // STEP 0: Fetch the FULL existing content BEFORE reverting (critical safety measure)
+    const getFullRes = await fetch(
+      `https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=CONTENT`,
+      { headers: hdrs }
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let existingFullNodes: WixRichNode[] = [];
+    if (getFullRes.ok) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fullData = await getFullRes.json() as any;
+      existingFullNodes = fullData.post?.richContent?.nodes ?? [];
+    }
+    // SAFETY: abort if we couldn't fetch existing content — never risk overwriting
+    if (existingFullNodes.length === 0) {
+      return { success: false, post_id: postId, url: "", error: "Wix: impossible de récupérer le contenu existant — abandon par sécurité" };
+    }
+
     // Strategy A: POST /revert/{postId}
     const revertRes = await fetch(
       `https://www.wixapis.com/blog/v3/draft-posts/revert/${postId}`,
@@ -1168,9 +1185,10 @@ async function wixUpdatePostContent(
     }));
 
     // Step 4: Update the draft with appended richContent
-    const updatedNodes = existingRc?.nodes
-      ? [...existingRc.nodes, ...newNodes]
-      : newNodes;
+    // CRITICAL: always use pre-fetched full content, never rely on draft response
+    // (draft from /revert may not include content, causing total data loss)
+    const baseNodes = (existingRc?.nodes?.length ?? 0) > 0 ? existingRc!.nodes! : existingFullNodes;
+    const updatedNodes = [...baseNodes, ...newNodes];
 
     const updateDraftRes = await fetch(
       `https://www.wixapis.com/blog/v3/draft-posts/${draftId}`,
