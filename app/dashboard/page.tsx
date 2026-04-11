@@ -2687,7 +2687,7 @@ export default function Dashboard() {
                                 <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60" />
                                 <p className="text-gray-400 text-sm">{kw}</p>
                               </div>
-                              <p className="text-gray-700 text-xs mt-0.5">Publication automatique à 8h00</p>
+                              <p className="text-gray-700 text-xs mt-0.5">Publication automatique à 13h00</p>
                             </div>
                             <span className="text-xs text-gray-600 bg-white/[0.04] px-2.5 py-1 rounded-full">Prévu</span>
                           </div>
