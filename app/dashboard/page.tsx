@@ -344,8 +344,12 @@ export default function Dashboard() {
       tutorialInitRef.current = false;
       setTutorialStep(0);
       setScoreBubbleStep(0);
+      // Auto-generate semantic cocoon after SEO analysis completes
+      if (!cocoonData && !cocoonLoading) {
+        generateCocoon();
+      }
     }
-  }, [showSeoModal]);
+  }, [showSeoModal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialise le tutoriel une seule fois après que l'analyse soit faite
   useEffect(() => {
