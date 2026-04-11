@@ -426,8 +426,10 @@ async function wixListPosts(
       }
 
       // Extract cover image from Wix coverMedia
-      const coverMedia = p.coverMedia as { image?: { url?: string }; imageUrl?: string } | undefined;
-      const featuredImage = coverMedia?.image?.url ?? coverMedia?.imageUrl ?? null;
+      const coverMedia = p.coverMedia as Record<string, unknown> | undefined;
+      console.log(`[WIX] coverMedia for "${title}":`, JSON.stringify(coverMedia));
+      const img = coverMedia?.image as { url?: string } | undefined;
+      const featuredImage = img?.url ?? (coverMedia?.imageUrl as string) ?? null;
 
       // Extract publish date
       const firstPublished = (p.firstPublishedDate ?? p.publishedDate ?? p.lastPublishedDate) as string | undefined;
