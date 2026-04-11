@@ -123,6 +123,7 @@ export default function LinkingGraph() {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeInsight, setActiveInsight] = useState<string | null>(null); // "orphans" | "underlinked" | "weak_clusters" | null
   const [selectedSuggestionIds, setSelectedSuggestionIds] = useState<Set<number>>(new Set());
   const [applying, setApplying] = useState(false);
   const [applyingNode, setApplyingNode] = useState(false);
@@ -978,38 +979,57 @@ export default function LinkingGraph() {
       {/* ── Insights bar ─────────────────────────────────────────────────── */}
       {insights.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {insights.map((insight, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                if (insight.action) {
-                  setShowSuggestions(true);
-                  // Scroll to suggestions
-                  setTimeout(() => {
-                    document.getElementById("suggestions-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }, 100);
-                }
-              }}
-              title={insight.tooltip}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-[1.03] active:scale-[0.97]"
-              style={{
-                background: insight.type === "warning" ? "rgba(239,68,68,0.08)" : insight.type === "success" ? "rgba(34,197,94,0.08)" : "rgba(59,130,246,0.08)",
-                border: `1px solid ${insight.type === "warning" ? "rgba(239,68,68,0.2)" : insight.type === "success" ? "rgba(34,197,94,0.2)" : "rgba(59,130,246,0.2)"}`,
-                color: insight.type === "warning" ? "#ef4444" : insight.type === "success" ? "#22c55e" : "#3b82f6",
-                cursor: insight.action ? "pointer" : "default",
-              }}
-            >
-              <span>{insight.icon}</span> {insight.label}
-              {insight.count != null && insight.count > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black" style={{
-                  background: "rgba(249,115,22,0.2)", color: "#f97316",
-                }}>
-                  {insight.count} fix
-                </span>
-              )}
-            </button>
-          ))}
+          {insights.map((insight, i) => {
+            const isActive = insight.action === activeInsight;
+            return (
+              <button
+                key={i}
+                onClick={() => {
+                  if (insight.action) {
+                    setActiveInsight(prev => prev === insight.action ? null : (insight.action ?? null));
+                    setShowSuggestions(false);
+                  }
+                }}
+                title={insight.tooltip}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-[1.03] active:scale-[0.97]"
+                style={{
+                  background: isActive
+                    ? (insight.type === "warning" ? "rgba(239,68,68,0.18)" : "rgba(59,130,246,0.18)")
+                    : (insight.type === "warning" ? "rgba(239,68,68,0.08)" : insight.type === "success" ? "rgba(34,197,94,0.08)" : "rgba(59,130,246,0.08)"),
+                  border: `1px solid ${isActive
+                    ? (insight.type === "warning" ? "rgba(239,68,68,0.45)" : "rgba(59,130,246,0.45)")
+                    : (insight.type === "warning" ? "rgba(239,68,68,0.2)" : insight.type === "success" ? "rgba(34,197,94,0.2)" : "rgba(59,130,246,0.2)")}`,
+                  color: insight.type === "warning" ? "#ef4444" : insight.type === "success" ? "#22c55e" : "#3b82f6",
+                  cursor: insight.action ? "pointer" : "default",
+                }}
+              >
+                <span>{insight.icon}</span> {insight.label}
+                {insight.count != null && insight.count > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black" style={{
+                    background: "rgba(249,115,22,0.2)", color: "#f97316",
+                  }}>
+                    {insight.count} fix
+                  </span>
+                )}
+                {isActive && <span className="ml-0.5 text-[10px]">▾</span>}
+              </button>
+            );
+          })}
         </div>
+      )}
+
+      {/* ── Problem-Solution Panel (contextual) ─────────────────────────── */}
+      {activeInsight && data && (
+        <ProblemSolutionPanel
+          type={activeInsight}
+          data={data}
+          appliedLinks={appliedLinks}
+          applyingNode={applyingNode}
+          onApply={async (suggestions) => {
+            await applyNodeSuggestions(suggestions);
+          }}
+          onClose={() => setActiveInsight(null)}
+        />
       )}
 
       {/* ── Relaunch banner (when data seems stale) ────────────────────── */}
@@ -1072,14 +1092,14 @@ export default function LinkingGraph() {
 
         <div className="ml-auto flex gap-2">
           <button
-            onClick={() => setShowSuggestions(!showSuggestions)}
+            onClick={() => { setShowSuggestions(!showSuggestions); setActiveInsight(null); }}
             className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
               showSuggestions
                 ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
                 : "bg-white/[0.04] text-gray-500 border border-white/[0.06] hover:text-gray-300"
             }`}
           >
-            Suggestions
+            Toutes les suggestions
           </button>
           <button
             onClick={() => { runAnalysis(); }}
@@ -1410,17 +1430,6 @@ export default function LinkingGraph() {
               </button>
             </div>
           </div>
-
-          {/* Contextual explanation */}
-          {data.orphan_pages.length > 0 && (
-            <div className="mb-4 rounded-xl p-3 text-xs" style={{ background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.15)" }}>
-              <p className="text-orange-400 font-bold mb-1">Comment corriger les pages orphelines ?</p>
-              <p className="text-orange-300/70">
-                Les suggestions ci-dessous ajoutent des liens depuis vos articles existants vers les pages isolées.
-                Sélectionnez les liens pertinents puis cliquez {'"'}Appliquer{'"'} — RankPill injectera automatiquement les liens dans vos articles.
-              </p>
-            </div>
-          )}
 
           {/* Apply result feedback */}
           {applyResult && (
@@ -1853,6 +1862,322 @@ function LinkAppliedPopup({
           to { opacity: 1; transform: translateX(0); }
         }
       `}</style>
+    </div>
+  );
+}
+
+// ── Problem-Solution Panel ──────────────────────────────────────────────────
+
+function ProblemSolutionPanel({
+  type,
+  data,
+  appliedLinks,
+  applyingNode,
+  onApply,
+  onClose,
+}: {
+  type: string;
+  data: LinkingData;
+  appliedLinks: Set<string>;
+  applyingNode: boolean;
+  onApply: (suggestions: Suggestion[]) => Promise<void>;
+  onClose: () => void;
+}) {
+  // Group suggestions by affected page depending on panel type
+  if (type === "orphans") {
+    const orphanUrls = new Set(data.orphan_pages.map(p => p.url));
+    // Group suggestions where to_url is an orphan page
+    const grouped = new Map<string, { page: OrphanPage; suggestions: Suggestion[] }>();
+    for (const op of data.orphan_pages) {
+      grouped.set(op.url, { page: op, suggestions: [] });
+    }
+    for (const s of data.suggestions) {
+      if (orphanUrls.has(s.to_url) && grouped.has(s.to_url)) {
+        grouped.get(s.to_url)!.suggestions.push(s);
+      }
+    }
+
+    return (
+      <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 animate-[fadeSlideIn_0.25s_ease-out]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-red-500/15 flex items-center justify-center text-red-400 text-sm">⚠</div>
+            <div>
+              <p className="text-white font-bold text-sm">{data.orphan_pages.length} page{data.orphan_pages.length > 1 ? "s" : ""} orpheline{data.orphan_pages.length > 1 ? "s" : ""}</p>
+              <p className="text-gray-500 text-xs">Ces pages n{"'"}ont aucun lien entrant — Google ne peut pas les découvrir.</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-300 text-sm px-2">✕</button>
+        </div>
+
+        <div className="space-y-3">
+          {[...grouped.values()].map(({ page, suggestions: pageSuggs }, idx) => (
+            <PageFixCard
+              key={idx}
+              title={page.title}
+              subtitle={page.reason}
+              icon="🔴"
+              suggestions={pageSuggs}
+              appliedLinks={appliedLinks}
+              applyingNode={applyingNode}
+              onApply={onApply}
+              direction="incoming"
+            />
+          ))}
+        </div>
+
+        <style jsx>{`
+          @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (type === "underlinked") {
+    const underlinkedUrls = new Set(data.underlinked_pages.map(p => p.url));
+    const grouped = new Map<string, { page: UnderlinkedPage; suggestions: Suggestion[] }>();
+    for (const up of data.underlinked_pages) {
+      grouped.set(up.url, { page: up, suggestions: [] });
+    }
+    for (const s of data.suggestions) {
+      if (underlinkedUrls.has(s.to_url) && grouped.has(s.to_url)) {
+        grouped.get(s.to_url)!.suggestions.push(s);
+      }
+    }
+
+    return (
+      <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 animate-[fadeSlideIn_0.25s_ease-out]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-orange-500/15 flex items-center justify-center text-orange-400 text-sm">🔗</div>
+            <div>
+              <p className="text-white font-bold text-sm">{data.underlinked_pages.length} page{data.underlinked_pages.length > 1 ? "s" : ""} sous-liée{data.underlinked_pages.length > 1 ? "s" : ""}</p>
+              <p className="text-gray-500 text-xs">Ces pages ont trop peu de liens entrants pour leur importance SEO.</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-300 text-sm px-2">✕</button>
+        </div>
+
+        <div className="space-y-3">
+          {[...grouped.values()].map(({ page, suggestions: pageSuggs }, idx) => (
+            <PageFixCard
+              key={idx}
+              title={page.title}
+              subtitle={`${page.incoming} lien${page.incoming > 1 ? "s" : ""} entrant${page.incoming > 1 ? "s" : ""} — ${page.needed} recommandé${page.needed > 1 ? "s" : ""}`}
+              icon="⚡"
+              suggestions={pageSuggs}
+              appliedLinks={appliedLinks}
+              applyingNode={applyingNode}
+              onApply={onApply}
+              direction="incoming"
+            />
+          ))}
+        </div>
+
+        <style jsx>{`
+          @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (type === "weak_clusters") {
+    const weakClusters = data.cluster_analysis.filter(c => c.strength_score < 40);
+    // For weak clusters, group suggestions where both from and to are in the same cluster
+    const clusterSuggestions = new Map<string, Suggestion[]>();
+    for (const wc of weakClusters) {
+      clusterSuggestions.set(wc.name, []);
+    }
+    // Pages per cluster
+    const clusterPageUrls = new Map<string, Set<string>>();
+    for (const wc of weakClusters) {
+      const urls = new Set<string>();
+      for (const pp of data.page_profiles) {
+        if (pp.cluster === wc.name) urls.add(pp.url);
+      }
+      clusterPageUrls.set(wc.name, urls);
+    }
+    // Match suggestions to clusters (source or target is in the cluster)
+    for (const s of data.suggestions) {
+      for (const [clusterName, urls] of clusterPageUrls) {
+        if (urls.has(s.from_url) || urls.has(s.to_url)) {
+          clusterSuggestions.get(clusterName)?.push(s);
+        }
+      }
+    }
+
+    return (
+      <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 animate-[fadeSlideIn_0.25s_ease-out]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-purple-500/15 flex items-center justify-center text-purple-400 text-sm">📊</div>
+            <div>
+              <p className="text-white font-bold text-sm">{weakClusters.length} cluster{weakClusters.length > 1 ? "s" : ""} faible{weakClusters.length > 1 ? "s" : ""}</p>
+              <p className="text-gray-500 text-xs">Clusters thématiques mal interconnectés — renforcez les liens entre ces pages.</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-300 text-sm px-2">✕</button>
+        </div>
+
+        <div className="space-y-4">
+          {weakClusters.map((wc, idx) => {
+            const suggs = clusterSuggestions.get(wc.name) ?? [];
+            return (
+              <div key={idx} className="rounded-xl border border-white/[0.06] overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 bg-white/[0.02]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: CLUSTER_COLORS[idx % CLUSTER_COLORS.length].main }} />
+                    <span className="text-white font-bold text-xs">{wc.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                    <span>Force : <span className={`font-bold ${wc.strength_score < 20 ? "text-red-400" : "text-orange-400"}`}>{wc.strength_score}/100</span></span>
+                    <span>{wc.pages.length} pages</span>
+                    <span>{wc.missing_links} liens manquants</span>
+                  </div>
+                </div>
+                {suggs.length > 0 ? (
+                  <div className="px-4 py-2 space-y-1">
+                    {suggs.slice(0, 5).map((s, si) => {
+                      const key = `${s.from_title}|${s.to_title}|${s.anchor}`;
+                      const done = appliedLinks.has(key);
+                      return (
+                        <div key={si} className={`flex items-center gap-2 py-1.5 border-b border-white/[0.03] last:border-0 ${done ? "opacity-40" : ""}`}>
+                          <span className="text-orange-400 text-[10px]">→</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-gray-300 text-[11px]">
+                              <span className="text-gray-500">{truncate(s.from_title, 25)}</span>
+                              <span className="text-orange-400 mx-1.5">→</span>
+                              <span>{truncate(s.to_title, 25)}</span>
+                            </p>
+                            <p className="text-orange-400/60 text-[10px]">ancre : {s.anchor}</p>
+                          </div>
+                          {done ? (
+                            <span className="text-green-400 text-xs">✓</span>
+                          ) : (
+                            <button
+                              onClick={() => onApply([s])}
+                              disabled={applyingNode}
+                              className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 transition-colors disabled:opacity-30 flex-shrink-0"
+                            >
+                              Appliquer
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {suggs.length > 5 && (
+                      <p className="text-gray-600 text-[10px] py-1">+{suggs.length - 5} autres suggestions</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="px-4 py-3 text-gray-600 text-[10px]">Publiez plus de pages dans ce cluster pour améliorer son score.</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <style jsx>{`
+          @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// ── Page Fix Card (used in Problem-Solution Panel) ─────────────────────────
+
+function PageFixCard({
+  title,
+  subtitle,
+  icon,
+  suggestions,
+  appliedLinks,
+  applyingNode,
+  onApply,
+  direction,
+}: {
+  title: string;
+  subtitle: string;
+  icon: string;
+  suggestions: Suggestion[];
+  appliedLinks: Set<string>;
+  applyingNode: boolean;
+  onApply: (suggestions: Suggestion[]) => Promise<void>;
+  direction: "incoming" | "outgoing";
+}) {
+  return (
+    <div className="rounded-xl border border-white/[0.06] overflow-hidden">
+      {/* Page header */}
+      <div className="flex items-center gap-2.5 px-4 py-3 bg-white/[0.02]">
+        <span className="text-xs">{icon}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-white font-bold text-xs truncate">{title}</p>
+          <p className="text-gray-600 text-[10px]">{subtitle}</p>
+        </div>
+        {suggestions.length > 0 && (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400">
+            {suggestions.length} fix
+          </span>
+        )}
+      </div>
+
+      {/* Fix suggestions for this page */}
+      {suggestions.length > 0 ? (
+        <div className="px-4 py-2 space-y-1">
+          <p className="text-[10px] text-gray-600 mb-1.5">
+            {direction === "incoming"
+              ? "Ajouter un lien depuis ces articles :"
+              : "Ajouter un lien vers ces articles :"}
+          </p>
+          {suggestions.map((s, i) => {
+            const key = `${s.from_title}|${s.to_title}|${s.anchor}`;
+            const done = appliedLinks.has(key);
+            return (
+              <div key={i} className={`flex items-center gap-2 py-1.5 border-b border-white/[0.03] last:border-0 ${done ? "opacity-40" : ""}`}>
+                <span className="text-green-400 text-[10px]">←</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-gray-300 text-[11px] truncate">{s.from_title}</p>
+                  <p className="text-orange-400/60 text-[10px] truncate">ancre : &quot;{s.anchor}&quot;</p>
+                </div>
+                {done ? (
+                  <span className="text-green-400 text-xs">✓</span>
+                ) : (
+                  <button
+                    onClick={() => onApply([s])}
+                    disabled={applyingNode}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 transition-colors disabled:opacity-30 flex-shrink-0"
+                  >
+                    Appliquer
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {suggestions.length > 1 && (
+            <button
+              onClick={() => onApply(suggestions.filter(s => !appliedLinks.has(`${s.from_title}|${s.to_title}|${s.anchor}`)))}
+              disabled={applyingNode}
+              className="w-full mt-2 py-1.5 rounded-lg text-[10px] font-bold bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors disabled:opacity-30"
+            >
+              {applyingNode ? "Application..." : `Tout appliquer (${suggestions.filter(s => !appliedLinks.has(`${s.from_title}|${s.to_title}|${s.anchor}`)).length})`}
+            </button>
+          )}
+        </div>
+      ) : (
+        <p className="px-4 py-3 text-gray-600 text-[10px]">Aucune suggestion automatique — ajoutez manuellement un lien vers cette page.</p>
+      )}
     </div>
   );
 }
