@@ -67,6 +67,7 @@ type DashboardData = {
     page_type: "article" | "page";
   }[];
   plannedKeywords: string[];
+  plannedItems: { keyword: string; source: "roadmap" | "keyword"; role?: string; reason?: string }[];
 };
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -2669,27 +2670,34 @@ export default function Dashboard() {
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
                   <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-5">Prochaines publications planifiées</p>
                   <div className="space-y-3">
-                    {(data.plannedKeywords?.length > 0 ? data.plannedKeywords : []).length === 0 ? (
+                    {(data.plannedItems?.length ?? 0) === 0 ? (
                       <p className="text-gray-600 text-sm py-4 text-center">Aucun mot-clé non couvert — tous les articles sont publiés !</p>
                     ) : (
-                      data.plannedKeywords.slice(0, 7).map((kw, i) => {
+                      data.plannedItems.slice(0, 7).map((item, i) => {
                         const d = new Date();
                         d.setDate(d.getDate() + i + 1);
-                        d.setHours(8, 0, 0, 0);
+                        d.setHours(13, 0, 0, 0);
+                        const sourceLabel = item.source === "roadmap" ? "Roadmap SEO" : "Mot-clé configuré";
+                        const roleLabel = item.role === "pilier" ? "Page pilier" : item.role === "support" ? "Page support" : item.role === "cluster" ? "Cluster" : null;
                         return (
-                          <div key={i} className="flex items-center gap-4 py-2.5 border-b border-white/[0.04] last:border-0">
+                          <div key={i} className="flex items-center gap-4 py-3 border-b border-white/[0.04] last:border-0">
                             <div className="w-12 text-center flex-shrink-0">
                               <p className="text-white font-black text-sm">{d.getDate()}</p>
                               <p className="text-gray-600 text-xs">{d.toLocaleDateString("fr-FR", { month: "short" })}</p>
                             </div>
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60" />
-                                <p className="text-gray-400 text-sm">{kw}</p>
+                                <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60 flex-shrink-0" />
+                                <p className="text-white text-sm font-medium truncate">{item.keyword}</p>
                               </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/[0.06] text-gray-500">{sourceLabel}</span>
+                                {roleLabel && <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400/70">{roleLabel}</span>}
+                              </div>
+                              {item.reason && <p className="text-gray-600 text-xs mt-1 truncate">{item.reason}</p>}
                               <p className="text-gray-700 text-xs mt-0.5">Publication automatique à 13h00</p>
                             </div>
-                            <span className="text-xs text-gray-600 bg-white/[0.04] px-2.5 py-1 rounded-full">Prévu</span>
+                            <span className="text-xs text-gray-600 bg-white/[0.04] px-2.5 py-1 rounded-full flex-shrink-0">Prévu</span>
                           </div>
                         );
                       })

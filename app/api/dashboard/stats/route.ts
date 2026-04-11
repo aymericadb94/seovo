@@ -401,29 +401,37 @@ export async function GET() {
       pubs.map(p => p.keyword?.toLowerCase()).filter(Boolean)
     );
 
-    const plannedKeywords: string[] = [];
-    // 1. Roadmap en priorité (comme le cron)
-    const roadmapArticlesRaw = (roadmapRow?.data as { articles?: { keyword: string; priority: number }[] } | null)?.articles;
+    type PlannedItem = { keyword: string; source: "roadmap" | "keyword"; role?: string; reason?: string };
+    const plannedItems: PlannedItem[] = [];
+    // 1. Roadmap en priorité (même logique que le cron)
+    type RoadmapArticle = { keyword: string; priority: number; role?: string; why_rank?: string; angle?: string };
+    const roadmapArticlesRaw = (roadmapRow?.data as { articles?: RoadmapArticle[] } | null)?.articles;
     if (roadmapArticlesRaw && roadmapArticlesRaw.length > 0) {
       const roadmapArticles = roadmapArticlesRaw
-        .filter((a: { keyword: string }) => a.keyword && !publishedKwSet.has(a.keyword.toLowerCase()))
-        .sort((a: { priority: number }, b: { priority: number }) => a.priority - b.priority);
+        .filter((a) => a.keyword && !publishedKwSet.has(a.keyword.toLowerCase()))
+        .sort((a, b) => a.priority - b.priority);
       for (const a of roadmapArticles) {
-        if (plannedKeywords.length >= 7) break;
-        plannedKeywords.push(a.keyword);
+        if (plannedItems.length >= 7) break;
+        plannedItems.push({
+          keyword: a.keyword,
+          source: "roadmap",
+          role: a.role,
+          reason: a.why_rank || a.angle,
+        });
         publishedKwSet.add(a.keyword.toLowerCase());
       }
     }
-    // 2. Rotation sur les mots-clés configurés (fallback, comme le cron)
-    if (plannedKeywords.length < 7 && allKeywords.length > 0) {
-      for (let i = 0; plannedKeywords.length < 7 && i < allKeywords.length; i++) {
-        const kw = allKeywords[i];
+    // 2. Rotation sur les mots-clés configurés (fallback, même offset que le cron)
+    if (plannedItems.length < 7 && allKeywords.length > 0) {
+      for (let i = 0; plannedItems.length < 7 && i < allKeywords.length; i++) {
+        const kw = allKeywords[(totalArticles + i) % allKeywords.length];
         if (!publishedKwSet.has(kw.toLowerCase())) {
-          plannedKeywords.push(kw);
+          plannedItems.push({ keyword: kw, source: "keyword" });
           publishedKwSet.add(kw.toLowerCase());
         }
       }
     }
+    const plannedKeywords = plannedItems.map(p => p.keyword);
 
     // ── Publications récentes (pour la table) ────────────────────────────────
     const recentPublications = pubs.map(p => ({
@@ -466,6 +474,7 @@ export async function GET() {
       calendarData,
       recentPublications,
       plannedKeywords,
+      plannedItems,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erreur inconnue";
