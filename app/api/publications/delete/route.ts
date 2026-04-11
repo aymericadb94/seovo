@@ -74,7 +74,7 @@ export async function POST(request: Request) {
         const { html: cleanedHtml, removed } = removeLinksToUrl(post.content, url);
         if (removed > 0) {
           const blogId = "blog_id" in post ? (post as { blog_id: number }).blog_id : undefined;
-          await updateCmsPost(creds, post.id, { content: cleanedHtml }, { blog_id: blogId });
+          await updateCmsPost(creds, post.id, { content: cleanedHtml }, { blog_id: blogId, supabase, userId: user.id, actionType: "remove_links_on_delete" });
           cleanedCount += removed;
         }
       }

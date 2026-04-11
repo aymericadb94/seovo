@@ -361,7 +361,7 @@ async function wixListPosts(
     let cursor: string | null = null;
 
     while (allPosts.length < limit) {
-      let url = `https://www.wixapis.com/blog/v3/posts?paging.limit=${perPage}&fieldsets=CONTENT&fieldsets=URL`;
+      let url = `https://www.wixapis.com/blog/v3/posts?paging.limit=${perPage}&fieldsets=CONTENT_TEXT&fieldsets=CONTENT&fieldsets=URL`;
       if (cursor) url += `&paging.offset=${allPosts.length}`;
       const res = await fetch(url, { headers: hdrs });
       if (!res.ok) break;
@@ -857,17 +857,31 @@ export async function updateCmsPost(
   updates: { content?: string; title?: string; excerpt?: string },
   extra?: { blog_id?: number; supabase?: SupabaseClient; userId?: string; actionType?: string }
 ): Promise<UpdateResult> {
-  // ── Snapshot before modification ──
+  // ── Snapshot before modification (MANDATORY for Wix) ──
   if (extra?.supabase && extra?.userId) {
     try {
       const currentPost = await getCmsPost(creds, postId);
       if (currentPost) {
+        // SAFETY: for Wix, verify snapshot has real content before proceeding
+        if (creds.cms === "wix" && (!currentPost.content || currentPost.content.length < 50)) {
+          console.error(`[cms-update] ABORT: snapshot content too short for Wix post ${postId} (${currentPost.content?.length ?? 0} chars) — refusing to modify`);
+          return { success: false, post_id: postId, url: "", error: "Impossible de sauvegarder le contenu actuel — abandon par sécurité" };
+        }
         await saveSnapshot(extra.supabase, extra.userId, currentPost, extra.actionType ?? "unknown");
+      } else if (creds.cms === "wix") {
+        console.error(`[cms-update] ABORT: could not fetch Wix post ${postId} for snapshot`);
+        return { success: false, post_id: postId, url: "", error: "Impossible de lire l'article existant — abandon par sécurité" };
       }
     } catch (err) {
-      console.error("[cms-update] snapshot failed (non-blocking):", err);
-      // Non-blocking: continue with the update even if snapshot fails
+      console.error("[cms-update] snapshot failed:", err);
+      if (creds.cms === "wix") {
+        return { success: false, post_id: postId, url: "", error: "Erreur lors de la sauvegarde préventive — abandon par sécurité" };
+      }
     }
+  } else if (creds.cms === "wix" && updates.content) {
+    // For Wix content updates, snapshot is MANDATORY
+    console.error(`[cms-update] ABORT: no supabase/userId for Wix snapshot on post ${postId}`);
+    return { success: false, post_id: postId, url: "", error: "Snapshot obligatoire pour les modifications Wix — paramètres manquants" };
   }
 
   switch (creds.cms) {
