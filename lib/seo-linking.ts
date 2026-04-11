@@ -838,22 +838,15 @@ function generateAnchor(
   return kw || cleanTitle || title;
 }
 
-/** Extract a meaningful key phrase from a title (skip filler words at the start) */
+/** Extract a meaningful key phrase from a title.
+ *  Strategy: take the first segment before ":" or "—" or "|", which is usually
+ *  the main topic. If no separator, use the full title. */
 function extractTitleKeyPhrase(title: string): string {
-  const TITLE_FILLER = new Set([
-    "le", "la", "les", "un", "une", "des", "du", "de", "d",
-    "guide", "ultime", "complet", "pour", "comment", "pourquoi",
-    "tout", "savoir", "sur", "notre", "votre", "mon", "ma",
-  ]);
-  const words = title.split(/\s+/);
-  // Skip leading filler words, keep the rest
-  let startIdx = 0;
-  while (startIdx < words.length - 2 && TITLE_FILLER.has(words[startIdx].toLowerCase())) {
-    startIdx++;
-  }
-  const meaningful = words.slice(startIdx);
-  // Take 3-5 meaningful words
-  return meaningful.slice(0, Math.min(5, meaningful.length)).join(" ");
+  // Split on common title separators and take the most meaningful part
+  const segments = title.split(/\s*[:\|—–]\s*/);
+  // Pick the first segment that has at least 3 words (the main topic)
+  const main = segments.find(s => s.trim().split(/\s+/).length >= 3) ?? segments[0];
+  return main.trim();
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
