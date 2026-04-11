@@ -435,13 +435,15 @@ export async function publishToWix(
       const wixImg = await importImageToWix(apiKey, siteId, pexelsImg.url, imageAlt || title);
       if (wixImg) {
         console.log(`[wix/cover] image importée: id=${wixImg.id}, url=${wixImg.url}`);
-        // Wix Blog v3 expects media.wixMedia.image as a wix:image:// URI string
-        const wixImageUri = wixImg.url.startsWith("wix:image://")
-          ? wixImg.url
-          : `wix:image://v1/${wixImg.id}/cover.jpg#originWidth=${wixImg.width}&originHeight=${wixImg.height}`;
+        // Wix Blog v3 expects media.wixMedia.image as an object { id, url, height, width }
         mediaData = {
           wixMedia: {
-            image: wixImageUri,
+            image: {
+              id: wixImg.id,
+              url: wixImg.url,
+              height: wixImg.height,
+              width: wixImg.width,
+            },
           },
           displayed: true,
         };
