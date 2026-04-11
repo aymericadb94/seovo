@@ -85,7 +85,7 @@ export default function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [pubFilter, setPubFilter] = useState<"all" | "articles" | "pages" | "indexed" | "not_indexed">("all");
-  const [cmsPages, setCmsPages] = useState<{ id: string; title: string; url: string; keyword: string; published_at: string; page_type: "article" | "page"; cover_image?: string | null }[]>([]);
+  const [cmsPages, setCmsPages] = useState<{ id: string; title: string; url: string; keyword: string; published_at: string; page_type: "article" | "page"; cover_image?: string | null; cms_id?: string | number; blog_id?: number }[]>([]);
   const [cmsPagesLoading, setCmsPagesLoading] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -397,7 +397,7 @@ export default function Dashboard() {
       });
       const json = await res.json();
       if (json.success) {
-        setCmsPages(prev => prev.filter(p => String(p.id) !== String(postId)));
+        setCmsPages(prev => prev.filter(p => String(p.cms_id) !== String(postId)));
       }
     } catch { /* ignore */ }
     finally {
@@ -2250,7 +2250,7 @@ export default function Dashboard() {
                                         Annuler
                                       </button>
                                       <button
-                                        onClick={() => deletePublication(String(pub.id), pub.url)}
+                                        onClick={() => deletePublication(String(pub.cms_id ?? pub.id), pub.url, pub.blog_id)}
                                         disabled={isDeleting}
                                         className="px-4 py-1.5 rounded-lg text-xs font-bold bg-red-500/80 text-white hover:bg-red-500 transition-colors disabled:opacity-50"
                                       >
