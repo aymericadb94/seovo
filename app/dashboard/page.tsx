@@ -380,6 +380,7 @@ export default function Dashboard() {
       const res = await fetch("/api/publications/list");
       const json = await res.json();
       if (json.pages) {
+        console.log("[PAGES] first page sample:", JSON.stringify(json.pages[0]));
         setCmsPages(json.pages);
         if (json.synced > 0) setSyncResult(`${json.synced} page(s) auto-synchronisée(s)`);
       }
@@ -389,7 +390,10 @@ export default function Dashboard() {
 
   async function deletePublication(pub: typeof cmsPages[number]) {
     const uiId = String(pub.id);
-    const cmsId = String(pub.cms_id ?? pub.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawPub = pub as any;
+    const cmsId = String(rawPub.cms_id ?? pub.id);
+    console.log("[DELETE] pub object keys:", Object.keys(pub), "cms_id:", rawPub.cms_id, "id:", pub.id, "resolved cmsId:", cmsId);
     setDeletingPostId(uiId);
     try {
       const res = await fetch("/api/publications/delete", {
