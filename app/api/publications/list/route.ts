@@ -78,6 +78,8 @@ export async function GET() {
       const published_at = item.published_at ?? match?.published_at ?? new Date().toISOString();
       return {
         id: match?.id ?? `cms-${i}`,
+        cms_id: item.id,
+        blog_id: "blog_id" in item ? (item as { blog_id: number }).blog_id : undefined,
         title: item.title,
         url: item.url,
         keyword: (match?.keyword && match.keyword !== "__page__") ? match.keyword : "",
