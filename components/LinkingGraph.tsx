@@ -640,18 +640,35 @@ export default function LinkingGraph() {
   // ── Insights ──────────────────────────────────────────────────────────────
   const insights = useMemo(() => {
     if (!data) return [];
-    const items: { icon: string; label: string; type: "warning" | "info" | "success" }[] = [];
+    const items: { icon: string; label: string; type: "warning" | "info" | "success"; action?: string; count?: number; tooltip?: string }[] = [];
 
     if (data.orphan_pages.length > 0) {
-      items.push({ icon: "⚠", label: `${data.orphan_pages.length} page(s) orpheline(s)`, type: "warning" });
+      // Count suggestions that target orphan pages
+      const orphanUrls = new Set(data.orphan_pages.map(p => p.url));
+      const fixCount = data.suggestions.filter(s => orphanUrls.has(s.to_url)).length;
+      items.push({
+        icon: "⚠", label: `${data.orphan_pages.length} page(s) orpheline(s)`,
+        type: "warning", action: "orphans", count: fixCount,
+        tooltip: "Pages sans aucun lien entrant — invisibles pour Google. Cliquez pour voir les suggestions de correction.",
+      });
     }
     if (data.underlinked_pages.length > 0) {
-      items.push({ icon: "🔗", label: `${data.underlinked_pages.length} page(s) sous-liée(s)`, type: "warning" });
+      const underlinkedUrls = new Set(data.underlinked_pages.map(p => p.url));
+      const fixCount = data.suggestions.filter(s => underlinkedUrls.has(s.to_url)).length;
+      items.push({
+        icon: "🔗", label: `${data.underlinked_pages.length} page(s) sous-liée(s)`,
+        type: "warning", action: "underlinked", count: fixCount,
+        tooltip: "Pages avec trop peu de liens entrants pour leur importance SEO. Cliquez pour voir les suggestions.",
+      });
     }
 
     const weakClusters = data.cluster_analysis.filter(c => c.strength_score < 40);
     if (weakClusters.length > 0) {
-      items.push({ icon: "📊", label: `${weakClusters.length} cluster(s) faible(s)`, type: "warning" });
+      items.push({
+        icon: "📊", label: `${weakClusters.length} cluster(s) faible(s)`,
+        type: "warning", action: "weak_clusters",
+        tooltip: "Clusters thématiques avec peu de pages publiées ou mal interconnectées.",
+      });
     }
 
     const overlinked = data.page_profiles.filter(p => p.outgoing > 5);
@@ -962,17 +979,35 @@ export default function LinkingGraph() {
       {insights.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {insights.map((insight, i) => (
-            <span
+            <button
               key={i}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+              onClick={() => {
+                if (insight.action) {
+                  setShowSuggestions(true);
+                  // Scroll to suggestions
+                  setTimeout(() => {
+                    document.getElementById("suggestions-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }, 100);
+                }
+              }}
+              title={insight.tooltip}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-[1.03] active:scale-[0.97]"
               style={{
                 background: insight.type === "warning" ? "rgba(239,68,68,0.08)" : insight.type === "success" ? "rgba(34,197,94,0.08)" : "rgba(59,130,246,0.08)",
                 border: `1px solid ${insight.type === "warning" ? "rgba(239,68,68,0.2)" : insight.type === "success" ? "rgba(34,197,94,0.2)" : "rgba(59,130,246,0.2)"}`,
                 color: insight.type === "warning" ? "#ef4444" : insight.type === "success" ? "#22c55e" : "#3b82f6",
+                cursor: insight.action ? "pointer" : "default",
               }}
             >
               <span>{insight.icon}</span> {insight.label}
-            </span>
+              {insight.count != null && insight.count > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black" style={{
+                  background: "rgba(249,115,22,0.2)", color: "#f97316",
+                }}>
+                  {insight.count} fix
+                </span>
+              )}
+            </button>
           ))}
         </div>
       )}
@@ -1349,7 +1384,7 @@ export default function LinkingGraph() {
 
       {/* ── Suggestions table ────────────────────────────────────────────── */}
       {showSuggestions && (
-        <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5">
+        <div id="suggestions-panel" className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-white font-bold text-sm">Suggestions de maillage</p>
@@ -1375,6 +1410,17 @@ export default function LinkingGraph() {
               </button>
             </div>
           </div>
+
+          {/* Contextual explanation */}
+          {data.orphan_pages.length > 0 && (
+            <div className="mb-4 rounded-xl p-3 text-xs" style={{ background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.15)" }}>
+              <p className="text-orange-400 font-bold mb-1">Comment corriger les pages orphelines ?</p>
+              <p className="text-orange-300/70">
+                Les suggestions ci-dessous ajoutent des liens depuis vos articles existants vers les pages isolées.
+                Sélectionnez les liens pertinents puis cliquez {'"'}Appliquer{'"'} — RankPill injectera automatiquement les liens dans vos articles.
+              </p>
+            </div>
+          )}
 
           {/* Apply result feedback */}
           {applyResult && (

@@ -258,9 +258,10 @@ function buildPageProfiles(
       ?? publications.find(p => p.title && post.title && p.title.toLowerCase() === post.title.toLowerCase());
     const keyword = pub?.keyword ?? "";
 
-    // Find cluster membership — try URL, keyword, and title matching
+    // Find cluster membership — try exact match first, then fuzzy theme matching
     let role: PageLinkProfile["role"] = "unknown";
     let clusterName: string | null = null;
+    // Pass 1: Exact matching (URL, keyword, title)
     for (const cluster of cocoon.clusters) {
       if (matchesPage(cluster.pillar, post.url, keyword, post.title)) {
         role = "pillar";
@@ -271,6 +272,14 @@ function buildPageProfiles(
         role = "support";
         clusterName = cluster.name;
         break;
+      }
+    }
+    // Pass 2: Fuzzy theme matching — match against the cluster's keyword pool
+    if (!clusterName) {
+      const bestCluster = findBestCluster(post.title, keyword, cocoon.clusters);
+      if (bestCluster) {
+        clusterName = bestCluster.name;
+        role = "support";
       }
     }
 
@@ -1040,6 +1049,45 @@ function urlsMatch(a: string, b: string): boolean {
   const slugA = extractSlug(a);
   const slugB = extractSlug(b);
   return slugA.length > 3 && slugA === slugB;
+}
+
+const STOPWORDS = new Set(["le","la","les","de","du","des","un","une","en","et","pour","par","a","au","aux","ce","se","son","sa","ses","il","elle","sur","dans","avec","qui","que","est","pas","plus","ne","ou","the","to","a","an","in","for","of","and","is","on","at","by","how","your","this","that","with"]);
+
+function meaningfulWords(text: string): Set<string> {
+  const words = text.toLowerCase().match(/[a-zàâéèêëïîôùûüç]+/g) ?? [];
+  return new Set(words.filter(w => w.length > 2 && !STOPWORDS.has(w)));
+}
+
+/** Find the best matching cluster for an article by word overlap with all cluster keywords */
+function findBestCluster(
+  postTitle: string,
+  postKeyword: string,
+  clusters: CocoonCluster[]
+): CocoonCluster | null {
+  const titleWords = meaningfulWords(`${postTitle} ${postKeyword}`);
+  if (titleWords.size === 0) return null;
+
+  let bestCluster: CocoonCluster | null = null;
+  let bestOverlap = 0;
+
+  for (const cluster of clusters) {
+    // Pool all keywords in this cluster
+    const allKeywords = [
+      cluster.pillar.keyword,
+      cluster.name,
+      ...(cluster.support_pages?.map(sp => sp.keyword) ?? []),
+    ].join(" ");
+    const clusterWords = meaningfulWords(allKeywords);
+
+    const overlap = [...titleWords].filter(w => clusterWords.has(w)).length;
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      bestCluster = cluster;
+    }
+  }
+
+  // Require at least 2 common meaningful words to avoid false positives
+  return bestOverlap >= 2 ? bestCluster : null;
 }
 
 function matchesPage(
