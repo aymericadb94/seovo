@@ -772,55 +772,67 @@ function generateAnchor(
   context: string,
   usedAnchors: Set<string>
 ): string {
-  const kw = keyword.trim();
-  const cleanTitle = title.replace(/[""«»]/g, "").trim();
+  // Use keyword if available, otherwise fall back to title
+  const rawKw = keyword.trim();
+  const cleanTitle = title.replace(/[""«»:]/g, "").replace(/\s+/g, " ").trim();
+  // If no keyword, extract meaningful words from title (skip filler like "Le Guide Ultime pour")
+  const kw = rawKw || extractTitleKeyPhrase(cleanTitle);
 
   // Generate multiple anchor candidates
   const candidates: string[] = [];
 
-  // 1. Exact keyword (use sparingly)
-  candidates.push(kw);
+  // 1. Exact keyword
+  if (kw) candidates.push(kw);
 
-  // 2. Partial keyword (first 2-3 words)
-  const kwWords = kw.split(/\s+/);
-  if (kwWords.length >= 3) {
+  // 2. Partial keyword (first 2-3 words) — only if keyword is long
+  const kwWords = kw.split(/\s+/).filter(Boolean);
+  if (kwWords.length >= 4) {
     candidates.push(kwWords.slice(0, 3).join(" "));
-    candidates.push(kwWords.slice(0, 2).join(" "));
   }
 
-  // 3. Title-based (shortened)
-  if (cleanTitle.length > 10 && cleanTitle !== kw) {
+  // 3. Title-based (shortened but still meaningful — at least 4 words)
+  if (cleanTitle.length > 10 && cleanTitle.toLowerCase() !== kw.toLowerCase()) {
     const titleWords = cleanTitle.split(/\s+/);
-    if (titleWords.length > 4) {
+    if (titleWords.length > 6) {
+      candidates.push(titleWords.slice(0, 5).join(" "));
+    } else if (titleWords.length > 4) {
       candidates.push(titleWords.slice(0, 4).join(" "));
     } else {
       candidates.push(cleanTitle);
     }
   }
 
-  // 4. Contextual variations (use full keyword to avoid truncated anchors)
-  switch (context) {
-    case "support_to_pillar":
-      candidates.push(`guide ${kw}`);
-      candidates.push(`tout savoir sur ${kw}`);
-      break;
-    case "pillar_to_support":
-      candidates.push(`en savoir plus sur ${kw}`);
-      candidates.push(kwWords.length > 1 ? kwWords.slice(-2).join(" ") : kw);
-      break;
-    case "gsc_boost":
-      candidates.push(`découvrir ${kw}`);
-      break;
-    case "orphan_rescue":
-      candidates.push(`article sur ${kw}`);
-      break;
-    case "cross_cluster":
-      candidates.push(`voir aussi : ${kw}`);
-      break;
+  // 4. Contextual variations (always use the full kw to avoid truncated anchors)
+  if (kw) {
+    switch (context) {
+      case "support_to_pillar":
+        candidates.push(`guide ${kw}`);
+        candidates.push(`tout savoir sur ${kw}`);
+        break;
+      case "pillar_to_support":
+        candidates.push(`en savoir plus sur ${kw}`);
+        candidates.push(kwWords.length > 1 ? kwWords.slice(-2).join(" ") : kw);
+        break;
+      case "gsc_boost":
+        candidates.push(`découvrir ${kw}`);
+        break;
+      case "orphan_rescue":
+        candidates.push(`article sur ${kw}`);
+        break;
+      case "cross_cluster":
+        candidates.push(`voir aussi : ${kw}`);
+        break;
+      case "min_incoming":
+        candidates.push(`en savoir plus sur ${kw}`);
+        break;
+    }
   }
 
+  // Filter out empty/too-short candidates (< 3 chars)
+  const validCandidates = candidates.filter(c => c.trim().length >= 3);
+
   // Pick the first candidate NOT already used
-  for (const c of candidates) {
+  for (const c of validCandidates) {
     const key = `anchor:${c.toLowerCase()}`;
     if (!usedAnchors.has(key)) {
       usedAnchors.add(key);
@@ -828,8 +840,26 @@ function generateAnchor(
     }
   }
 
-  // Fallback: keyword with slight variation
-  return kw;
+  // Fallback: use title if nothing else works
+  return kw || cleanTitle || title;
+}
+
+/** Extract a meaningful key phrase from a title (skip filler words at the start) */
+function extractTitleKeyPhrase(title: string): string {
+  const TITLE_FILLER = new Set([
+    "le", "la", "les", "un", "une", "des", "du", "de", "d",
+    "guide", "ultime", "complet", "pour", "comment", "pourquoi",
+    "tout", "savoir", "sur", "notre", "votre", "mon", "ma",
+  ]);
+  const words = title.split(/\s+/);
+  // Skip leading filler words, keep the rest
+  let startIdx = 0;
+  while (startIdx < words.length - 2 && TITLE_FILLER.has(words[startIdx].toLowerCase())) {
+    startIdx++;
+  }
+  const meaningful = words.slice(startIdx);
+  // Take 3-5 meaningful words
+  return meaningful.slice(0, Math.min(5, meaningful.length)).join(" ");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
