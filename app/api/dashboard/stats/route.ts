@@ -182,6 +182,10 @@ export async function GET() {
 
     let streak = 0;
     const checkDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Si pas encore publié aujourd'hui, commencer le comptage depuis hier
+    if (!pubDaySet.has(toKey(checkDay))) {
+      checkDay.setDate(checkDay.getDate() - 1);
+    }
     while (pubDaySet.has(toKey(checkDay))) {
       streak++;
       checkDay.setDate(checkDay.getDate() - 1);
@@ -384,6 +388,43 @@ export async function GET() {
       calendarData.push({ date: toKey(d), count });
     }
 
+    // ── Prochaines publications planifiées (même logique que le cron) ────────
+    const { data: roadmapRow } = await supabase
+      .from("roadmaps")
+      .select("data")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const publishedKwSet = new Set(
+      pubs.map(p => p.keyword?.toLowerCase()).filter(Boolean)
+    );
+
+    const plannedKeywords: string[] = [];
+    // 1. Roadmap en priorité (comme le cron)
+    const roadmapArticlesRaw = (roadmapRow?.data as { articles?: { keyword: string; priority: number }[] } | null)?.articles;
+    if (roadmapArticlesRaw && roadmapArticlesRaw.length > 0) {
+      const roadmapArticles = roadmapArticlesRaw
+        .filter((a: { keyword: string }) => a.keyword && !publishedKwSet.has(a.keyword.toLowerCase()))
+        .sort((a: { priority: number }, b: { priority: number }) => a.priority - b.priority);
+      for (const a of roadmapArticles) {
+        if (plannedKeywords.length >= 7) break;
+        plannedKeywords.push(a.keyword);
+        publishedKwSet.add(a.keyword.toLowerCase());
+      }
+    }
+    // 2. Rotation sur les mots-clés configurés (fallback, comme le cron)
+    if (plannedKeywords.length < 7 && allKeywords.length > 0) {
+      for (let i = 0; plannedKeywords.length < 7 && i < allKeywords.length; i++) {
+        const kw = allKeywords[i];
+        if (!publishedKwSet.has(kw.toLowerCase())) {
+          plannedKeywords.push(kw);
+          publishedKwSet.add(kw.toLowerCase());
+        }
+      }
+    }
+
     // ── Publications récentes (pour la table) ────────────────────────────────
     const recentPublications = pubs.map(p => ({
       id: p.id,
@@ -424,6 +465,7 @@ export async function GET() {
       uncoveredKeywords,
       calendarData,
       recentPublications,
+      plannedKeywords,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erreur inconnue";

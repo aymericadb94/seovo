@@ -66,6 +66,7 @@ type DashboardData = {
     published_at: string;
     page_type: "article" | "page";
   }[];
+  plannedKeywords: string[];
 };
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -2668,29 +2669,31 @@ export default function Dashboard() {
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
                   <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-5">Prochaines publications planifiées</p>
                   <div className="space-y-3">
-                    {Array.from({ length: 7 }).map((_, i) => {
-                      const d = new Date();
-                      d.setDate(d.getDate() + i + 1);
-                      d.setHours(8, 0, 0, 0);
-                      const kwIndex = (data.uncoveredKeywords.length > 0) ? i % data.uncoveredKeywords.length : -1;
-                      const kw = data.uncoveredKeywords[kwIndex]?.keyword ?? data.keywordStats[i % Math.max(data.keywordStats.length, 1)]?.keyword ?? "—";
-                      return (
-                        <div key={i} className="flex items-center gap-4 py-2.5 border-b border-white/[0.04] last:border-0">
-                          <div className="w-12 text-center flex-shrink-0">
-                            <p className="text-white font-black text-sm">{d.getDate()}</p>
-                            <p className="text-gray-600 text-xs">{d.toLocaleDateString("fr-FR", { month: "short" })}</p>
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60" />
-                              <p className="text-gray-400 text-sm">{kw}</p>
+                    {(data.plannedKeywords?.length > 0 ? data.plannedKeywords : []).length === 0 ? (
+                      <p className="text-gray-600 text-sm py-4 text-center">Aucun mot-clé non couvert — tous les articles sont publiés !</p>
+                    ) : (
+                      data.plannedKeywords.slice(0, 7).map((kw, i) => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + i + 1);
+                        d.setHours(8, 0, 0, 0);
+                        return (
+                          <div key={i} className="flex items-center gap-4 py-2.5 border-b border-white/[0.04] last:border-0">
+                            <div className="w-12 text-center flex-shrink-0">
+                              <p className="text-white font-black text-sm">{d.getDate()}</p>
+                              <p className="text-gray-600 text-xs">{d.toLocaleDateString("fr-FR", { month: "short" })}</p>
                             </div>
-                            <p className="text-gray-700 text-xs mt-0.5">Publication automatique à 8h00</p>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60" />
+                                <p className="text-gray-400 text-sm">{kw}</p>
+                              </div>
+                              <p className="text-gray-700 text-xs mt-0.5">Publication automatique à 8h00</p>
+                            </div>
+                            <span className="text-xs text-gray-600 bg-white/[0.04] px-2.5 py-1 rounded-full">Prévu</span>
                           </div>
-                          <span className="text-xs text-gray-600 bg-white/[0.04] px-2.5 py-1 rounded-full">Planifié</span>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>
