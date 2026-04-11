@@ -387,19 +387,23 @@ export default function Dashboard() {
     finally { setCmsPagesLoading(false); }
   }
 
-  async function deletePublication(postId: string, url: string, blogId?: number) {
-    setDeletingPostId(postId);
+  async function deletePublication(pub: typeof cmsPages[number]) {
+    const uiId = String(pub.id);
+    const cmsId = String(pub.cms_id ?? pub.id);
+    setDeletingPostId(uiId);
     try {
       const res = await fetch("/api/publications/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ post_id: postId, url, blog_id: blogId }),
+        body: JSON.stringify({ post_id: cmsId, url: pub.url, blog_id: pub.blog_id }),
       });
       const json = await res.json();
       if (json.success) {
-        setCmsPages(prev => prev.filter(p => String(p.cms_id) !== String(postId)));
+        setCmsPages(prev => prev.filter(p => String(p.id) !== uiId));
+      } else {
+        console.error("Delete failed:", json.error);
       }
-    } catch { /* ignore */ }
+    } catch (err) { console.error("Delete error:", err); }
     finally {
       setDeletingPostId(null);
       setConfirmDeleteId(null);
@@ -2250,7 +2254,7 @@ export default function Dashboard() {
                                         Annuler
                                       </button>
                                       <button
-                                        onClick={() => deletePublication(String(pub.cms_id ?? pub.id), pub.url, pub.blog_id)}
+                                        onClick={() => deletePublication(pub)}
                                         disabled={isDeleting}
                                         className="px-4 py-1.5 rounded-lg text-xs font-bold bg-red-500/80 text-white hover:bg-red-500 transition-colors disabled:opacity-50"
                                       >
