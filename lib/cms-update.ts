@@ -1082,24 +1082,24 @@ async function wixUpdatePostContent(
     let draftId: string | null = null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let draftData: any = null;
+    // Track content format: some old Wix posts use DraftJS (content.blocks), not richContent
+    let contentFormat: "richContent" | "draftJS" = "richContent";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let existingDraftJSContent: any = null;
 
-    // STEP 0: Fetch the FULL existing content BEFORE reverting (critical safety measure)
-    // Try multiple fieldset combos — Wix sometimes needs CONTENT_TEXT or both
+    // STEP 0: Fetch existing content BEFORE reverting (safety measure)
     let existingFullNodes: WixRichNode[] = [];
-    for (const fs of ["CONTENT", "CONTENT_TEXT", "CONTENT,URL"]) {
-      const getFullRes = await fetch(
-        `https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=${fs}`,
-        { headers: hdrs }
-      );
-      if (getFullRes.ok) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fullData = await getFullRes.json() as any;
-        existingFullNodes = fullData.post?.richContent?.nodes ?? [];
-        if (existingFullNodes.length > 0) break;
-      }
+    const getFullRes = await fetch(
+      `https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=CONTENT`,
+      { headers: hdrs }
+    );
+    if (getFullRes.ok) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fullData = await getFullRes.json() as any;
+      existingFullNodes = fullData.post?.richContent?.nodes ?? [];
     }
 
-    // Strategy A: POST /revert/{postId}
+    // Strategy A: Try revert to get a draft
     const revertRes = await fetch(
       `https://www.wixapis.com/blog/v3/draft-posts/revert/${postId}`,
       { method: "POST", headers: hdrs }
@@ -1107,13 +1107,12 @@ async function wixUpdatePostContent(
     if (revertRes.ok) {
       draftData = await revertRes.json();
       draftId = draftData?.draftPost?.id ?? null;
-      // If we couldn't get content from published post, try from the draft
       if (existingFullNodes.length === 0) {
         existingFullNodes = draftData?.draftPost?.richContent?.nodes ?? [];
       }
     }
 
-    // Strategy B: List drafts and find one matching this postId
+    // Strategy B: Find existing draft
     if (!draftId) {
       const listRes = await fetch(
         `https://www.wixapis.com/blog/v3/draft-posts?paging.limit=100&fieldsets=CONTENT`,
@@ -1127,7 +1126,6 @@ async function wixUpdatePostContent(
         if (match) {
           draftId = match.id;
           draftData = { draftPost: match };
-          // Try to get content from draft if still missing
           if (existingFullNodes.length === 0) {
             existingFullNodes = match.richContent?.nodes ?? [];
           }
@@ -1135,26 +1133,115 @@ async function wixUpdatePostContent(
       }
     }
 
+    // Check for DraftJS format (old Wix posts: content.blocks instead of richContent)
+    if (existingFullNodes.length === 0 && draftData?.draftPost?.content?.blocks) {
+      contentFormat = "draftJS";
+      existingDraftJSContent = draftData.draftPost.content;
+    }
+
+    // If we still have no content from any source, try fetching draft directly
+    if (existingFullNodes.length === 0 && !existingDraftJSContent && draftId) {
+      const getDraftRes = await fetch(
+        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}?fieldsets=CONTENT`,
+        { headers: hdrs }
+      );
+      if (getDraftRes.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const draftFullData = await getDraftRes.json() as any;
+        existingFullNodes = draftFullData.draftPost?.richContent?.nodes ?? [];
+        if (existingFullNodes.length === 0 && draftFullData.draftPost?.content?.blocks) {
+          contentFormat = "draftJS";
+          existingDraftJSContent = draftFullData.draftPost.content;
+        }
+      }
+    }
+
     // SAFETY: abort if we couldn't fetch existing content from ANY source
-    if (existingFullNodes.length === 0) {
+    if (existingFullNodes.length === 0 && !existingDraftJSContent) {
       return { success: false, post_id: postId, url: "", error: "Wix: impossible de récupérer le contenu existant — abandon par sécurité" };
     }
 
-    // Strategy C: Try direct PATCH on published post as last resort
-    // IMPORTANT: fetch existing content first to APPEND, never overwrite
-    if (!draftId) {
-      // Fetch existing post content
-      const getRes = await fetch(
-        `https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=CONTENT`,
-        { headers: hdrs }
-      );
-      let existingNodes: WixRichNode[] = [];
-      if (getRes.ok) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const getData = await getRes.json() as any;
-        existingNodes = getData.post?.richContent?.nodes ?? [];
+    // ── DraftJS format path ──────────────────────────────────────────────
+    if (contentFormat === "draftJS" && existingDraftJSContent && draftId) {
+      const blocks = existingDraftJSContent.blocks as { text: string; entityRanges?: { key: number }[] }[];
+      const entityMap = existingDraftJSContent.entityMap as Record<string, { type: string; data: { url?: string } }>;
+
+      // Collect existing link URLs
+      const existingLinkUrls = new Set<string>();
+      for (const [, entity] of Object.entries(entityMap)) {
+        if (entity.type === "LINK" && entity.data?.url) {
+          existingLinkUrls.add(entity.data.url);
+        }
       }
 
+      const linksToAdd = allLinksInHtml.filter(l => !existingLinkUrls.has(l.url));
+      if (linksToAdd.length === 0) {
+        return { success: false, post_id: postId, url: "", error: "Liens déjà présents dans l'article" };
+      }
+
+      // Append new blocks in DraftJS format
+      let nextEntityKey = Math.max(0, ...Object.keys(entityMap).map(Number).filter(n => !isNaN(n))) + 1;
+      const newBlocks = [];
+      const newEntities: Record<string, { type: string; mutability: string; data: { url: string; target: string } }> = {};
+
+      for (const link of linksToAdd) {
+        const text = `À lire aussi : ${link.text}`;
+        const offset = 15; // "À lire aussi : ".length
+        newBlocks.push({
+          key: Math.random().toString(36).slice(2, 7),
+          text,
+          type: "unstyled",
+          depth: 0,
+          inlineStyleRanges: [],
+          entityRanges: [{ key: nextEntityKey, offset, length: link.text.length }],
+          data: {},
+        });
+        newEntities[String(nextEntityKey)] = {
+          type: "LINK",
+          mutability: "MUTABLE",
+          data: { url: link.url, target: "_blank" },
+        };
+        nextEntityKey++;
+      }
+
+      const updatedContent = {
+        ...existingDraftJSContent,
+        blocks: [...blocks, ...newBlocks],
+        entityMap: { ...entityMap, ...newEntities },
+      };
+
+      const updateDraftRes = await fetch(
+        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}`,
+        {
+          method: "PATCH",
+          headers: hdrs,
+          body: JSON.stringify({ draftPost: { content: updatedContent }, fieldMask: ["content"] }),
+        }
+      );
+      if (!updateDraftRes.ok) {
+        const errText = (await updateDraftRes.text()).slice(0, 300);
+        return { success: false, post_id: postId, url: "", error: `Wix update draft failed (${updateDraftRes.status}): ${errText}` };
+      }
+
+      // Publish
+      const publishRes = await fetch(
+        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}/publish`,
+        { method: "POST", headers: hdrs }
+      );
+      if (!publishRes.ok) {
+        const errText = (await publishRes.text()).slice(0, 300);
+        return { success: false, post_id: postId, url: "", error: `Wix publish draft failed (${publishRes.status}): ${errText}` };
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pubData = await publishRes.json() as any;
+      const url = pubData.post?.url ? `${pubData.post.url.base}${pubData.post.url.path}` : "";
+      return { success: true, post_id: pubData.post?.id ?? postId, url };
+    }
+
+    // ── richContent format path (standard) ───────────────────────────────
+
+    // Strategy C: Try direct PATCH on published post as last resort
+    if (!draftId) {
       // Check which links already exist
       const existingLinkUrls = new Set<string>();
       function scanNodes(nodes: WixRichNode[]) {
@@ -1167,7 +1254,7 @@ async function wixUpdatePostContent(
           if (n.nodes) scanNodes(n.nodes as WixRichNode[]);
         }
       }
-      scanNodes(existingNodes);
+      scanNodes(existingFullNodes);
 
       const linksToAdd = allLinksInHtml.filter(l => !existingLinkUrls.has(l.url));
       if (linksToAdd.length === 0) {
@@ -1183,8 +1270,7 @@ async function wixUpdatePostContent(
         ],
       }));
 
-      // APPEND new links to existing content
-      const mergedNodes = [...existingNodes, ...newNodes];
+      const mergedNodes = [...existingFullNodes, ...newNodes];
 
       const directRes = await fetch(
         `https://www.wixapis.com/blog/v3/posts/${postId}`,
@@ -1201,8 +1287,7 @@ async function wixUpdatePostContent(
         return { success: true, post_id: data.post?.id ?? postId, url };
       }
 
-      const aText = await revertRes.text().catch(() => "");
-      return { success: false, post_id: postId, url: "", error: `Wix: impossible de créer un brouillon (revert=${revertRes.status}, direct PATCH=${directRes.status}). revert body: ${aText.slice(0, 200)}` };
+      return { success: false, post_id: postId, url: "", error: `Wix: impossible de créer un brouillon (revert=${revertRes.status}, direct PATCH=${directRes.status})` };
     }
 
     // Step 2: Get existing links from the draft to avoid duplicates
@@ -1237,8 +1322,6 @@ async function wixUpdatePostContent(
     }));
 
     // Step 4: Update the draft with appended richContent
-    // CRITICAL: always use pre-fetched full content, never rely on draft response
-    // (draft from /revert may not include content, causing total data loss)
     const baseNodes = (existingRc?.nodes?.length ?? 0) > 0 ? existingRc!.nodes! : existingFullNodes;
     const updatedNodes = [...baseNodes, ...newNodes];
 
