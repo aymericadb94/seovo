@@ -73,6 +73,13 @@ export type ExistingLink = {
   to_title: string;
 };
 
+export type BrokenLink = {
+  from_url: string;
+  from_title: string;
+  broken_url: string;
+  anchor_text: string;
+};
+
 export type LinkingAnalysis = {
   page_profiles: PageLinkProfile[];
   cluster_strengths: ClusterStrength[];
@@ -80,6 +87,7 @@ export type LinkingAnalysis = {
   underlinked_pages: { url: string; title: string; incoming: number; needed: number }[];
   suggestions: LinkSuggestion[];
   existing_links: ExistingLink[];
+  broken_links: BrokenLink[];
   global_score: number;
   global_label: string;
 };
@@ -209,6 +217,9 @@ export async function analyzeLinking(
   // 7. Extract existing links from CMS content
   const existingLinks = extractExistingLinks(cmsPosts, publications, siteUrl);
 
+  // 7b. Detect broken internal links (pointing to pages that no longer exist)
+  const brokenLinks = detectBrokenLinks(cmsPosts, siteUrl);
+
   // 8. Global score
   const globalScore = computeGlobalScore(profiles, clusterStrengths, orphans);
   const globalLabel = globalScore >= 75 ? "Excellent" : globalScore >= 50 ? "Bon" : globalScore >= 25 ? "Moyen" : "Faible";
@@ -220,6 +231,7 @@ export async function analyzeLinking(
     underlinked_pages: underlinked,
     suggestions,
     existing_links: existingLinks,
+    broken_links: brokenLinks,
     global_score: globalScore,
     global_label: globalLabel,
   };
@@ -888,6 +900,51 @@ function computeGlobalScore(
 // ══════════════════════════════════════════════════════════════════════════════
 // EXISTING LINKS EXTRACTION — Scan CMS content for real <a> tags
 // ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Detect internal links that point to pages not in the CMS (likely deleted → 404).
+ */
+function detectBrokenLinks(cmsPosts: CmsPost[], siteUrl: string): BrokenLink[] {
+  const domain = (() => { try { return new URL(siteUrl).hostname; } catch { return ""; } })();
+  const knownPaths = new Set(cmsPosts.map(p => normalizeUrl(p.url)));
+  const broken: BrokenLink[] = [];
+  const seen = new Set<string>();
+
+  for (const post of cmsPosts) {
+    const regex = /<a[^>]+href=["']([^"']+)["'][^>]*>([^<]*)<\/a>/gi;
+    let match;
+    while ((match = regex.exec(post.content)) !== null) {
+      const href = match[1];
+      const anchorText = match[2];
+      let resolvedPath: string | null = null;
+
+      try {
+        const u = new URL(href, siteUrl);
+        if (u.hostname === domain) resolvedPath = normalizeUrl(u.href);
+      } catch {
+        if (href.startsWith("/")) resolvedPath = normalizeUrl(href);
+      }
+
+      if (!resolvedPath) continue;
+      if (resolvedPath === normalizeUrl(post.url)) continue;
+      // Check if target exists in CMS
+      const exists = knownPaths.has(resolvedPath) || [...knownPaths].some(k => urlsMatch(href, k));
+      if (exists) continue;
+
+      const key = `${normalizeUrl(post.url)}|${resolvedPath}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      broken.push({
+        from_url: post.url,
+        from_title: post.title,
+        broken_url: href,
+        anchor_text: anchorText,
+      });
+    }
+  }
+  return broken;
+}
 
 function extractExistingLinks(
   cmsPosts: CmsPost[],

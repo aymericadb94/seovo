@@ -155,6 +155,12 @@ export async function POST() {
         to_url: l.to_url,
         to_title: l.to_title,
       })),
+      broken_links: analysis.broken_links.map(l => ({
+        from_url: l.from_url,
+        from_title: l.from_title,
+        broken_url: l.broken_url,
+        anchor_text: l.anchor_text,
+      })),
       opportunities: opportunities ?? [],
     };
 

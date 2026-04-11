@@ -915,6 +915,46 @@ export async function updateCmsPost(
   }
 }
 
+/**
+ * Remove all links pointing to a deleted URL from CMS articles.
+ * Handles two patterns:
+ * 1. Inline links: <a href="URL">text</a> → keeps just "text"
+ * 2. "À lire aussi" paragraphs: removes the entire paragraph if it only links to the deleted URL
+ */
+export function removeLinksToUrl(html: string, deletedUrl: string): { html: string; removed: number } {
+  const normDeleted = deletedUrl.replace(/\/$/, "").toLowerCase();
+  let removed = 0;
+
+  // Pattern 1: Remove entire "À lire aussi : <a>" paragraphs pointing to deleted URL
+  const readAlsoRegex = new RegExp(
+    `<p[^>]*>\\s*À lire aussi\\s*:\\s*<a\\s+href="[^"]*"[^>]*>[^<]*<\\/a>\\s*<\\/p>`,
+    "gi"
+  );
+  let result = html.replace(readAlsoRegex, (match) => {
+    const hrefMatch = match.match(/href="([^"]+)"/i);
+    if (hrefMatch && hrefMatch[1].replace(/\/$/, "").toLowerCase() === normDeleted) {
+      removed++;
+      return "";
+    }
+    return match;
+  });
+
+  // Pattern 2: Unwrap inline <a> tags pointing to deleted URL (keep the text)
+  const linkRegex = new RegExp(
+    `<a\\s+href="([^"]+)"[^>]*>([^<]*)<\\/a>`,
+    "gi"
+  );
+  result = result.replace(linkRegex, (match, href: string, text: string) => {
+    if (href.replace(/\/$/, "").toLowerCase() === normDeleted) {
+      removed++;
+      return text;
+    }
+    return match;
+  });
+
+  return { html: result, removed };
+}
+
 export type DeleteResult = {
   success: boolean;
   post_id: string | number;

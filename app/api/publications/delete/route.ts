@@ -6,7 +6,7 @@
  */
 
 import { createClient } from "@/lib/supabase/server";
-import { deleteCmsPost, type CmsCredentials } from "@/lib/cms-update";
+import { deleteCmsPost, listCmsPosts, updateCmsPost, removeLinksToUrl, type CmsCredentials } from "@/lib/cms-update";
 import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
@@ -65,7 +65,30 @@ export async function POST(request: Request) {
       .eq("user_id", user.id)
       .ilike("wordpress_url", `%${normalizedUrl.split("/").pop()}%`);
 
-    return Response.json({ success: true, post_id });
+    // Clean up broken links in other articles pointing to the deleted URL
+    let cleanedCount = 0;
+    try {
+      const allPosts = await listCmsPosts(creds, 200);
+      for (const post of allPosts) {
+        if (!post.content.toLowerCase().includes(normalizedUrl)) continue;
+        const { html: cleanedHtml, removed } = removeLinksToUrl(post.content, url);
+        if (removed > 0) {
+          const blogId = "blog_id" in post ? (post as { blog_id: number }).blog_id : undefined;
+          await updateCmsPost(creds, post.id, { content: cleanedHtml }, { blog_id: blogId });
+          cleanedCount += removed;
+        }
+      }
+    } catch { /* non-blocking — links cleanup is best-effort */ }
+
+    // Invalidate cached linking analysis
+    try {
+      await supabase
+        .from("internal_linking")
+        .delete()
+        .eq("user_id", user.id);
+    } catch { /* non-blocking */ }
+
+    return Response.json({ success: true, post_id, cleaned_links: cleanedCount });
   } catch (err: unknown) {
     return Response.json({ error: err instanceof Error ? err.message : "Erreur inconnue" }, { status: 500 });
   }
