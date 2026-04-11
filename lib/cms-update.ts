@@ -425,11 +425,10 @@ async function wixListPosts(
         html = `<p>${excerpt}</p>`;
       }
 
-      // Extract cover image from Wix coverMedia
-      const coverMedia = p.coverMedia as Record<string, unknown> | undefined;
-      console.log(`[WIX] coverMedia for "${title}":`, JSON.stringify(coverMedia));
-      const img = coverMedia?.image as { url?: string } | undefined;
-      const featuredImage = img?.url ?? (coverMedia?.imageUrl as string) ?? null;
+      // Extract cover image: media.wixMedia.image.url > coverMedia.image.url > null
+      const media = p.media as { wixMedia?: { image?: { url?: string } }; image?: { url?: string } } | undefined;
+      const coverMedia = p.coverMedia as { image?: { url?: string } } | undefined;
+      const featuredImage = media?.wixMedia?.image?.url ?? coverMedia?.image?.url ?? null;
 
       // Extract publish date
       const firstPublished = (p.firstPublishedDate ?? p.publishedDate ?? p.lastPublishedDate) as string | undefined;
