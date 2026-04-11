@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 
 // Dynamic import — react-force-graph-2d uses canvas and needs browser
@@ -1587,14 +1588,15 @@ export default function LinkingGraph() {
       {/* ── Score comment ────────────────────────────────────────────────── */}
       <p className="text-gray-600 text-xs text-center">{data.score_comment}</p>
 
-      {/* ── Link applied popup ─────────────────────────────────────────── */}
-      {linkPopup && (
+      {/* ── Link applied popup (portal to body for correct centering) ── */}
+      {linkPopup && typeof document !== "undefined" && createPortal(
         <LinkAppliedPopup
           applied={linkPopup.applied}
           skipped={linkPopup.skipped}
           errors={linkPopup.errors}
           onClose={() => setLinkPopup(null)}
-        />
+        />,
+        document.body
       )}
     </div>
   );

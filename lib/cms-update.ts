@@ -1084,20 +1084,19 @@ async function wixUpdatePostContent(
     let draftData: any = null;
 
     // STEP 0: Fetch the FULL existing content BEFORE reverting (critical safety measure)
-    const getFullRes = await fetch(
-      `https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=CONTENT`,
-      { headers: hdrs }
-    );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // Try multiple fieldset combos — Wix sometimes needs CONTENT_TEXT or both
     let existingFullNodes: WixRichNode[] = [];
-    if (getFullRes.ok) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const fullData = await getFullRes.json() as any;
-      existingFullNodes = fullData.post?.richContent?.nodes ?? [];
-    }
-    // SAFETY: abort if we couldn't fetch existing content — never risk overwriting
-    if (existingFullNodes.length === 0) {
-      return { success: false, post_id: postId, url: "", error: "Wix: impossible de récupérer le contenu existant — abandon par sécurité" };
+    for (const fs of ["CONTENT", "CONTENT_TEXT", "CONTENT,URL"]) {
+      const getFullRes = await fetch(
+        `https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=${fs}`,
+        { headers: hdrs }
+      );
+      if (getFullRes.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fullData = await getFullRes.json() as any;
+        existingFullNodes = fullData.post?.richContent?.nodes ?? [];
+        if (existingFullNodes.length > 0) break;
+      }
     }
 
     // Strategy A: POST /revert/{postId}
@@ -1108,6 +1107,10 @@ async function wixUpdatePostContent(
     if (revertRes.ok) {
       draftData = await revertRes.json();
       draftId = draftData?.draftPost?.id ?? null;
+      // If we couldn't get content from published post, try from the draft
+      if (existingFullNodes.length === 0) {
+        existingFullNodes = draftData?.draftPost?.richContent?.nodes ?? [];
+      }
     }
 
     // Strategy B: List drafts and find one matching this postId
@@ -1124,8 +1127,17 @@ async function wixUpdatePostContent(
         if (match) {
           draftId = match.id;
           draftData = { draftPost: match };
+          // Try to get content from draft if still missing
+          if (existingFullNodes.length === 0) {
+            existingFullNodes = match.richContent?.nodes ?? [];
+          }
         }
       }
+    }
+
+    // SAFETY: abort if we couldn't fetch existing content from ANY source
+    if (existingFullNodes.length === 0) {
+      return { success: false, post_id: postId, url: "", error: "Wix: impossible de récupérer le contenu existant — abandon par sécurité" };
     }
 
     // Strategy C: Try direct PATCH on published post as last resort
