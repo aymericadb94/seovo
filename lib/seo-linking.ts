@@ -798,24 +798,24 @@ function generateAnchor(
     }
   }
 
-  // 4. Contextual variations
+  // 4. Contextual variations (use full keyword to avoid truncated anchors)
   switch (context) {
     case "support_to_pillar":
-      candidates.push(`guide ${kwWords[0] ?? kw}`);
-      candidates.push(`tout savoir sur ${kwWords.slice(0, 2).join(" ")}`);
+      candidates.push(`guide ${kw}`);
+      candidates.push(`tout savoir sur ${kw}`);
       break;
     case "pillar_to_support":
-      candidates.push(`en savoir plus sur ${kwWords.slice(0, 2).join(" ")}`);
+      candidates.push(`en savoir plus sur ${kw}`);
       candidates.push(kwWords.length > 1 ? kwWords.slice(-2).join(" ") : kw);
       break;
     case "gsc_boost":
-      candidates.push(`découvrir ${kwWords.slice(0, 2).join(" ")}`);
+      candidates.push(`découvrir ${kw}`);
       break;
     case "orphan_rescue":
-      candidates.push(`article sur ${kwWords.slice(0, 2).join(" ")}`);
+      candidates.push(`article sur ${kw}`);
       break;
     case "cross_cluster":
-      candidates.push(`voir aussi : ${kwWords.slice(0, 2).join(" ")}`);
+      candidates.push(`voir aussi : ${kw}`);
       break;
   }
 
