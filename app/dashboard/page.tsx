@@ -87,6 +87,8 @@ export default function Dashboard() {
   const [pubFilter, setPubFilter] = useState<"all" | "articles" | "pages" | "indexed" | "not_indexed">("all");
   const [cmsPages, setCmsPages] = useState<{ id: string; title: string; url: string; keyword: string; published_at: string; page_type: "article" | "page"; cover_image?: string | null }[]>([]);
   const [cmsPagesLoading, setCmsPagesLoading] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // ── Tutorial (0=score, 1=cocon, 2=potentiel, 3=roadmap, 4=libre) ─────────────
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
@@ -383,6 +385,25 @@ export default function Dashboard() {
       }
     } catch { /* ignore */ }
     finally { setCmsPagesLoading(false); }
+  }
+
+  async function deletePublication(postId: string, url: string, blogId?: number) {
+    setDeletingPostId(postId);
+    try {
+      const res = await fetch("/api/publications/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ post_id: postId, url, blog_id: blogId }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setCmsPages(prev => prev.filter(p => String(p.id) !== String(postId)));
+      }
+    } catch { /* ignore */ }
+    finally {
+      setDeletingPostId(null);
+      setConfirmDeleteId(null);
+    }
   }
 
   async function syncPublications() {
@@ -2208,57 +2229,93 @@ export default function Dashboard() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
                           {filtered.map((pub, i) => {
                             const idx = pub.url ? indexationResults[pub.url] : null;
+                            const isConfirming = confirmDeleteId === String(pub.id);
+                            const isDeleting = deletingPostId === String(pub.id);
                             return (
-                              <a
+                              <div
                                 key={pub.id}
-                                href={pub.url || "#"}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="group block rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-orange-500/30 hover:bg-white/[0.04] transition-all overflow-hidden animate-fade-in-up"
-                                style={{ animationDelay: `${i * 50}ms` }}
+                                className="group relative rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-orange-500/30 hover:bg-white/[0.04] transition-all overflow-hidden animate-fade-in-up"
+                                style={{ animationDelay: `${i * 50}ms`, opacity: isDeleting ? 0.4 : 1 }}
                               >
+                                {/* Delete confirmation overlay */}
+                                {isConfirming && (
+                                  <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 p-4">
+                                    <p className="text-white font-bold text-sm text-center">Supprimer cet article du CMS ?</p>
+                                    <p className="text-gray-400 text-xs text-center">Cette action est irréversible</p>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => setConfirmDeleteId(null)}
+                                        className="px-4 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-gray-300 hover:bg-white/20 transition-colors"
+                                      >
+                                        Annuler
+                                      </button>
+                                      <button
+                                        onClick={() => deletePublication(String(pub.id), pub.url)}
+                                        disabled={isDeleting}
+                                        className="px-4 py-1.5 rounded-lg text-xs font-bold bg-red-500/80 text-white hover:bg-red-500 transition-colors disabled:opacity-50"
+                                      >
+                                        {isDeleting ? "Suppression..." : "Confirmer"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                                 {/* Thumbnail */}
-                                <div className="relative w-full aspect-[16/9] bg-white/[0.03] overflow-hidden">
-                                  {pub.cover_image ? (
-                                    <img
-                                      src={pub.cover_image}
-                                      alt={pub.title}
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                      loading="lazy"
-                                      onError={(e) => {
-                                        const target = e.currentTarget;
-                                        target.style.display = "none";
-                                        const placeholder = target.nextElementSibling as HTMLElement | null;
-                                        if (placeholder) placeholder.style.display = "flex";
-                                      }}
-                                    />
-                                  ) : null}
-                                  <div className={`w-full h-full ${pub.cover_image ? "hidden" : "flex"} items-center justify-center absolute inset-0`}>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-10 h-10 text-white/[0.06]">
-                                      <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
-                                    </svg>
-                                  </div>
-                                  {/* Type badge overlay */}
-                                  <div className="absolute top-2 left-2">
-                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase backdrop-blur-sm ${pub.page_type === "page" ? "bg-blue-500/20 text-blue-300 border border-blue-500/20" : "bg-orange-500/20 text-orange-300 border border-orange-500/20"}`}>
-                                      {pub.page_type === "page" ? "Page" : "Article"}
-                                    </span>
-                                  </div>
-                                  {/* Indexation badge overlay */}
-                                  {idx && (
-                                    <div className="absolute top-2 right-2">
-                                      <span className={`flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${idx.indexed ? "bg-green-500/20 text-green-300 border border-green-500/20" : "bg-red-500/20 text-red-300 border border-red-500/20"}`}>
-                                        <span className={`w-1 h-1 rounded-full ${idx.indexed ? "bg-green-400" : "bg-red-400"}`} />
-                                        {idx.indexed ? "Index\u00e9" : "Non index\u00e9"}
+                                <a href={pub.url || "#"} target="_blank" rel="noopener noreferrer" className="block">
+                                  <div className="relative w-full aspect-[16/9] bg-white/[0.03] overflow-hidden">
+                                    {pub.cover_image ? (
+                                      <img
+                                        src={pub.cover_image}
+                                        alt={pub.title}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        loading="lazy"
+                                        onError={(e) => {
+                                          const target = e.currentTarget;
+                                          target.style.display = "none";
+                                          const placeholder = target.nextElementSibling as HTMLElement | null;
+                                          if (placeholder) placeholder.style.display = "flex";
+                                        }}
+                                      />
+                                    ) : null}
+                                    <div className={`w-full h-full ${pub.cover_image ? "hidden" : "flex"} items-center justify-center absolute inset-0`}>
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-10 h-10 text-white/[0.06]">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+                                      </svg>
+                                    </div>
+                                    {/* Type badge overlay */}
+                                    <div className="absolute top-2 left-2">
+                                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase backdrop-blur-sm ${pub.page_type === "page" ? "bg-blue-500/20 text-blue-300 border border-blue-500/20" : "bg-orange-500/20 text-orange-300 border border-orange-500/20"}`}>
+                                        {pub.page_type === "page" ? "Page" : "Article"}
                                       </span>
                                     </div>
-                                  )}
-                                </div>
+                                    {/* Indexation badge overlay */}
+                                    {idx && (
+                                      <div className="absolute top-2 right-2">
+                                        <span className={`flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${idx.indexed ? "bg-green-500/20 text-green-300 border border-green-500/20" : "bg-red-500/20 text-red-300 border border-red-500/20"}`}>
+                                          <span className={`w-1 h-1 rounded-full ${idx.indexed ? "bg-green-400" : "bg-red-400"}`} />
+                                          {idx.indexed ? "Indexé" : "Non indexé"}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </a>
                                 {/* Content */}
                                 <div className="p-3.5">
-                                  <h3 className="text-white font-bold text-sm leading-snug line-clamp-2 group-hover:text-orange-400 transition-colors mb-2">
-                                    {pub.title}
-                                  </h3>
+                                  <div className="flex items-start justify-between gap-2">
+                                    <a href={pub.url || "#"} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0">
+                                      <h3 className="text-white font-bold text-sm leading-snug line-clamp-2 group-hover:text-orange-400 transition-colors mb-2">
+                                        {pub.title}
+                                      </h3>
+                                    </a>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(String(pub.id)); }}
+                                      className="flex-shrink-0 p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                      title="Supprimer"
+                                    >
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                                        <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14M10 11v6M14 11v6"/>
+                                      </svg>
+                                    </button>
+                                  </div>
                                   <div className="flex items-center gap-2 flex-wrap">
                                     {pub.keyword && (
                                       <span className="bg-orange-500/10 text-orange-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -2270,7 +2327,7 @@ export default function Dashboard() {
                                     </span>
                                   </div>
                                 </div>
-                              </a>
+                              </div>
                             );
                           })}
                         </div>

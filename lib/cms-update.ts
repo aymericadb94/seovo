@@ -914,6 +914,81 @@ export async function updateCmsPost(
   }
 }
 
+export type DeleteResult = {
+  success: boolean;
+  post_id: string | number;
+  error?: string;
+};
+
+export async function deleteCmsPost(
+  creds: CmsCredentials,
+  postId: string | number,
+  extra?: { blog_id?: number }
+): Promise<DeleteResult> {
+  switch (creds.cms) {
+    case "wordpress": {
+      if (!creds.wp_username || !creds.wp_app_password) {
+        return { success: false, post_id: postId, error: "WordPress credentials missing" };
+      }
+      const auth = wpAuth(creds.wp_username, creds.wp_app_password);
+      // Try posts first, then pages
+      let res = await fetch(
+        `${creds.site_url}/wp-json/wp/v2/posts/${postId}?force=true`,
+        { method: "DELETE", headers: { Authorization: auth } }
+      );
+      if (!res.ok) {
+        res = await fetch(
+          `${creds.site_url}/wp-json/wp/v2/pages/${postId}?force=true`,
+          { method: "DELETE", headers: { Authorization: auth } }
+        );
+      }
+      if (!res.ok) {
+        return { success: false, post_id: postId, error: `WordPress DELETE failed: ${res.status}` };
+      }
+      return { success: true, post_id: postId };
+    }
+
+    case "shopify": {
+      if (!creds.shopify_api_key) {
+        return { success: false, post_id: postId, error: "Shopify API key missing" };
+      }
+      const storeUrl = creds.shopify_store_url || creds.site_url;
+      if (extra?.blog_id) {
+        const res = await shopifyFetch(storeUrl, creds.shopify_api_key, `blogs/${extra.blog_id}/articles/${postId}.json`, { method: "DELETE" });
+        if (!res.ok) {
+          return { success: false, post_id: postId, error: `Shopify DELETE article failed: ${res.status}` };
+        }
+        return { success: true, post_id: postId };
+      }
+      // Try as page
+      const res = await shopifyFetch(storeUrl, creds.shopify_api_key, `pages/${postId}.json`, { method: "DELETE" });
+      if (!res.ok) {
+        return { success: false, post_id: postId, error: `Shopify DELETE page failed: ${res.status}` };
+      }
+      return { success: true, post_id: postId };
+    }
+
+    case "wix": {
+      if (!creds.wix_api_key || !creds.wix_site_id) {
+        return { success: false, post_id: postId, error: "Wix credentials missing" };
+      }
+      const hdrs = wixHeaders(creds.wix_api_key, creds.wix_site_id);
+      // Move to trash first (Wix doesn't hard-delete)
+      const res = await fetch(
+        `https://www.wixapis.com/blog/v3/posts/${postId}`,
+        { method: "DELETE", headers: hdrs }
+      );
+      if (!res.ok) {
+        return { success: false, post_id: postId, error: `Wix DELETE failed: ${res.status}` };
+      }
+      return { success: true, post_id: postId };
+    }
+
+    default:
+      return { success: false, post_id: postId, error: `CMS ${creds.cms} ne supporte pas la suppression` };
+  }
+}
+
 export async function getCmsPost(
   creds: CmsCredentials,
   postId: string | number
