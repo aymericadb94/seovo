@@ -51,9 +51,11 @@ export async function POST(request: Request) {
     };
 
     // Delete from CMS
+    console.log(`[DELETE] cms=${site.cms} post_id=${post_id} blog_id=${blog_id} url=${url}`);
     const result = await deleteCmsPost(creds, post_id, { blog_id });
 
     if (!result.success) {
+      console.error(`[DELETE] failed:`, result.error);
       return Response.json({ error: result.error ?? "Échec de la suppression CMS" }, { status: 500 });
     }
 

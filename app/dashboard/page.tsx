@@ -402,8 +402,9 @@ export default function Dashboard() {
         setCmsPages(prev => prev.filter(p => String(p.id) !== uiId));
       } else {
         console.error("Delete failed:", json.error);
+        alert(`Erreur de suppression : ${json.error || "Erreur inconnue"}`);
       }
-    } catch (err) { console.error("Delete error:", err); }
+    } catch (err) { console.error("Delete error:", err); alert("Erreur réseau lors de la suppression"); }
     finally {
       setDeletingPostId(null);
       setConfirmDeleteId(null);

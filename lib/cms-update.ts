@@ -980,7 +980,9 @@ export async function deleteCmsPost(
         { method: "DELETE", headers: hdrs }
       );
       if (!res.ok) {
-        return { success: false, post_id: postId, error: `Wix DELETE failed: ${res.status}` };
+        const body = await res.text().catch(() => "");
+        console.error(`[Wix DELETE] postId=${postId} status=${res.status} body=${body}`);
+        return { success: false, post_id: postId, error: `Wix DELETE failed: ${res.status} — ${body}` };
       }
       return { success: true, post_id: postId };
     }
