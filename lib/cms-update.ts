@@ -1074,9 +1074,20 @@ export async function getCmsPost(
 async function wixUpdatePostContent(
   apiKey: string, siteId: string, postId: string, newHtml: string
 ): Promise<UpdateResult> {
-  try {
-    const hdrs = wixHeaders(apiKey, siteId);
+  const hdrs = wixHeaders(apiKey, siteId);
+  let draftId: string | null = null;
 
+  // Helper: republish a draft to restore the original published state
+  async function republishDraft(id: string): Promise<void> {
+    try {
+      console.log(`[wix/update] Republishing draft ${id} to restore original state`);
+      await fetch(`https://www.wixapis.com/blog/v3/draft-posts/${id}/publish`, { method: "POST", headers: hdrs });
+    } catch (e) {
+      console.error(`[wix/update] Failed to republish draft ${id}:`, e);
+    }
+  }
+
+  try {
     // Extract new links from the modified HTML
     const allLinksInHtml: { url: string; text: string }[] = [];
     const allLinkRegex = /<a\s+href="([^"]+)"[^>]*>([^<]+)<\/a>/gi;
@@ -1093,7 +1104,6 @@ async function wixUpdatePostContent(
     // Strategy B: Check if a draft already exists for this post
     // Strategy C: Try PATCH directly on the post (some Wix versions allow it)
 
-    let draftId: string | null = null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let draftData: any = null;
     // Track content format: some old Wix posts use DraftJS (content.blocks), not richContent
@@ -1218,6 +1228,7 @@ async function wixUpdatePostContent(
 
     // FINAL SAFETY: re-verify content after all strategies
     if (existingFullNodes.length === 0 && !existingDraftJSContent) {
+      if (draftId) await republishDraft(draftId);
       return { success: false, post_id: postId, url: "", error: "Wix: impossible de récupérer le contenu existant — abandon par sécurité" };
     }
 
@@ -1236,6 +1247,7 @@ async function wixUpdatePostContent(
 
       const linksToAdd = allLinksInHtml.filter(l => !existingLinkUrls.has(l.url));
       if (linksToAdd.length === 0) {
+        await republishDraft(draftId);
         return { success: false, post_id: postId, url: "", error: "Liens déjà présents dans l'article" };
       }
 
@@ -1267,6 +1279,7 @@ async function wixUpdatePostContent(
       const updatedBlocks = [...blocks, ...newBlocks];
       // SAFETY: updated content must be LARGER than original (we only append)
       if (updatedBlocks.length < blocks.length) {
+        await republishDraft(draftId);
         return { success: false, post_id: postId, url: "", error: `Wix: safety check failed — updated blocks (${updatedBlocks.length}) < original (${blocks.length})` };
       }
 
@@ -1286,6 +1299,7 @@ async function wixUpdatePostContent(
       );
       if (!updateDraftRes.ok) {
         const errText = (await updateDraftRes.text()).slice(0, 300);
+        await republishDraft(draftId);
         return { success: false, post_id: postId, url: "", error: `Wix update draft failed (${updateDraftRes.status}): ${errText}` };
       }
 
@@ -1297,6 +1311,7 @@ async function wixUpdatePostContent(
         const verifyBlocks = verifyData.draftPost?.content?.blocks?.length ?? 0;
         if (verifyBlocks < blocks.length) {
           console.error(`[wix/update] ABORT: draft has ${verifyBlocks} blocks but original had ${blocks.length} — would lose content`);
+          await republishDraft(draftId);
           return { success: false, post_id: postId, url: "", error: `Wix: abandon — le brouillon (${verifyBlocks} blocs) a moins de contenu que l'original (${blocks.length} blocs)` };
         }
       }
@@ -1392,6 +1407,7 @@ async function wixUpdatePostContent(
 
     const linksToAdd = allLinksInHtml.filter(l => !existingLinks.has(l.url));
     if (linksToAdd.length === 0) {
+      if (draftId) await republishDraft(draftId);
       return { success: false, post_id: postId, url: "", error: "Liens déjà présents dans l'article" };
     }
 
@@ -1411,6 +1427,7 @@ async function wixUpdatePostContent(
     // SAFETY: baseNodes must have substantial content
     if (baseNodes.length < 3) {
       console.error(`[wix/update] ABORT: baseNodes only has ${baseNodes.length} nodes — would lose content`);
+      if (draftId) await republishDraft(draftId);
       return { success: false, post_id: postId, url: "", error: `Wix: contenu de base trop court (${baseNodes.length} nodes) — abandon pour éviter l'écrasement` };
     }
 
@@ -1427,6 +1444,7 @@ async function wixUpdatePostContent(
     );
     if (!updateDraftRes.ok) {
       const errText = (await updateDraftRes.text()).slice(0, 300);
+      if (draftId) await republishDraft(draftId);
       return { success: false, post_id: postId, url: "", error: `Wix update draft failed (${updateDraftRes.status}): ${errText}` };
     }
 
@@ -1438,6 +1456,7 @@ async function wixUpdatePostContent(
       const verifyNodeCount = verifyData.draftPost?.richContent?.nodes?.length ?? 0;
       if (verifyNodeCount < baseNodes.length) {
         console.error(`[wix/update] ABORT PUBLISH: draft has ${verifyNodeCount} nodes but original had ${baseNodes.length} — content loss detected`);
+        await republishDraft(draftId);
         return { success: false, post_id: postId, url: "", error: `Wix: abandon — le brouillon (${verifyNodeCount} nodes) a moins de contenu que l'original (${baseNodes.length} nodes)` };
       }
     }
@@ -1455,6 +1474,8 @@ async function wixUpdatePostContent(
     const url = pubData.post?.url ? `${pubData.post.url.base}${pubData.post.url.path}` : "";
     return { success: true, post_id: pubData.post?.id ?? postId, url };
   } catch (err) {
+    // If we have a draft from revert, republish it to restore original state
+    if (draftId) await republishDraft(draftId);
     return { success: false, post_id: postId, url: "", error: `Wix update error: ${err instanceof Error ? err.message : "Unknown"}` };
   }
 }
