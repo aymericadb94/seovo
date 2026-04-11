@@ -166,24 +166,25 @@ ${existingPagesCtx}
 
 MISSION : Analyse toutes ces données et conçois un cocon sémantique intelligent et complet.
 
-RÈGLE CRITIQUE — SOURCE DE VÉRITÉ :
-Les MOTS-CLÉS CONFIGURÉS ci-dessus sont la SOURCE DE VÉRITÉ ABSOLUE pour construire les clusters.
-Chaque cluster DOIT être construit autour d'un ou plusieurs de ces mots-clés configurés.
-Tu peux ajouter des mots-clés support complémentaires issus des données GSC ou de ton expertise, mais les piliers et mots-clés principaux DOIVENT provenir de la liste configurée.
-NE PAS inventer de clusters sur des thématiques absentes des mots-clés configurés, même si les données GSC ou les articles existants portent sur d'autres sujets.
-Les données GSC et les pages existantes servent à enrichir les clusters, détecter les pages existantes, et estimer le potentiel — PAS à définir les thématiques.
+HIÉRARCHIE DES SOURCES DE DONNÉES :
+1. DONNÉES GSC (source primaire) — Ce sont des données RÉELLES de trafic et comportement utilisateur. Les requêtes GSC avec clics/impressions révèlent les thématiques qui fonctionnent déjà et les opportunités concrètes. Construis les clusters principalement autour de ces thématiques réelles.
+2. MOTS-CLÉS CONFIGURÉS (source stratégique) — Ils représentent l'intention business du site. Utilise-les pour compléter les clusters GSC et pour créer des clusters sur des thématiques stratégiques pas encore visibles dans GSC (nouveaux marchés, nouvelles offres).
+3. TON EXPERTISE SEO — Pour combler les trous, suggérer des angles manquants et structurer le maillage.
+
+Si les données GSC sont absentes ou faibles (< 10 requêtes), appuie-toi davantage sur les mots-clés configurés et ton expertise.
+Les clusters doivent refléter la RÉALITÉ du trafic ET l'ambition stratégique du site.
 
 ÉTAPES :
 
 1. ANALYSE GLOBALE
-- Identifie les clusters DANS les mots-clés configurés
-- Détecte les pages fortes, faibles et les trous de contenu
+- Identifie les thématiques fortes dans les données GSC
+- Croise avec les mots-clés configurés pour détecter les trous de contenu
 - Évalue la maturité SEO actuelle du site
 
 2. CLUSTERISATION
-- Regroupe les MOTS-CLÉS CONFIGURÉS par intention de recherche et thématique
+- Regroupe les thématiques par intention de recherche (en priorité depuis GSC, complété par les mots-clés configurés)
 - Chaque cluster a un objectif SEO, un potentiel de trafic estimé, une priorité
-- Tu peux ajouter des mots-clés support complémentaires pertinents
+- Intègre les mots-clés configurés qui n'apparaissent pas encore dans GSC comme opportunités stratégiques
 
 3. STRUCTURE DU COCON
 Pour chaque cluster :
