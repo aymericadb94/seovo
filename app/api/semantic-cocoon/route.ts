@@ -166,16 +166,24 @@ ${existingPagesCtx}
 
 MISSION : Analyse toutes ces données et conçois un cocon sémantique intelligent et complet.
 
+RÈGLE CRITIQUE — SOURCE DE VÉRITÉ :
+Les MOTS-CLÉS CONFIGURÉS ci-dessus sont la SOURCE DE VÉRITÉ ABSOLUE pour construire les clusters.
+Chaque cluster DOIT être construit autour d'un ou plusieurs de ces mots-clés configurés.
+Tu peux ajouter des mots-clés support complémentaires issus des données GSC ou de ton expertise, mais les piliers et mots-clés principaux DOIVENT provenir de la liste configurée.
+NE PAS inventer de clusters sur des thématiques absentes des mots-clés configurés, même si les données GSC ou les articles existants portent sur d'autres sujets.
+Les données GSC et les pages existantes servent à enrichir les clusters, détecter les pages existantes, et estimer le potentiel — PAS à définir les thématiques.
+
 ÉTAPES :
 
 1. ANALYSE GLOBALE
-- Identifie les clusters de mots-clés dans les données GSC
+- Identifie les clusters DANS les mots-clés configurés
 - Détecte les pages fortes, faibles et les trous de contenu
 - Évalue la maturité SEO actuelle du site
 
 2. CLUSTERISATION
-- Regroupe les mots-clés par intention de recherche et thématique
+- Regroupe les MOTS-CLÉS CONFIGURÉS par intention de recherche et thématique
 - Chaque cluster a un objectif SEO, un potentiel de trafic estimé, une priorité
+- Tu peux ajouter des mots-clés support complémentaires pertinents
 
 3. STRUCTURE DU COCON
 Pour chaque cluster :
