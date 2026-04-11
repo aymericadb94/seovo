@@ -2631,13 +2631,13 @@ export default function Dashboard() {
                   const totalPubs = sliced.reduce((s, d) => s + d.count, 0);
                   const activeDays = sliced.filter(d => d.count > 0).length;
                   const maxCount = Math.max(...sliced.map(d => d.count), 1);
-                  const weekCount = calRange === 7 ? 1 : calRange === 30 ? 5 : 13;
-                  const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
                   const pubs = data.recentPublications ?? [];
+
+                  // Build lookup map for calendar data
+                  const calMap = new Map(sliced.map(d => [d.date, d.count]));
 
                   return (
                     <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover overflow-hidden">
-                      {/* Glow background */}
                       <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full opacity-[0.04] pointer-events-none" style={{ background: "radial-gradient(circle, #f97316, transparent 70%)" }} />
 
                       {/* Header */}
@@ -2664,138 +2664,254 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* Heatmap grid */}
-                      <div className="flex gap-0">
-                        {/* Day labels */}
-                        {calRange !== 7 && (
-                          <div className="flex flex-col gap-[3px] mr-2 pt-0">
-                            {dayNames.map((name, i) => (
-                              <div key={i} className="h-0 flex items-center" style={{ height: calRange === 30 ? "28px" : "14px" }}>
-                                {i % 2 === 0 && <span className="text-[10px] text-gray-700 font-medium">{name}</span>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          {calRange === 7 ? (
-                            /* ── Vue 7 jours : barres horizontales ── */
-                            <div className="space-y-2">
-                              {sliced.map((entry, i) => {
-                                const d = new Date(entry.date + "T12:00:00");
-                                const isToday = entry.date === todayStr;
-                                const pct = maxCount > 0 ? (entry.count / maxCount) * 100 : 0;
-                                const dayPubs = pubs.filter(p => p.published_at.startsWith(entry.date));
-                                return (
-                                  <div key={i} className={`group flex items-center gap-3 p-2.5 rounded-xl transition-all duration-300 ${isToday ? "bg-orange-500/[0.08] ring-1 ring-orange-500/20" : "hover:bg-white/[0.03]"}`} style={{ animationDelay: `${i * 60}ms` }}>
-                                    <div className="w-16 flex-shrink-0 text-center">
-                                      <p className={`text-xs font-bold uppercase ${isToday ? "text-orange-400" : "text-gray-500"}`}>
-                                        {d.toLocaleDateString("fr-FR", { weekday: "short" })}
-                                      </p>
-                                      <p className={`text-lg font-black ${isToday ? "text-white" : "text-gray-400"}`}>{d.getDate()}</p>
-                                    </div>
-                                    <div className="flex-1 relative">
-                                      <div className="h-8 bg-white/[0.04] rounded-lg overflow-hidden">
-                                        <div className="h-full rounded-lg transition-all duration-700 ease-out" style={{ width: `${Math.max(pct, entry.count > 0 ? 8 : 0)}%`, background: entry.count === 0 ? "transparent" : `linear-gradient(90deg, rgba(249,115,22,${0.3 + (pct/100)*0.5}), rgba(251,146,60,${0.4 + (pct/100)*0.5}))`, transitionDelay: `${i * 80}ms` }} />
-                                      </div>
-                                    </div>
-                                    <div className="w-8 text-right">
-                                      <span className={`text-sm font-black ${entry.count > 0 ? "text-orange-400" : "text-gray-700"}`}>{entry.count}</span>
-                                    </div>
-                                    {/* Détails au hover */}
-                                    {dayPubs.length > 0 && (
-                                      <div className="hidden group-hover:block absolute left-20 right-12 top-10 z-10 bg-gray-900/95 backdrop-blur-sm border border-white/10 rounded-xl p-3 shadow-2xl">
-                                        {dayPubs.map((p, j) => (
-                                          <div key={j} className="flex items-center gap-2 py-1">
-                                            <div className="w-1 h-1 rounded-full bg-orange-400" />
-                                            <span className="text-xs text-gray-300 truncate">{p.title}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
+                      {calRange === 7 ? (
+                        /* ══════ Vue 7 jours : barres horizontales ══════ */
+                        <div className="space-y-2">
+                          {sliced.map((entry, i) => {
+                            const d = new Date(entry.date + "T12:00:00");
+                            const isToday = entry.date === todayStr;
+                            const pct = maxCount > 0 ? (entry.count / maxCount) * 100 : 0;
+                            const dayPubs = pubs.filter(p => p.published_at.startsWith(entry.date));
+                            return (
+                              <div key={i} className={`group relative flex items-center gap-3 p-2.5 rounded-xl transition-all duration-300 ${isToday ? "bg-orange-500/[0.08] ring-1 ring-orange-500/20" : "hover:bg-white/[0.03]"}`}>
+                                <div className="w-16 flex-shrink-0 text-center">
+                                  <p className={`text-xs font-bold uppercase ${isToday ? "text-orange-400" : "text-gray-500"}`}>
+                                    {d.toLocaleDateString("fr-FR", { weekday: "short" })}
+                                  </p>
+                                  <p className={`text-lg font-black ${isToday ? "text-white" : "text-gray-400"}`}>{d.getDate()}</p>
+                                </div>
+                                <div className="flex-1">
+                                  <div className="h-8 bg-white/[0.04] rounded-lg overflow-hidden">
+                                    <div className="h-full rounded-lg transition-all duration-700 ease-out" style={{ width: `${Math.max(pct, entry.count > 0 ? 8 : 0)}%`, background: entry.count === 0 ? "transparent" : `linear-gradient(90deg, rgba(249,115,22,${0.3 + (pct/100)*0.5}), rgba(251,146,60,${0.4 + (pct/100)*0.5}))`, transitionDelay: `${i * 80}ms` }} />
                                   </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            /* ── Vue 30/90 jours : grille heatmap ── */
-                            <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${weekCount}, minmax(0, 1fr))` }}>
-                              {Array.from({ length: weekCount }).map((_, weekIdx) => (
-                                <div key={weekIdx} className="flex flex-col gap-[3px]">
-                                  {Array.from({ length: 7 }).map((_, dayIdx) => {
-                                    const cellIdx = weekIdx * 7 + dayIdx;
-                                    const entry = sliced[cellIdx];
-                                    if (!entry) return <div key={dayIdx} className="w-full rounded-[3px]" style={{ aspectRatio: "1" }} />;
-                                    const isToday = entry.date === todayStr;
-                                    const ratio = maxCount > 0 ? entry.count / maxCount : 0;
-                                    const dayPubs = pubs.filter(p => p.published_at.startsWith(entry.date));
-                                    const d = new Date(entry.date + "T12:00:00");
-                                    return (
-                                      <div
-                                        key={dayIdx}
-                                        className={`group relative w-full rounded-[3px] cursor-default transition-all duration-200 hover:scale-[1.4] hover:z-10 hover:rounded-md ${isToday ? "ring-1.5 ring-orange-400/80 ring-offset-1 ring-offset-gray-950" : ""}`}
-                                        style={{
-                                          aspectRatio: "1",
-                                          background: entry.count === 0
-                                            ? "rgba(255,255,255,0.03)"
-                                            : `rgba(249, 115, 22, ${0.15 + ratio * 0.75})`,
-                                          boxShadow: entry.count > 0 ? `0 0 ${4 + ratio * 8}px rgba(249,115,22,${ratio * 0.3})` : "none",
-                                        }}
-                                      >
-                                        {/* Tooltip */}
-                                        <div className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
-                                          <div className="bg-gray-900/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 shadow-2xl whitespace-nowrap">
-                                            <p className="text-white text-xs font-bold">{d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</p>
-                                            <p className="text-orange-400 text-[11px] font-semibold mt-0.5">
-                                              {entry.count === 0 ? "Aucune publication" : `${entry.count} article${entry.count > 1 ? "s" : ""} publié${entry.count > 1 ? "s" : ""}`}
-                                            </p>
-                                            {dayPubs.length > 0 && (
-                                              <div className="mt-1.5 pt-1.5 border-t border-white/10">
-                                                {dayPubs.slice(0, 3).map((p, j) => (
-                                                  <p key={j} className="text-gray-400 text-[10px] truncate max-w-[200px]">{p.title}</p>
-                                                ))}
-                                                {dayPubs.length > 3 && <p className="text-gray-600 text-[10px]">+{dayPubs.length - 3} autres</p>}
-                                              </div>
+                                  {dayPubs.length > 0 && (
+                                    <div className="mt-1.5 space-y-0.5">
+                                      {dayPubs.map((p, j) => (
+                                        <div key={j} className="flex items-center gap-1.5">
+                                          <div className="w-1 h-1 rounded-full bg-orange-400/60 flex-shrink-0" />
+                                          <span className="text-[11px] text-gray-500 truncate">{p.title}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="w-8 text-right flex-shrink-0">
+                                  <span className={`text-sm font-black ${entry.count > 0 ? "text-orange-400" : "text-gray-700"}`}>{entry.count}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : calRange === 30 ? (
+                        /* ══════ Vue 30 jours : vrai calendrier mensuel ══════ */
+                        (() => {
+                          // Build proper month calendar from last 30 days
+                          const today = new Date();
+                          const firstDay = new Date(today);
+                          firstDay.setDate(firstDay.getDate() - 29);
+                          // Get the Monday of the week containing firstDay
+                          const startOfCal = new Date(firstDay);
+                          const dow = startOfCal.getDay();
+                          startOfCal.setDate(startOfCal.getDate() - ((dow + 6) % 7)); // rewind to Monday
+
+                          // Generate all days from startOfCal to today (and pad to end of week)
+                          const endOfCal = new Date(today);
+                          const endDow = endOfCal.getDay();
+                          endOfCal.setDate(endOfCal.getDate() + (endDow === 0 ? 0 : 7 - endDow)); // forward to Sunday
+
+                          const allDays: Date[] = [];
+                          const cur = new Date(startOfCal);
+                          while (cur <= endOfCal) {
+                            allDays.push(new Date(cur));
+                            cur.setDate(cur.getDate() + 1);
+                          }
+
+                          const weeks: Date[][] = [];
+                          for (let i = 0; i < allDays.length; i += 7) {
+                            weeks.push(allDays.slice(i, i + 7));
+                          }
+
+                          const dayLabels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+                          const firstDateStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, "0")}-${String(firstDay.getDate()).padStart(2, "0")}`;
+
+                          return (
+                            <div>
+                              {/* Day headers */}
+                              <div className="grid grid-cols-7 gap-1 mb-1">
+                                {dayLabels.map(d => (
+                                  <div key={d} className="text-center">
+                                    <span className="text-[10px] font-semibold text-gray-600 uppercase">{d}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Weeks */}
+                              <div className="grid gap-1">
+                                {weeks.map((week, wi) => (
+                                  <div key={wi} className="grid grid-cols-7 gap-1">
+                                    {week.map((day, di) => {
+                                      const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+                                      const count = calMap.get(dateStr) ?? 0;
+                                      const isToday = dateStr === todayStr;
+                                      const inRange = dateStr >= firstDateStr && dateStr <= todayStr;
+                                      const ratio = maxCount > 0 ? count / maxCount : 0;
+                                      const dayPubs = pubs.filter(p => p.published_at.startsWith(dateStr));
+                                      const isFirstOfMonth = day.getDate() === 1;
+
+                                      return (
+                                        <div
+                                          key={di}
+                                          className={`group relative rounded-lg p-1.5 min-h-[56px] transition-all duration-200 cursor-default ${isToday ? "ring-1 ring-orange-400/60" : ""} ${!inRange ? "opacity-30" : ""}`}
+                                          style={{
+                                            background: !inRange ? "rgba(255,255,255,0.015)"
+                                              : count === 0 ? "rgba(255,255,255,0.03)"
+                                              : `rgba(249, 115, 22, ${0.08 + ratio * 0.25})`,
+                                            boxShadow: count > 0 && inRange ? `inset 0 0 ${8 + ratio * 12}px rgba(249,115,22,${ratio * 0.15})` : "none",
+                                          }}
+                                        >
+                                          <div className="flex items-center justify-between mb-0.5">
+                                            <span className={`text-[11px] font-bold ${isToday ? "text-orange-400" : isFirstOfMonth ? "text-white" : "text-gray-500"}`}>
+                                              {isFirstOfMonth ? day.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : day.getDate()}
+                                            </span>
+                                            {count > 0 && inRange && (
+                                              <span className="text-[10px] font-black text-orange-400">{count}</span>
                                             )}
                                           </div>
-                                          <div className="w-2 h-2 bg-gray-900/95 border-r border-b border-white/10 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
+                                          {/* Publication dots */}
+                                          {dayPubs.length > 0 && inRange && (
+                                            <div className="flex gap-0.5 flex-wrap">
+                                              {dayPubs.slice(0, 3).map((_, j) => (
+                                                <div key={j} className="w-1.5 h-1.5 rounded-full bg-orange-400" style={{ opacity: 0.5 + j * 0.2 }} />
+                                              ))}
+                                              {dayPubs.length > 3 && <span className="text-[8px] text-orange-400/60">+{dayPubs.length - 3}</span>}
+                                            </div>
+                                          )}
+                                          {/* Tooltip */}
+                                          {inRange && (
+                                            <div className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
+                                              <div className="bg-gray-900/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 shadow-2xl whitespace-nowrap">
+                                                <p className="text-white text-xs font-bold">{day.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</p>
+                                                <p className={`text-[11px] font-semibold mt-0.5 ${count > 0 ? "text-orange-400" : "text-gray-600"}`}>
+                                                  {count === 0 ? "Aucune publication" : `${count} article${count > 1 ? "s" : ""}`}
+                                                </p>
+                                                {dayPubs.length > 0 && (
+                                                  <div className="mt-1.5 pt-1.5 border-t border-white/10">
+                                                    {dayPubs.slice(0, 3).map((p, j) => (
+                                                      <p key={j} className="text-gray-400 text-[10px] truncate max-w-[200px]">{p.title}</p>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                              <div className="w-2 h-2 bg-gray-900/95 border-r border-b border-white/10 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
+                                            </div>
+                                          )}
                                         </div>
-                                      </div>
-                                    );
-                                  })}
+                                      );
+                                    })}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        /* ══════ Vue 90 jours : GitHub-style horizontal ══════ */
+                        (() => {
+                          // Reorganize data: rows = days of week (Mon-Sun), columns = weeks
+                          const dayLabels = ["Lun", "", "Mer", "", "Ven", "", ""];
+                          const weeks = Math.ceil(sliced.length / 7);
+
+                          return (
+                            <div>
+                              <div className="flex">
+                                {/* Day labels column */}
+                                <div className="flex flex-col gap-[3px] mr-2 justify-center">
+                                  {dayLabels.map((label, i) => (
+                                    <div key={i} className="flex items-center" style={{ height: "13px" }}>
+                                      <span className="text-[10px] text-gray-600 font-medium w-6">{label}</span>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Date labels */}
-                          {calRange !== 7 && (
-                            <div className="flex justify-between mt-2.5 text-[10px] text-gray-700 font-medium">
-                              {(() => {
-                                const labels: string[] = [];
-                                const total = calRange === 30 ? 5 : 13;
-                                const step = calRange === 30 ? 1 : 3;
-                                for (let w = total - 1; w >= 0; w -= step) {
-                                  const idx = w * 7;
-                                  if (sliced[idx]) {
-                                    const d = new Date(sliced[idx].date + "T12:00:00");
-                                    labels.push(d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }));
+                                {/* Grid */}
+                                <div className="flex-1 flex gap-[3px]">
+                                  {Array.from({ length: weeks }).map((_, weekIdx) => (
+                                    <div key={weekIdx} className="flex-1 flex flex-col gap-[3px]">
+                                      {Array.from({ length: 7 }).map((_, dayIdx) => {
+                                        const cellIdx = weekIdx * 7 + dayIdx;
+                                        const entry = sliced[cellIdx];
+                                        if (!entry) return <div key={dayIdx} className="rounded-[3px]" style={{ height: "13px" }} />;
+                                        const isToday = entry.date === todayStr;
+                                        const ratio = maxCount > 0 ? entry.count / maxCount : 0;
+                                        const dayPubs = pubs.filter(p => p.published_at.startsWith(entry.date));
+                                        const d = new Date(entry.date + "T12:00:00");
+                                        return (
+                                          <div
+                                            key={dayIdx}
+                                            className={`group relative rounded-[3px] cursor-default transition-all duration-200 hover:scale-[1.8] hover:z-10 hover:rounded-md ${isToday ? "ring-1 ring-orange-400/70" : ""}`}
+                                            style={{
+                                              height: "13px",
+                                              background: entry.count === 0
+                                                ? "rgba(255,255,255,0.035)"
+                                                : `rgba(249, 115, 22, ${0.18 + ratio * 0.72})`,
+                                              boxShadow: entry.count > 0 ? `0 0 ${3 + ratio * 6}px rgba(249,115,22,${ratio * 0.25})` : "none",
+                                            }}
+                                          >
+                                            <div className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
+                                              <div className="bg-gray-900/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 shadow-2xl whitespace-nowrap">
+                                                <p className="text-white text-xs font-bold">{d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</p>
+                                                <p className={`text-[11px] font-semibold mt-0.5 ${entry.count > 0 ? "text-orange-400" : "text-gray-600"}`}>
+                                                  {entry.count === 0 ? "Aucune publication" : `${entry.count} article${entry.count > 1 ? "s" : ""}`}
+                                                </p>
+                                                {dayPubs.length > 0 && (
+                                                  <div className="mt-1.5 pt-1.5 border-t border-white/10">
+                                                    {dayPubs.slice(0, 3).map((p, j) => (
+                                                      <p key={j} className="text-gray-400 text-[10px] truncate max-w-[200px]">{p.title}</p>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                              <div className="w-2 h-2 bg-gray-900/95 border-r border-b border-white/10 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              {/* Month labels */}
+                              <div className="flex mt-2 ml-8">
+                                {(() => {
+                                  const labels: { label: string; pos: number }[] = [];
+                                  let lastMonth = -1;
+                                  for (let w = 0; w < weeks; w++) {
+                                    const idx = w * 7;
+                                    if (sliced[idx]) {
+                                      const d = new Date(sliced[idx].date + "T12:00:00");
+                                      if (d.getMonth() !== lastMonth) {
+                                        lastMonth = d.getMonth();
+                                        labels.push({ label: d.toLocaleDateString("fr-FR", { month: "short" }), pos: w });
+                                      }
+                                    }
                                   }
-                                }
-                                return labels.reverse().map((l, i) => <span key={i}>{l}</span>);
-                              })()}
+                                  return labels.map((l, i) => (
+                                    <span key={i} className="text-[10px] text-gray-600 font-medium" style={{ position: "absolute", left: `calc(${(l.pos / weeks) * 100}% + 2rem)` }}>
+                                      {l.label}
+                                    </span>
+                                  ));
+                                })()}
+                              </div>
+                              {/* Legend */}
+                              <div className="flex items-center justify-end gap-1.5 mt-5 text-[10px] text-gray-600">
+                                <span>Moins</span>
+                                {[0, 0.2, 0.4, 0.7, 1].map((v, i) => (
+                                  <div key={i} className="w-[13px] h-[13px] rounded-[3px]" style={{ background: v === 0 ? "rgba(255,255,255,0.035)" : `rgba(249,115,22,${0.18 + v * 0.72})` }} />
+                                ))}
+                                <span>Plus</span>
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Legend */}
-                      <div className="flex items-center justify-end gap-1.5 mt-4 text-[10px] text-gray-600">
-                        <span>Moins</span>
-                        {[0, 0.2, 0.4, 0.7, 1].map((opacity, i) => (
-                          <div key={i} className="w-3 h-3 rounded-[2px] transition-transform hover:scale-125" style={{ background: opacity === 0 ? "rgba(255,255,255,0.03)" : `rgba(249, 115, 22, ${0.15 + opacity * 0.75})` }} />
-                        ))}
-                        <span>Plus</span>
-                      </div>
+                          );
+                        })()
+                      )}
                     </div>
                   );
                 })()}
