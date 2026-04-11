@@ -784,19 +784,13 @@ function generateAnchor(
   // 1. Exact keyword
   if (kw) candidates.push(kw);
 
-  // 2. Partial keyword (first 2-3 words) — only if keyword is long
   const kwWords = kw.split(/\s+/).filter(Boolean);
-  if (kwWords.length >= 4) {
-    candidates.push(kwWords.slice(0, 3).join(" "));
-  }
 
-  // 3. Title-based (shortened but still meaningful — at least 4 words)
+  // 2. Title-based (meaningful, never less than 4 words)
   if (cleanTitle.length > 10 && cleanTitle.toLowerCase() !== kw.toLowerCase()) {
     const titleWords = cleanTitle.split(/\s+/);
     if (titleWords.length > 6) {
       candidates.push(titleWords.slice(0, 5).join(" "));
-    } else if (titleWords.length > 4) {
-      candidates.push(titleWords.slice(0, 4).join(" "));
     } else {
       candidates.push(cleanTitle);
     }
