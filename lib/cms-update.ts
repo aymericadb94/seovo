@@ -973,9 +973,10 @@ export async function deleteCmsPost(
         return { success: false, post_id: postId, error: "Wix credentials missing" };
       }
       const hdrs = wixHeaders(creds.wix_api_key, creds.wix_site_id);
-      // Move to trash first (Wix doesn't hard-delete)
+      // Wix uses the draft-posts endpoint for deleting (even published posts)
+      // ?permanent=true bypasses trash bin
       const res = await fetch(
-        `https://www.wixapis.com/blog/v3/posts/${postId}`,
+        `https://www.wixapis.com/blog/v3/draft-posts/${postId}?permanent=true`,
         { method: "DELETE", headers: hdrs }
       );
       if (!res.ok) {
