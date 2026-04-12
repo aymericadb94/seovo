@@ -2280,7 +2280,11 @@ export default function Dashboard() {
                                   <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 p-4">
                                     <p className="text-white font-bold text-sm text-center">Supprimer cet article du CMS ?</p>
                                     <p className="text-gray-400 text-xs text-center">Cette action est irréversible</p>
-                                    <div className="flex gap-2">
+                                    <div className="flex items-start gap-2 px-3 py-2 rounded-lg mt-1" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0 mt-0.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                      <p className="text-amber-400/90 text-[10px] leading-relaxed">D&apos;autres articles peuvent contenir des liens vers cette page. Pensez à cliquer sur <strong>&quot;Nettoyer les liens&quot;</strong> après la suppression.</p>
+                                    </div>
+                                    <div className="flex gap-2 mt-1">
                                       <button
                                         onClick={() => setConfirmDeleteId(null)}
                                         className="px-4 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-gray-300 hover:bg-white/20 transition-colors"
