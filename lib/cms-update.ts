@@ -1481,6 +1481,284 @@ async function wixUpdatePostContent(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// WIX: REMOVE BROKEN LINKS (works directly on richContent / DraftJS)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Remove broken internal links from a Wix post by working directly on the
+ * native content format (richContent or DraftJS). This bypasses HTML conversion
+ * entirely, which is critical because wixUpdatePostContent only appends links.
+ *
+ * For richContent: removes LINK decorations from TEXT nodes where URL is broken.
+ * For DraftJS: removes entityRanges + entities where the link URL is broken.
+ * In both cases, "À lire aussi" paragraphs with only broken links are removed entirely.
+ *
+ * Returns the number of links removed, or -1 on error.
+ */
+export async function wixRemoveBrokenLinks(
+  apiKey: string,
+  siteId: string,
+  postId: string,
+  isBrokenUrl: (href: string) => boolean,
+  extra?: { supabase?: SupabaseClient; userId?: string }
+): Promise<{ removed: number; brokenUrls: string[]; error?: string }> {
+  const hdrs = wixHeaders(apiKey, siteId);
+  let draftId: string | null = null;
+
+  async function republishDraft(id: string): Promise<void> {
+    try {
+      await fetch(`https://www.wixapis.com/blog/v3/draft-posts/${id}/publish`, { method: "POST", headers: hdrs });
+    } catch { /* best effort */ }
+  }
+
+  try {
+    // ── Fetch existing content ──
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let richContentNodes: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let draftJSContent: any = null;
+    let contentFormat: "richContent" | "draftJS" = "richContent";
+
+    for (const fs of ["CONTENT_TEXT", "CONTENT"]) {
+      if (richContentNodes.length > 0) break;
+      try {
+        const res = await fetch(`https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=${fs}`, { headers: hdrs });
+        if (!res.ok) continue;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await res.json() as any;
+        const nodes = data.post?.richContent?.nodes ?? [];
+        if (nodes.length > richContentNodes.length) richContentNodes = nodes;
+        if (nodes.length === 0 && data.post?.content?.blocks?.length > 0) {
+          contentFormat = "draftJS";
+          draftJSContent = data.post.content;
+        }
+      } catch { /* try next */ }
+    }
+
+    if (richContentNodes.length === 0 && !draftJSContent) {
+      return { removed: -1, brokenUrls: [], error: "Impossible de récupérer le contenu du post" };
+    }
+
+    // ── Snapshot (safety) ──
+    if (extra?.supabase && extra?.userId) {
+      try {
+        const currentPost = await getCmsPost(
+          { cms: "wix", site_url: "", wix_api_key: apiKey, wix_site_id: siteId } as CmsCredentials,
+          postId
+        );
+        if (currentPost) {
+          await saveSnapshot(extra.supabase, extra.userId, currentPost, "cleanup_broken_links");
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    const brokenUrls: string[] = [];
+    let removed = 0;
+
+    // ── richContent path ──
+    if (contentFormat === "richContent" && richContentNodes.length > 0) {
+      // Walk all nodes recursively and remove LINK decorations for broken URLs
+      // Also remove entire "À lire aussi" paragraphs if only link is broken
+      function cleanNodes(nodes: WixRichNode[]): WixRichNode[] {
+        const result: WixRichNode[] = [];
+        for (const node of nodes) {
+          // Check if this is a "À lire aussi" paragraph with a broken link
+          if (node.type === "PARAGRAPH" && node.nodes) {
+            const textParts = node.nodes.filter((n: WixRichNode) => n.type === "TEXT");
+            const fullText = textParts.map((n: WixRichNode) => n.textData?.text ?? "").join("");
+            if (fullText.toLowerCase().includes("à lire aussi")) {
+              const linkNodes = textParts.filter((n: WixRichNode) =>
+                n.textData?.decorations?.some((d: { type: string; linkData?: { link?: { url?: string } } }) => d.type === "LINK")
+              );
+              const allBroken = linkNodes.length > 0 && linkNodes.every((n: WixRichNode) => {
+                const linkDecor = n.textData?.decorations?.find((d: { type: string; linkData?: { link?: { url?: string } } }) => d.type === "LINK");
+                const url = linkDecor?.linkData?.link?.url ?? "";
+                return url && isBrokenUrl(url);
+              });
+              if (allBroken) {
+                for (const n of linkNodes) {
+                  const url = n.textData?.decorations?.find((d: { type: string; linkData?: { link?: { url?: string } } }) => d.type === "LINK")?.linkData?.link?.url ?? "";
+                  brokenUrls.push(url);
+                  removed++;
+                }
+                continue; // skip entire paragraph
+              }
+            }
+          }
+
+          // For any node with TEXT children, strip LINK decorations for broken URLs
+          if (node.nodes) {
+            const cleanedChildren: WixRichNode[] = [];
+            for (const child of node.nodes) {
+              if (child.type === "TEXT" && child.textData?.decorations) {
+                const linkDecor = child.textData.decorations.find(
+                  (d: { type: string; linkData?: { link?: { url?: string } } }) => d.type === "LINK"
+                );
+                if (linkDecor?.linkData?.link?.url && isBrokenUrl(linkDecor.linkData.link.url)) {
+                  brokenUrls.push(linkDecor.linkData.link.url);
+                  removed++;
+                  // Keep text, remove LINK decoration
+                  cleanedChildren.push({
+                    ...child,
+                    textData: {
+                      ...child.textData,
+                      decorations: child.textData.decorations.filter(
+                        (d: { type: string }) => d.type !== "LINK"
+                      ),
+                    },
+                  });
+                  continue;
+                }
+              }
+              // Recurse for containers
+              if (child.nodes) {
+                cleanedChildren.push({ ...child, nodes: cleanNodes(child.nodes) });
+              } else {
+                cleanedChildren.push(child);
+              }
+            }
+            result.push({ ...node, nodes: cleanedChildren });
+          } else {
+            result.push(node);
+          }
+        }
+        return result;
+      }
+
+      const cleanedNodes = cleanNodes(richContentNodes as WixRichNode[]);
+      if (removed === 0) return { removed: 0, brokenUrls: [] };
+
+      // Revert to draft
+      const revertRes = await fetch(
+        `https://www.wixapis.com/blog/v3/draft-posts/revert/${postId}`,
+        { method: "POST", headers: hdrs }
+      );
+      if (revertRes.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const revertData = await revertRes.json() as any;
+        draftId = revertData?.draftPost?.id ?? null;
+      }
+      if (!draftId) {
+        return { removed: -1, brokenUrls, error: "Impossible de créer un brouillon Wix" };
+      }
+
+      // PATCH the cleaned richContent
+      const patchRes = await fetch(
+        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}`,
+        {
+          method: "PATCH",
+          headers: hdrs,
+          body: JSON.stringify({ draftPost: { richContent: { nodes: cleanedNodes } }, fieldMask: ["richContent"] }),
+        }
+      );
+      if (!patchRes.ok) {
+        await republishDraft(draftId);
+        return { removed: -1, brokenUrls, error: `PATCH failed: ${patchRes.status}` };
+      }
+
+      // Publish
+      const pubRes = await fetch(
+        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}/publish`,
+        { method: "POST", headers: hdrs }
+      );
+      if (!pubRes.ok) {
+        return { removed: -1, brokenUrls, error: `Publish failed: ${pubRes.status}` };
+      }
+
+      return { removed, brokenUrls };
+    }
+
+    // ── DraftJS path ──
+    if (contentFormat === "draftJS" && draftJSContent) {
+      const blocks = draftJSContent.blocks as WixDraftBlock[];
+      const entityMap = (draftJSContent.entityMap ?? {}) as Record<string, WixDraftEntity>;
+
+      // Find broken entity keys
+      const brokenEntityKeys = new Set<number>();
+      for (const [key, entity] of Object.entries(entityMap)) {
+        if (entity.type === "LINK") {
+          const url = entity.data?.url ?? entity.data?.href ?? "";
+          if (url && isBrokenUrl(url)) {
+            brokenEntityKeys.add(Number(key));
+            brokenUrls.push(url);
+            removed++;
+          }
+        }
+      }
+
+      if (removed === 0) return { removed: 0, brokenUrls: [] };
+
+      // Remove "À lire aussi" blocks with only broken links
+      const cleanedBlocks = blocks.filter(block => {
+        if (block.text.toLowerCase().includes("à lire aussi")) {
+          const hasOnlyBrokenLinks = (block.entityRanges ?? []).every(r => brokenEntityKeys.has(r.key));
+          if (hasOnlyBrokenLinks && (block.entityRanges ?? []).length > 0) return false;
+        }
+        return true;
+      });
+
+      // For remaining blocks, strip broken entityRanges
+      for (const block of cleanedBlocks) {
+        if (block.entityRanges) {
+          block.entityRanges = block.entityRanges.filter(r => !brokenEntityKeys.has(r.key));
+        }
+      }
+
+      // Remove broken entities from map
+      const cleanedEntityMap = { ...entityMap };
+      for (const key of brokenEntityKeys) {
+        delete cleanedEntityMap[String(key)];
+      }
+
+      // Revert to draft
+      const revertRes = await fetch(
+        `https://www.wixapis.com/blog/v3/draft-posts/revert/${postId}`,
+        { method: "POST", headers: hdrs }
+      );
+      if (revertRes.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const revertData = await revertRes.json() as any;
+        draftId = revertData?.draftPost?.id ?? null;
+      }
+      if (!draftId) {
+        return { removed: -1, brokenUrls, error: "Impossible de créer un brouillon Wix" };
+      }
+
+      const patchRes = await fetch(
+        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}`,
+        {
+          method: "PATCH",
+          headers: hdrs,
+          body: JSON.stringify({
+            draftPost: { content: { blocks: cleanedBlocks, entityMap: cleanedEntityMap } },
+            fieldMask: ["content"],
+          }),
+        }
+      );
+      if (!patchRes.ok) {
+        await republishDraft(draftId);
+        return { removed: -1, brokenUrls, error: `PATCH failed: ${patchRes.status}` };
+      }
+
+      const pubRes = await fetch(
+        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}/publish`,
+        { method: "POST", headers: hdrs }
+      );
+      if (!pubRes.ok) {
+        return { removed: -1, brokenUrls, error: `Publish failed: ${pubRes.status}` };
+      }
+
+      return { removed, brokenUrls };
+    }
+
+    return { removed: 0, brokenUrls: [] };
+  } catch (err) {
+    if (draftId) await republishDraft(draftId);
+    return { removed: -1, brokenUrls: [], error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // HTML → DRAFT.JS CONVERSION (kept for potential future use)
 // ══════════════════════════════════════════════════════════════════════════════
 

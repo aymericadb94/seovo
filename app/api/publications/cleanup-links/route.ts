@@ -4,11 +4,12 @@
  * Source of truth: ONLY the CMS (live posts from Wix/WP/Shopify API).
  * NOT the publications DB table (which can contain stale/wrong URLs).
  *
- * A link is broken if its slug doesn't match any live CMS post slug.
+ * For Wix: works directly on richContent/DraftJS (not HTML conversion).
+ * For WP/Shopify: works on HTML content.
  */
 
 import { createClient } from "@/lib/supabase/server";
-import { listCmsPosts, updateCmsPost, type CmsCredentials } from "@/lib/cms-update";
+import { listCmsPosts, updateCmsPost, wixRemoveBrokenLinks, type CmsCredentials } from "@/lib/cms-update";
 import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
@@ -57,7 +58,6 @@ export async function POST() {
     const siteHost = new URL(site.site_url).hostname.replace(/^www\./, "");
 
     // SOURCE DE VÉRITÉ : UNIQUEMENT les URLs/slugs des posts CMS réels
-    // PAS la table publications (qui peut contenir des URLs fausses)
     const liveUrls = new Set<string>();
     const liveSlugs = new Set<string>();
     for (const p of allPosts) {
@@ -66,22 +66,82 @@ export async function POST() {
         const slug = extractSlug(p.url);
         if (slug && slug.length > 3) liveSlugs.add(slug);
       }
-      // Also extract slug from title (Wix uses title-based slugs)
-      if (p.title) {
-        const titleSlug = p.title.toLowerCase()
-          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-        if (titleSlug.length > 3) liveSlugs.add(titleSlug);
-      }
     }
 
     logger.info(`[cleanup-links] Live CMS: ${allPosts.length} posts, ${liveUrls.size} URLs, ${liveSlugs.size} slugs`);
     logger.info(`[cleanup-links] Live slugs: ${[...liveSlugs].join(", ")}`);
 
+    // Function to check if an internal link URL is broken
+    function isBrokenInternalLink(href: string): boolean {
+      if (!href.startsWith("http")) return false;
+      let linkHost: string;
+      try {
+        linkHost = new URL(href).hostname.replace(/^www\./, "");
+      } catch {
+        return false;
+      }
+      // Only check internal links
+      if (linkHost !== siteHost) return false;
+
+      // Check 1: exact URL match
+      const normalized = href.replace(/\/$/, "").toLowerCase();
+      if (liveUrls.has(normalized)) return false;
+
+      // Check 2: slug match
+      const slug = extractSlug(href);
+      if (slug && slug.length > 3 && liveSlugs.has(slug)) return false;
+
+      // No match → broken
+      logger.info(`[cleanup-links] BROKEN: ${href} (slug: "${slug}")`);
+      return true;
+    }
+
     const details: { title: string; removed: number; broken_urls: string[] }[] = [];
     let totalCleaned = 0;
     let totalLinksFound = 0;
 
+    // ── WIX: use native richContent/DraftJS approach ──
+    if (site.cms === "wix" && site.wix_api_key && site.wix_site_id) {
+      for (const post of allPosts) {
+        // Count internal links in converted HTML for reporting
+        const linkRegex = /<a\s+[^>]*href="([^"]+)"[^>]*>/gi;
+        let match;
+        while ((match = linkRegex.exec(post.content)) !== null) {
+          const href = match[1];
+          if (!href.startsWith("http")) continue;
+          try {
+            const host = new URL(href).hostname.replace(/^www\./, "");
+            if (host === siteHost) totalLinksFound++;
+          } catch { /* skip */ }
+        }
+
+        const result = await wixRemoveBrokenLinks(
+          site.wix_api_key,
+          site.wix_site_id,
+          post.id as string,
+          isBrokenInternalLink,
+          { supabase, userId: user.id }
+        );
+
+        if (result.removed > 0) {
+          details.push({ title: post.title, removed: result.removed, broken_urls: result.brokenUrls });
+          totalCleaned += result.removed;
+        } else if (result.error) {
+          logger.warn(`[cleanup-links] "${post.title}": ${result.error}`);
+        }
+      }
+
+      logger.info(`[cleanup-links] Done (Wix native): ${totalLinksFound} internal links, ${totalCleaned} broken removed`);
+
+      return Response.json({
+        cleaned: totalCleaned,
+        scanned: allPosts.length,
+        links_found: totalLinksFound,
+        details,
+      });
+    }
+
+    // ── WP / Shopify: HTML regex approach ──
     for (const post of allPosts) {
       let removedCount = 0;
       const brokenUrls: string[] = [];
@@ -89,35 +149,22 @@ export async function POST() {
       const cleanedHtml = post.content.replace(
         /<a\s+[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi,
         (fullMatch, href: string, innerText: string) => {
-          if (!href.startsWith("http")) return fullMatch;
-
-          let linkBase: string;
-          try {
-            linkBase = new URL(href).hostname.replace(/^www\./, "");
-          } catch {
-            return fullMatch;
+          if (isBrokenInternalLink(href)) {
+            removedCount++;
+            brokenUrls.push(href);
+            return innerText;
           }
-
-          // Skip external links
-          if (linkBase !== siteHost) return fullMatch;
-
-          totalLinksFound++;
-
-          // Check 1: exact URL match against live CMS
-          const normalized = href.replace(/\/$/, "").toLowerCase();
-          if (liveUrls.has(normalized)) return fullMatch;
-
-          // Check 2: slug match against live CMS slugs
-          const slug = extractSlug(href);
-          if (slug && slug.length > 3 && liveSlugs.has(slug)) return fullMatch;
-
-          // No match in live CMS → this link is BROKEN
-          removedCount++;
-          brokenUrls.push(href);
-          logger.info(`[cleanup-links] BROKEN in "${post.title}": ${href} (slug: "${slug}")`);
-          return innerText;
+          if (href.startsWith("http")) {
+            try {
+              const host = new URL(href).hostname.replace(/^www\./, "");
+              if (host === siteHost) totalLinksFound++;
+            } catch { /* skip */ }
+          }
+          return fullMatch;
         }
       );
+      // Count broken links as found too
+      totalLinksFound += removedCount;
 
       if (removedCount === 0) continue;
 
@@ -136,33 +183,12 @@ export async function POST() {
       }
     }
 
-    // Also clean stale DB entries: remove publications whose URL doesn't match any live CMS post
-    let dbCleaned = 0;
-    try {
-      const { data: dbPubs } = await supabase
-        .from("publications")
-        .select("id, wordpress_url")
-        .eq("user_id", user.id);
-      for (const pub of dbPubs ?? []) {
-        if (!pub.wordpress_url) continue;
-        const pubNorm = pub.wordpress_url.replace(/\/$/, "").toLowerCase();
-        const pubSlug = extractSlug(pub.wordpress_url);
-        const matchesLive = liveUrls.has(pubNorm) || (pubSlug && pubSlug.length > 3 && liveSlugs.has(pubSlug));
-        if (!matchesLive) {
-          // This DB entry references a page that doesn't exist on the CMS
-          logger.info(`[cleanup-links] Stale DB entry: ${pub.wordpress_url} (slug: "${pubSlug}") — no live CMS match`);
-          dbCleaned++;
-        }
-      }
-    } catch { /* non-blocking */ }
-
-    logger.info(`[cleanup-links] Done: ${totalLinksFound} internal links, ${totalCleaned} broken removed, ${dbCleaned} stale DB entries found`);
+    logger.info(`[cleanup-links] Done: ${totalLinksFound} internal links, ${totalCleaned} broken removed`);
 
     return Response.json({
       cleaned: totalCleaned,
       scanned: allPosts.length,
       links_found: totalLinksFound,
-      stale_db_entries: dbCleaned,
       details,
     });
   } catch (err: unknown) {
