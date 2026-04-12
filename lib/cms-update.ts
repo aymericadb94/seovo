@@ -1563,6 +1563,97 @@ export async function wixListRawPosts(
 }
 
 /**
+ * Apply a content patch to a Wix post using 3 strategies with fallbacks:
+ * 1. Try direct PATCH on published post
+ * 2. Try revert-to-draft → PATCH draft → publish
+ * 3. Try listing existing drafts → PATCH draft → publish
+ */
+async function wixPatchContent(
+  hdrs: Record<string, string>,
+  postId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  patchPayload: Record<string, any>,
+  fieldMaskField: string
+): Promise<{ success: boolean; error?: string }> {
+  // Strategy 1: Direct PATCH on published post
+  console.log(`[wix/patch] Trying direct PATCH on post ${postId}`);
+  const directRes = await fetch(
+    `https://www.wixapis.com/blog/v3/posts/${postId}`,
+    {
+      method: "PATCH",
+      headers: hdrs,
+      body: JSON.stringify({ post: patchPayload, fieldMask: [fieldMaskField] }),
+    }
+  );
+  if (directRes.ok) {
+    console.log(`[wix/patch] Direct PATCH succeeded for ${postId}`);
+    return { success: true };
+  }
+  console.log(`[wix/patch] Direct PATCH failed: ${directRes.status}`);
+
+  // Strategy 2: Revert to draft → PATCH → publish
+  let draftId: string | null = null;
+  const revertRes = await fetch(
+    `https://www.wixapis.com/blog/v3/draft-posts/revert/${postId}`,
+    { method: "POST", headers: hdrs }
+  );
+  if (revertRes.ok) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const revertData = await revertRes.json() as any;
+    draftId = revertData?.draftPost?.id ?? null;
+    console.log(`[wix/patch] Revert succeeded, draftId=${draftId}`);
+  } else {
+    console.log(`[wix/patch] Revert failed: ${revertRes.status}`);
+  }
+
+  // Strategy 3: Find existing draft
+  if (!draftId) {
+    const listRes = await fetch(
+      `https://www.wixapis.com/blog/v3/draft-posts?paging.limit=100`,
+      { headers: hdrs }
+    );
+    if (listRes.ok) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const listData = await listRes.json() as { draftPosts?: any[] };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const match = listData.draftPosts?.find((d: any) => d.postId === postId || d.id === postId);
+      if (match) {
+        draftId = match.id;
+        console.log(`[wix/patch] Found existing draft: ${draftId}`);
+      }
+    }
+  }
+
+  if (!draftId) {
+    return { success: false, error: `Impossible de modifier le post Wix (direct PATCH=${directRes.status}, revert=${revertRes.status})` };
+  }
+
+  // PATCH the draft
+  const draftPatchPayload: Record<string, unknown> = { draftPost: patchPayload, fieldMask: [fieldMaskField] };
+  const patchRes = await fetch(
+    `https://www.wixapis.com/blog/v3/draft-posts/${draftId}`,
+    { method: "PATCH", headers: hdrs, body: JSON.stringify(draftPatchPayload) }
+  );
+  if (!patchRes.ok) {
+    // Republish the draft to restore original state
+    await fetch(`https://www.wixapis.com/blog/v3/draft-posts/${draftId}/publish`, { method: "POST", headers: hdrs }).catch(() => {});
+    return { success: false, error: `Draft PATCH failed: ${patchRes.status}` };
+  }
+
+  // Publish the draft
+  const pubRes = await fetch(
+    `https://www.wixapis.com/blog/v3/draft-posts/${draftId}/publish`,
+    { method: "POST", headers: hdrs }
+  );
+  if (!pubRes.ok) {
+    return { success: false, error: `Draft publish failed: ${pubRes.status}` };
+  }
+
+  console.log(`[wix/patch] Draft workflow succeeded for ${postId}`);
+  return { success: true };
+}
+
+/**
  * Remove broken internal links from a Wix post by working directly on the
  * native content format (richContent or DraftJS).
  *
@@ -1578,13 +1669,6 @@ export async function wixRemoveBrokenLinks(
 ): Promise<{ removed: number; brokenUrls: string[]; error?: string }> {
   const hdrs = wixHeaders(apiKey, siteId);
   const postId = rawPost.id;
-  let draftId: string | null = null;
-
-  async function republishDraft(id: string): Promise<void> {
-    try {
-      await fetch(`https://www.wixapis.com/blog/v3/draft-posts/${id}/publish`, { method: "POST", headers: hdrs });
-    } catch { /* best effort */ }
-  }
 
   try {
     const richContentNodes = rawPost.richContentNodes;
@@ -1694,47 +1778,18 @@ export async function wixRemoveBrokenLinks(
       const cleanedNodes = cleanNodes(richContentNodes as WixRichNode[]);
       if (removed === 0) return { removed: 0, brokenUrls: [] };
 
-      const revertRes = await fetch(
-        `https://www.wixapis.com/blog/v3/draft-posts/revert/${postId}`,
-        { method: "POST", headers: hdrs }
-      );
-      if (revertRes.ok) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const revertData = await revertRes.json() as any;
-        draftId = revertData?.draftPost?.id ?? null;
+      // Apply the cleaned content to Wix (3 strategies with fallbacks)
+      const patchResult = await wixPatchContent(hdrs, postId, { richContent: { nodes: cleanedNodes } }, "richContent");
+      if (!patchResult.success) {
+        return { removed: -1, brokenUrls, error: patchResult.error ?? "PATCH failed" };
       }
-      if (!draftId) {
-        return { removed: -1, brokenUrls, error: "Impossible de créer un brouillon Wix" };
-      }
-
-      const patchRes = await fetch(
-        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}`,
-        {
-          method: "PATCH",
-          headers: hdrs,
-          body: JSON.stringify({ draftPost: { richContent: { nodes: cleanedNodes } }, fieldMask: ["richContent"] }),
-        }
-      );
-      if (!patchRes.ok) {
-        await republishDraft(draftId);
-        return { removed: -1, brokenUrls, error: `PATCH failed: ${patchRes.status}` };
-      }
-
-      const pubRes = await fetch(
-        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}/publish`,
-        { method: "POST", headers: hdrs }
-      );
-      if (!pubRes.ok) {
-        return { removed: -1, brokenUrls, error: `Publish failed: ${pubRes.status}` };
-      }
-
       return { removed, brokenUrls };
     }
 
     // ── DraftJS path ──
     if (contentFormat === "draftJS" && draftJSContent) {
-      const blocks = draftJSContent.blocks as WixDraftBlock[];
-      const entityMap = (draftJSContent.entityMap ?? {}) as Record<string, WixDraftEntity>;
+      const blocks = [...(draftJSContent.blocks as WixDraftBlock[])];
+      const entityMap = { ...(draftJSContent.entityMap ?? {}) } as Record<string, WixDraftEntity>;
 
       // Log all link entities
       for (const [key, entity] of Object.entries(entityMap)) {
@@ -1777,49 +1832,19 @@ export async function wixRemoveBrokenLinks(
         delete cleanedEntityMap[String(key)];
       }
 
-      const revertRes = await fetch(
-        `https://www.wixapis.com/blog/v3/draft-posts/revert/${postId}`,
-        { method: "POST", headers: hdrs }
+      const patchResult = await wixPatchContent(
+        hdrs, postId,
+        { content: { blocks: cleanedBlocks, entityMap: cleanedEntityMap } },
+        "content"
       );
-      if (revertRes.ok) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const revertData = await revertRes.json() as any;
-        draftId = revertData?.draftPost?.id ?? null;
+      if (!patchResult.success) {
+        return { removed: -1, brokenUrls, error: patchResult.error ?? "PATCH failed" };
       }
-      if (!draftId) {
-        return { removed: -1, brokenUrls, error: "Impossible de créer un brouillon Wix" };
-      }
-
-      const patchRes = await fetch(
-        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}`,
-        {
-          method: "PATCH",
-          headers: hdrs,
-          body: JSON.stringify({
-            draftPost: { content: { blocks: cleanedBlocks, entityMap: cleanedEntityMap } },
-            fieldMask: ["content"],
-          }),
-        }
-      );
-      if (!patchRes.ok) {
-        await republishDraft(draftId);
-        return { removed: -1, brokenUrls, error: `PATCH failed: ${patchRes.status}` };
-      }
-
-      const pubRes = await fetch(
-        `https://www.wixapis.com/blog/v3/draft-posts/${draftId}/publish`,
-        { method: "POST", headers: hdrs }
-      );
-      if (!pubRes.ok) {
-        return { removed: -1, brokenUrls, error: `Publish failed: ${pubRes.status}` };
-      }
-
       return { removed, brokenUrls };
     }
 
     return { removed: 0, brokenUrls: [] };
   } catch (err) {
-    if (draftId) await republishDraft(draftId);
     return { removed: -1, brokenUrls: [], error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
