@@ -9,7 +9,7 @@
  */
 
 import { createClient } from "@/lib/supabase/server";
-import { listCmsPosts, updateCmsPost, wixRemoveBrokenLinks, type CmsCredentials } from "@/lib/cms-update";
+import { listCmsPosts, updateCmsPost, wixListRawPosts, wixRemoveBrokenLinks, type CmsCredentials } from "@/lib/cms-update";
 import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
@@ -103,41 +103,32 @@ export async function POST() {
 
     // ── WIX: use native richContent/DraftJS approach ──
     if (site.cms === "wix" && site.wix_api_key && site.wix_site_id) {
-      for (const post of allPosts) {
-        // Count internal links in converted HTML for reporting
-        const linkRegex = /<a\s+[^>]*href="([^"]+)"[^>]*>/gi;
-        let match;
-        while ((match = linkRegex.exec(post.content)) !== null) {
-          const href = match[1];
-          if (!href.startsWith("http")) continue;
-          try {
-            const host = new URL(href).hostname.replace(/^www\./, "");
-            if (host === siteHost) totalLinksFound++;
-          } catch { /* skip */ }
-        }
+      // Fetch raw posts with richContent intact (LIST endpoint returns content, single GET does NOT)
+      const rawPosts = await wixListRawPosts(site.wix_api_key, site.wix_site_id, 200, site.site_url);
+      logger.info(`[cleanup-links] Wix raw posts fetched: ${rawPosts.length} (${rawPosts.filter(p => p.richContentNodes.length > 0).length} with richContent, ${rawPosts.filter(p => p.draftJSContent).length} with DraftJS)`);
 
+      for (const rawPost of rawPosts) {
         const result = await wixRemoveBrokenLinks(
           site.wix_api_key,
           site.wix_site_id,
-          post.id as string,
+          rawPost,
           isBrokenInternalLink,
           { supabase, userId: user.id }
         );
 
         if (result.removed > 0) {
-          details.push({ title: post.title, removed: result.removed, broken_urls: result.brokenUrls });
+          details.push({ title: rawPost.title, removed: result.removed, broken_urls: result.brokenUrls });
           totalCleaned += result.removed;
         } else if (result.error) {
-          logger.warn(`[cleanup-links] "${post.title}": ${result.error}`);
+          logger.warn(`[cleanup-links] "${rawPost.title}": ${result.error}`);
         }
       }
 
-      logger.info(`[cleanup-links] Done (Wix native): ${totalLinksFound} internal links, ${totalCleaned} broken removed`);
+      logger.info(`[cleanup-links] Done (Wix native): ${totalCleaned} broken removed from ${rawPosts.length} posts`);
 
       return Response.json({
         cleaned: totalCleaned,
-        scanned: allPosts.length,
-        links_found: totalLinksFound,
+        scanned: rawPosts.length,
         details,
       });
     }
