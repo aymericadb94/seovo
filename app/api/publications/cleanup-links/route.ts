@@ -147,13 +147,36 @@ export async function POST() {
       }
     }
 
+    // Diagnostic: log all internal links found with their match status
+    const allLinksDebug: { post: string; href: string; slug: string; matched_by: string }[] = [];
+    for (const post of allPosts) {
+      const lr = /<a\s+[^>]*href="(https?:\/\/[^"]+)"[^>]*>/gi;
+      let dm;
+      while ((dm = lr.exec(post.content)) !== null) {
+        try {
+          const lh = new URL(dm[1]).hostname;
+          const sb = siteHost.replace(/^www\./, "");
+          const lb = lh.replace(/^www\./, "");
+          if (lb === sb || lh === siteHost) {
+            const norm = dm[1].replace(/\/$/, "").toLowerCase();
+            const slug = extractSlug(dm[1]);
+            const matchedBy = knownUrls.has(norm) ? "url" : (slug && knownSlugs.has(slug)) ? "slug" : "BROKEN";
+            allLinksDebug.push({ post: post.title, href: dm[1], slug, matched_by: matchedBy });
+          }
+        } catch { /* skip */ }
+      }
+    }
+
     logger.info(`[cleanup-links] Done: ${totalLinksFound} internal links found, ${totalCleaned} broken removed across ${allPosts.length} posts`);
+    logger.info(`[cleanup-links] Known slugs: ${[...knownSlugs].join(", ")}`);
+    logger.info(`[cleanup-links] All links debug: ${JSON.stringify(allLinksDebug)}`);
 
     return Response.json({
       cleaned: totalCleaned,
       scanned: allPosts.length,
       links_found: totalLinksFound,
       details,
+      debug: allLinksDebug,
     });
   } catch (err: unknown) {
     return Response.json({ error: err instanceof Error ? err.message : "Erreur inconnue" }, { status: 500 });
