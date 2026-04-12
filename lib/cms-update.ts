@@ -1576,7 +1576,6 @@ async function wixPatchContent(
   fieldMaskField: string
 ): Promise<{ success: boolean; error?: string }> {
   // Strategy 1: Direct PATCH on published post
-  console.log(`[wix/patch] Trying direct PATCH on post ${postId}`);
   const directRes = await fetch(
     `https://www.wixapis.com/blog/v3/posts/${postId}`,
     {
@@ -1586,10 +1585,8 @@ async function wixPatchContent(
     }
   );
   if (directRes.ok) {
-    console.log(`[wix/patch] Direct PATCH succeeded for ${postId}`);
     return { success: true };
   }
-  console.log(`[wix/patch] Direct PATCH failed: ${directRes.status}`);
 
   // Strategy 2: Revert to draft → PATCH → publish
   let draftId: string | null = null;
@@ -1601,9 +1598,7 @@ async function wixPatchContent(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const revertData = await revertRes.json() as any;
     draftId = revertData?.draftPost?.id ?? null;
-    console.log(`[wix/patch] Revert succeeded, draftId=${draftId}`);
   } else {
-    console.log(`[wix/patch] Revert failed: ${revertRes.status}`);
   }
 
   // Strategy 3: Find existing draft
@@ -1619,7 +1614,6 @@ async function wixPatchContent(
       const match = listData.draftPosts?.find((d: any) => d.postId === postId || d.id === postId);
       if (match) {
         draftId = match.id;
-        console.log(`[wix/patch] Found existing draft: ${draftId}`);
       }
     }
   }
@@ -1649,7 +1643,6 @@ async function wixPatchContent(
     return { success: false, error: `Draft publish failed: ${pubRes.status}` };
   }
 
-  console.log(`[wix/patch] Draft workflow succeeded for ${postId}`);
   return { success: true };
 }
 
@@ -1697,22 +1690,6 @@ export async function wixRemoveBrokenLinks(
 
     // ── richContent path ──
     if (contentFormat === "richContent" && richContentNodes.length > 0) {
-      // Log all links found
-      function logAllLinks(nodes: WixRichNode[]) {
-        for (const node of nodes) {
-          if (node.textData?.decorations) {
-            for (const d of node.textData.decorations) {
-              if (d.type === "LINK" && d.linkData?.link?.url) {
-                const url = d.linkData.link.url;
-                console.log(`[wix/cleanup] "${rawPost.title}" LINK: "${url}" → ${isBrokenUrl(url) ? "BROKEN" : "OK"}`);
-              }
-            }
-          }
-          if (node.nodes) logAllLinks(node.nodes as WixRichNode[]);
-        }
-      }
-      logAllLinks(richContentNodes as WixRichNode[]);
-
       function cleanNodes(nodes: WixRichNode[]): WixRichNode[] {
         const result: WixRichNode[] = [];
         for (const node of nodes) {
@@ -1790,14 +1767,6 @@ export async function wixRemoveBrokenLinks(
     if (contentFormat === "draftJS" && draftJSContent) {
       const blocks = [...(draftJSContent.blocks as WixDraftBlock[])];
       const entityMap = { ...(draftJSContent.entityMap ?? {}) } as Record<string, WixDraftEntity>;
-
-      // Log all link entities
-      for (const [key, entity] of Object.entries(entityMap)) {
-        if (entity.type === "LINK") {
-          const url = entity.data?.url ?? entity.data?.href ?? "";
-          console.log(`[wix/cleanup] "${rawPost.title}" DraftJS entity ${key} LINK: "${url}" → ${url && isBrokenUrl(url) ? "BROKEN" : "OK"}`);
-        }
-      }
 
       const brokenEntityKeys = new Set<number>();
       for (const [key, entity] of Object.entries(entityMap)) {
