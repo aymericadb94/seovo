@@ -1,8 +1,9 @@
 /**
  * Cleanup Broken Internal Links API
  *
- * Scans all CMS posts, identifies internal links pointing to non-existent pages,
- * and removes them (keeping the anchor text, just unwrapping the <a> tag).
+ * Scans all CMS posts, identifies internal links pointing to non-existent pages
+ * by actually checking if the URL responds (HEAD request), and removes broken ones
+ * (keeping the anchor text, just unwrapping the <a> tag).
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -11,6 +12,29 @@ import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
 export const maxDuration = 180;
+
+/** Check if a URL is reachable (non-404). Cached per run. */
+async function isUrlAlive(url: string, cache: Map<string, boolean>): Promise<boolean> {
+  const key = url.replace(/\/$/, "").toLowerCase();
+  if (cache.has(key)) return cache.get(key)!;
+
+  try {
+    const res = await fetch(url, {
+      method: "HEAD",
+      redirect: "follow",
+      signal: AbortSignal.timeout(5000),
+      headers: { "User-Agent": "RankPill-LinkChecker/1.0" },
+    });
+    // 2xx/3xx = alive, 404/410 = dead, 5xx = assume alive (server error, not missing)
+    const alive = res.status < 400 || res.status >= 500;
+    cache.set(key, alive);
+    return alive;
+  } catch {
+    // Network error / timeout → assume alive (don't remove links on network issues)
+    cache.set(key, true);
+    return true;
+  }
+}
 
 export async function POST() {
   try {
@@ -37,63 +61,71 @@ export async function POST() {
       custom_api_url: site.custom_api_url, custom_api_key: site.custom_api_key,
     };
 
-    // Fetch all CMS posts
     const allPosts = await listCmsPosts(creds, 200);
     if (allPosts.length === 0) {
       return Response.json({ cleaned: 0, scanned: 0, details: [] });
     }
 
-    // Build set of real URLs from CMS
-    const realUrls = new Set(
-      allPosts.map(p => p.url.replace(/\/$/, "").toLowerCase()).filter(Boolean)
-    );
-
-    // Also add the site root
     const siteHost = new URL(site.site_url).hostname;
-    realUrls.add(site.site_url.replace(/\/$/, "").toLowerCase());
+    const urlCache = new Map<string, boolean>();
 
-    const details: { title: string; removed: number }[] = [];
+    // Pre-populate cache: all CMS post URLs are known-alive
+    for (const p of allPosts) {
+      if (p.url) urlCache.set(p.url.replace(/\/$/, "").toLowerCase(), true);
+    }
+
+    const details: { title: string; removed: number; broken_urls: string[] }[] = [];
     let totalCleaned = 0;
 
     for (const post of allPosts) {
-      // Find all internal <a href="..."> in content
+      // Collect all internal links first
       const linkRegex = /<a\s+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-      let modified = false;
-      let removedCount = 0;
+      const internalLinks: { href: string; fullMatch: string; text: string }[] = [];
 
-      const cleanedHtml = post.content.replace(linkRegex, (match, href: string, text: string) => {
+      let m;
+      while ((m = linkRegex.exec(post.content)) !== null) {
         try {
-          const linkHost = new URL(href).hostname;
-          // Only check internal links (same domain)
-          if (linkHost !== siteHost) return match;
+          const linkHost = new URL(m[1]).hostname;
+          if (linkHost === siteHost) {
+            internalLinks.push({ href: m[1], fullMatch: m[0], text: m[2] });
+          }
+        } catch { /* skip invalid URLs */ }
+      }
 
-          const normalized = href.replace(/\/$/, "").toLowerCase();
-          if (realUrls.has(normalized)) return match; // URL exists, keep it
+      if (internalLinks.length === 0) continue;
 
-          // Broken internal link — unwrap (keep text, remove <a>)
-          modified = true;
-          removedCount++;
-          return text;
-        } catch {
-          return match; // invalid URL format, leave as-is
-        }
-      });
+      // Check each internal link
+      const brokenLinks: typeof internalLinks = [];
+      for (const link of internalLinks) {
+        const alive = await isUrlAlive(link.href, urlCache);
+        if (!alive) brokenLinks.push(link);
+      }
 
-      if (modified && removedCount > 0) {
-        const blogId = "blog_id" in post ? (post as { blog_id: number }).blog_id : undefined;
-        const updateRes = await updateCmsPost(
-          creds, post.id,
-          { content: cleanedHtml },
-          { blog_id: blogId, supabase, userId: user.id, actionType: "cleanup_broken_links" }
-        );
+      if (brokenLinks.length === 0) continue;
 
-        if (updateRes.success) {
-          details.push({ title: post.title, removed: removedCount });
-          totalCleaned += removedCount;
-          logger.info(`[cleanup-links] "${post.title}": ${removedCount} broken link(s) removed`);
-        } else {
-          logger.warn(`[cleanup-links] "${post.title}": update failed — ${updateRes.error}`);
-        }
+      // Remove broken links from content
+      let cleanedHtml = post.content;
+      for (const link of brokenLinks) {
+        cleanedHtml = cleanedHtml.replace(link.fullMatch, link.text);
+      }
+
+      const blogId = "blog_id" in post ? (post as { blog_id: number }).blog_id : undefined;
+      const updateRes = await updateCmsPost(
+        creds, post.id,
+        { content: cleanedHtml },
+        { blog_id: blogId, supabase, userId: user.id, actionType: "cleanup_broken_links" }
+      );
+
+      if (updateRes.success) {
+        details.push({
+          title: post.title,
+          removed: brokenLinks.length,
+          broken_urls: brokenLinks.map(l => l.href),
+        });
+        totalCleaned += brokenLinks.length;
+        logger.info(`[cleanup-links] "${post.title}": ${brokenLinks.length} broken link(s) removed — ${brokenLinks.map(l => l.href).join(", ")}`);
+      } else {
+        logger.warn(`[cleanup-links] "${post.title}": update failed — ${updateRes.error}`);
       }
     }
 
