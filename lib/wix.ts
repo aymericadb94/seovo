@@ -514,9 +514,30 @@ export async function publishToWix(
     return `${publishData.post.url.base}${publishData.post.url.path}`;
   }
 
-  // Fallback : slug Wix → notre seoSlug généré → l'ID (dernier recours)
+  // Fallback : re-fetch le post publié via l'API pour obtenir l'URL réelle
+  const postId = publishData.post?.id;
+  if (postId) {
+    try {
+      const refetchRes = await fetch(`${WIX_POSTS_API}/${postId}?fieldsets=URL`, { headers });
+      if (refetchRes.ok) {
+        const refetchData = await refetchRes.json() as {
+          post?: { slug?: string; url?: { base: string; path: string } };
+        };
+        if (refetchData.post?.url?.base && refetchData.post?.url?.path) {
+          return `${refetchData.post.url.base}${refetchData.post.url.path}`;
+        }
+        if (refetchData.post?.slug) {
+          const base = siteUrl ? siteUrl.replace(/\/$/, "") : "";
+          return `${base}/post/${refetchData.post.slug}`;
+        }
+      }
+    } catch { /* non-fatal — use fallback below */ }
+  }
+
+  // Dernier recours : slug Wix (du publish response) → notre seoSlug
   const slug = publishData.post?.slug ?? seoSlug;
   const base = siteUrl ? siteUrl.replace(/\/$/, "") : "https://www.wix.com";
+  console.warn(`[wix] Fallback URL used: ${base}/post/${slug} — Wix API did not return full URL`);
   return `${base}/post/${slug}`;
 }
 

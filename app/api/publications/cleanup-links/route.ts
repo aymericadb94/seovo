@@ -1,8 +1,10 @@
 /**
  * Cleanup Broken Internal Links API
  *
- * Scans all CMS posts, finds internal links, checks them against
- * the known CMS post slugs, and removes broken ones.
+ * Source of truth: ONLY the CMS (live posts from Wix/WP/Shopify API).
+ * NOT the publications DB table (which can contain stale/wrong URLs).
+ *
+ * A link is broken if its slug doesn't match any live CMS post slug.
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -12,7 +14,6 @@ import { logger } from "@/lib/logger";
 
 export const maxDuration = 180;
 
-/** Extract the last meaningful path segment (slug) from a URL */
 function extractSlug(urlStr: string): string {
   try {
     const path = new URL(urlStr).pathname.replace(/\/$/, "");
@@ -55,45 +56,39 @@ export async function POST() {
 
     const siteHost = new URL(site.site_url).hostname.replace(/^www\./, "");
 
-    // Build sets of known-good identifiers (exact URLs + slugs)
-    const knownUrls = new Set<string>();
-    const knownSlugs = new Set<string>();
+    // SOURCE DE VÉRITÉ : UNIQUEMENT les URLs/slugs des posts CMS réels
+    // PAS la table publications (qui peut contenir des URLs fausses)
+    const liveUrls = new Set<string>();
+    const liveSlugs = new Set<string>();
     for (const p of allPosts) {
       if (p.url) {
-        knownUrls.add(p.url.replace(/\/$/, "").toLowerCase());
+        liveUrls.add(p.url.replace(/\/$/, "").toLowerCase());
         const slug = extractSlug(p.url);
-        if (slug && slug.length > 3) knownSlugs.add(slug);
+        if (slug && slug.length > 3) liveSlugs.add(slug);
+      }
+      // Also extract slug from title (Wix uses title-based slugs)
+      if (p.title) {
+        const titleSlug = p.title.toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        if (titleSlug.length > 3) liveSlugs.add(titleSlug);
       }
     }
 
-    // Also add publications from DB
-    const { data: pubs } = await supabase
-      .from("publications")
-      .select("wordpress_url")
-      .eq("user_id", user.id);
-    for (const p of pubs ?? []) {
-      if (p.wordpress_url) {
-        knownUrls.add(p.wordpress_url.replace(/\/$/, "").toLowerCase());
-        const slug = extractSlug(p.wordpress_url);
-        if (slug && slug.length > 3) knownSlugs.add(slug);
-      }
-    }
-
-    logger.info(`[cleanup-links] Known slugs (${knownSlugs.size}): ${[...knownSlugs].join(", ")}`);
+    logger.info(`[cleanup-links] Live CMS: ${allPosts.length} posts, ${liveUrls.size} URLs, ${liveSlugs.size} slugs`);
+    logger.info(`[cleanup-links] Live slugs: ${[...liveSlugs].join(", ")}`);
 
     const details: { title: string; removed: number; broken_urls: string[] }[] = [];
     let totalCleaned = 0;
     let totalLinksFound = 0;
 
     for (const post of allPosts) {
-      // Use replace to find AND fix in one pass
       let removedCount = 0;
       const brokenUrls: string[] = [];
 
       const cleanedHtml = post.content.replace(
         /<a\s+[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi,
         (fullMatch, href: string, innerText: string) => {
-          // Only process http(s) links
           if (!href.startsWith("http")) return fullMatch;
 
           let linkBase: string;
@@ -108,17 +103,18 @@ export async function POST() {
 
           totalLinksFound++;
 
-          // Check: exact URL match
+          // Check 1: exact URL match against live CMS
           const normalized = href.replace(/\/$/, "").toLowerCase();
-          if (knownUrls.has(normalized)) return fullMatch;
+          if (liveUrls.has(normalized)) return fullMatch;
 
-          // Check: slug match
+          // Check 2: slug match against live CMS slugs
           const slug = extractSlug(href);
-          if (slug && slug.length > 3 && knownSlugs.has(slug)) return fullMatch;
+          if (slug && slug.length > 3 && liveSlugs.has(slug)) return fullMatch;
 
-          // Broken — unwrap link, keep text
+          // No match in live CMS → this link is BROKEN
           removedCount++;
           brokenUrls.push(href);
+          logger.info(`[cleanup-links] BROKEN in "${post.title}": ${href} (slug: "${slug}")`);
           return innerText;
         }
       );
@@ -135,18 +131,38 @@ export async function POST() {
       if (updateRes.success) {
         details.push({ title: post.title, removed: removedCount, broken_urls: brokenUrls });
         totalCleaned += removedCount;
-        logger.info(`[cleanup-links] "${post.title}": ${removedCount} broken link(s) removed — ${brokenUrls.join(", ")}`);
       } else {
         logger.warn(`[cleanup-links] "${post.title}": update failed — ${updateRes.error}`);
       }
     }
 
-    logger.info(`[cleanup-links] Done: ${totalLinksFound} internal links found, ${totalCleaned} broken removed across ${allPosts.length} posts`);
+    // Also clean stale DB entries: remove publications whose URL doesn't match any live CMS post
+    let dbCleaned = 0;
+    try {
+      const { data: dbPubs } = await supabase
+        .from("publications")
+        .select("id, wordpress_url")
+        .eq("user_id", user.id);
+      for (const pub of dbPubs ?? []) {
+        if (!pub.wordpress_url) continue;
+        const pubNorm = pub.wordpress_url.replace(/\/$/, "").toLowerCase();
+        const pubSlug = extractSlug(pub.wordpress_url);
+        const matchesLive = liveUrls.has(pubNorm) || (pubSlug && pubSlug.length > 3 && liveSlugs.has(pubSlug));
+        if (!matchesLive) {
+          // This DB entry references a page that doesn't exist on the CMS
+          logger.info(`[cleanup-links] Stale DB entry: ${pub.wordpress_url} (slug: "${pubSlug}") — no live CMS match`);
+          dbCleaned++;
+        }
+      }
+    } catch { /* non-blocking */ }
+
+    logger.info(`[cleanup-links] Done: ${totalLinksFound} internal links, ${totalCleaned} broken removed, ${dbCleaned} stale DB entries found`);
 
     return Response.json({
       cleaned: totalCleaned,
       scanned: allPosts.length,
       links_found: totalLinksFound,
+      stale_db_entries: dbCleaned,
       details,
     });
   } catch (err: unknown) {

@@ -47,6 +47,24 @@ export async function POST() {
     const existingUrls = new Set((existing ?? []).map(p => p.wordpress_url?.replace(/\/$/, "").toLowerCase()));
     const existingTitles = new Set((existing ?? []).map(p => p.title?.toLowerCase()));
 
+    // Fix stale URLs: if a DB entry has the same title but wrong URL, update it
+    let urlsFixed = 0;
+    for (const cmsPage of allContent) {
+      const normCmsUrl = cmsPage.url.replace(/\/$/, "").toLowerCase();
+      const matchByTitle = (existing ?? []).find(e =>
+        e.title?.toLowerCase() === cmsPage.title.toLowerCase() &&
+        e.wordpress_url?.replace(/\/$/, "").toLowerCase() !== normCmsUrl
+      );
+      if (matchByTitle && matchByTitle.wordpress_url) {
+        await supabase
+          .from("publications")
+          .update({ wordpress_url: cmsPage.url })
+          .eq("user_id", user.id)
+          .ilike("title", cmsPage.title);
+        urlsFixed++;
+      }
+    }
+
     // Find missing content
     const toSync = allContent.filter(p => {
       const normUrl = p.url.replace(/\/$/, "").toLowerCase();
@@ -79,6 +97,7 @@ export async function POST() {
 
     return Response.json({
       synced: toSync.length,
+      urls_fixed: urlsFixed,
       articles_count: articles,
       pages_count: pages,
       items: toSync.map(p => ({ title: p.title, type: p.page_type ?? "article" })),
