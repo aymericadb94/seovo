@@ -451,12 +451,7 @@ export default function Dashboard() {
       if (json.error) {
         setCleanupResult(`Erreur : ${json.error}`);
       } else if (json.cleaned === 0) {
-        // Debug: show link details
-        const debugLinks = (json.debug ?? []) as { post: string; href: string; slug: string; matched_by: string }[];
-        const debugStr = debugLinks.length > 0
-          ? ` | Debug: ${debugLinks.map(l => `[${l.matched_by}] ${l.slug}`).join(", ")}`
-          : "";
-        setCleanupResult(`${json.scanned} pages, ${json.links_found ?? 0} liens vérifiés — 0 cassé${debugStr}`);
+        setCleanupResult(`${json.scanned} pages scannées, ${json.links_found ?? 0} liens vérifiés — aucun lien cassé`);
       } else {
         setCleanupResult(`${json.cleaned} lien(s) cassé(s) supprimé(s) sur ${json.details.length} page(s)`);
       }

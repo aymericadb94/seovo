@@ -2,7 +2,7 @@
  * Cleanup Broken Internal Links API
  *
  * Scans all CMS posts, finds internal links, checks them against
- * the known CMS post URLs (by slug matching), and removes broken ones.
+ * the known CMS post slugs, and removes broken ones.
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -53,7 +53,7 @@ export async function POST() {
       return Response.json({ cleaned: 0, scanned: 0, details: [] });
     }
 
-    const siteHost = new URL(site.site_url).hostname;
+    const siteHost = new URL(site.site_url).hostname.replace(/^www\./, "");
 
     // Build sets of known-good identifiers (exact URLs + slugs)
     const knownUrls = new Set<string>();
@@ -62,11 +62,11 @@ export async function POST() {
       if (p.url) {
         knownUrls.add(p.url.replace(/\/$/, "").toLowerCase());
         const slug = extractSlug(p.url);
-        if (slug) knownSlugs.add(slug);
+        if (slug && slug.length > 3) knownSlugs.add(slug);
       }
     }
 
-    // Also add publications from DB (may have different URL format)
+    // Also add publications from DB
     const { data: pubs } = await supabase
       .from("publications")
       .select("wordpress_url")
@@ -75,57 +75,55 @@ export async function POST() {
       if (p.wordpress_url) {
         knownUrls.add(p.wordpress_url.replace(/\/$/, "").toLowerCase());
         const slug = extractSlug(p.wordpress_url);
-        if (slug) knownSlugs.add(slug);
+        if (slug && slug.length > 3) knownSlugs.add(slug);
       }
     }
 
-    logger.info(`[cleanup-links] Known URLs: ${knownUrls.size}, Known slugs: ${knownSlugs.size}, Site host: ${siteHost}`);
+    logger.info(`[cleanup-links] Known slugs (${knownSlugs.size}): ${[...knownSlugs].join(", ")}`);
 
     const details: { title: string; removed: number; broken_urls: string[] }[] = [];
     let totalCleaned = 0;
     let totalLinksFound = 0;
 
     for (const post of allPosts) {
-      // Find all <a href="..."> in content
-      const linkRegex = /<a\s+[^>]*href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-      const internalLinks: { href: string; fullMatch: string; text: string }[] = [];
+      // Use replace to find AND fix in one pass
+      let removedCount = 0;
+      const brokenUrls: string[] = [];
 
-      let m;
-      while ((m = linkRegex.exec(post.content)) !== null) {
-        try {
-          const linkHost = new URL(m[1]).hostname;
-          // Internal link = same domain (support both www and non-www)
-          const siteBase = siteHost.replace(/^www\./, "");
-          const linkBase = linkHost.replace(/^www\./, "");
-          if (linkBase === siteBase || linkHost === siteHost) {
-            internalLinks.push({ href: m[1], fullMatch: m[0], text: m[2] });
+      const cleanedHtml = post.content.replace(
+        /<a\s+[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi,
+        (fullMatch, href: string, innerText: string) => {
+          // Only process http(s) links
+          if (!href.startsWith("http")) return fullMatch;
+
+          let linkBase: string;
+          try {
+            linkBase = new URL(href).hostname.replace(/^www\./, "");
+          } catch {
+            return fullMatch;
           }
-        } catch { /* skip invalid URLs */ }
-      }
 
-      totalLinksFound += internalLinks.length;
-      if (internalLinks.length === 0) continue;
+          // Skip external links
+          if (linkBase !== siteHost) return fullMatch;
 
-      // Check each link: is it in known URLs or does its slug match?
-      const brokenLinks: typeof internalLinks = [];
-      for (const link of internalLinks) {
-        const normalized = link.href.replace(/\/$/, "").toLowerCase();
-        if (knownUrls.has(normalized)) continue; // exact match — alive
+          totalLinksFound++;
 
-        const slug = extractSlug(link.href);
-        if (slug && knownSlugs.has(slug)) continue; // slug match — alive
+          // Check: exact URL match
+          const normalized = href.replace(/\/$/, "").toLowerCase();
+          if (knownUrls.has(normalized)) return fullMatch;
 
-        // No match found — this link is broken
-        brokenLinks.push(link);
-      }
+          // Check: slug match
+          const slug = extractSlug(href);
+          if (slug && slug.length > 3 && knownSlugs.has(slug)) return fullMatch;
 
-      if (brokenLinks.length === 0) continue;
+          // Broken — unwrap link, keep text
+          removedCount++;
+          brokenUrls.push(href);
+          return innerText;
+        }
+      );
 
-      // Remove broken links from content (keep text, unwrap <a>)
-      let cleanedHtml = post.content;
-      for (const link of brokenLinks) {
-        cleanedHtml = cleanedHtml.replace(link.fullMatch, link.text);
-      }
+      if (removedCount === 0) continue;
 
       const blogId = "blog_id" in post ? (post as { blog_id: number }).blog_id : undefined;
       const updateRes = await updateCmsPost(
@@ -135,48 +133,21 @@ export async function POST() {
       );
 
       if (updateRes.success) {
-        details.push({
-          title: post.title,
-          removed: brokenLinks.length,
-          broken_urls: brokenLinks.map(l => l.href),
-        });
-        totalCleaned += brokenLinks.length;
-        logger.info(`[cleanup-links] "${post.title}": ${brokenLinks.length} broken link(s) removed — ${brokenLinks.map(l => l.href).join(", ")}`);
+        details.push({ title: post.title, removed: removedCount, broken_urls: brokenUrls });
+        totalCleaned += removedCount;
+        logger.info(`[cleanup-links] "${post.title}": ${removedCount} broken link(s) removed — ${brokenUrls.join(", ")}`);
       } else {
         logger.warn(`[cleanup-links] "${post.title}": update failed — ${updateRes.error}`);
       }
     }
 
-    // Diagnostic: log all internal links found with their match status
-    const allLinksDebug: { post: string; href: string; slug: string; matched_by: string }[] = [];
-    for (const post of allPosts) {
-      const lr = /<a\s+[^>]*href="(https?:\/\/[^"]+)"[^>]*>/gi;
-      let dm;
-      while ((dm = lr.exec(post.content)) !== null) {
-        try {
-          const lh = new URL(dm[1]).hostname;
-          const sb = siteHost.replace(/^www\./, "");
-          const lb = lh.replace(/^www\./, "");
-          if (lb === sb || lh === siteHost) {
-            const norm = dm[1].replace(/\/$/, "").toLowerCase();
-            const slug = extractSlug(dm[1]);
-            const matchedBy = knownUrls.has(norm) ? "url" : (slug && knownSlugs.has(slug)) ? "slug" : "BROKEN";
-            allLinksDebug.push({ post: post.title, href: dm[1], slug, matched_by: matchedBy });
-          }
-        } catch { /* skip */ }
-      }
-    }
-
     logger.info(`[cleanup-links] Done: ${totalLinksFound} internal links found, ${totalCleaned} broken removed across ${allPosts.length} posts`);
-    logger.info(`[cleanup-links] Known slugs: ${[...knownSlugs].join(", ")}`);
-    logger.info(`[cleanup-links] All links debug: ${JSON.stringify(allLinksDebug)}`);
 
     return Response.json({
       cleaned: totalCleaned,
       scanned: allPosts.length,
       links_found: totalLinksFound,
       details,
-      debug: allLinksDebug,
     });
   } catch (err: unknown) {
     return Response.json({ error: err instanceof Error ? err.message : "Erreur inconnue" }, { status: 500 });
