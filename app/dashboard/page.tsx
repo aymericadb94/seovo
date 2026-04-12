@@ -451,7 +451,7 @@ export default function Dashboard() {
       if (json.error) {
         setCleanupResult(`Erreur : ${json.error}`);
       } else if (json.cleaned === 0) {
-        setCleanupResult(`${json.scanned} pages scannées — aucun lien cassé`);
+        setCleanupResult(`${json.scanned} pages scannées, ${json.links_found ?? 0} lien(s) vérifié(s) — aucun lien cassé`);
       } else {
         setCleanupResult(`${json.cleaned} lien(s) cassé(s) supprimé(s) sur ${json.details.length} page(s)`);
       }

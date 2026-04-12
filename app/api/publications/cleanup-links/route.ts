@@ -1,9 +1,8 @@
 /**
  * Cleanup Broken Internal Links API
  *
- * Scans all CMS posts, identifies internal links pointing to non-existent pages
- * by actually checking if the URL responds (HEAD request), and removes broken ones
- * (keeping the anchor text, just unwrapping the <a> tag).
+ * Scans all CMS posts, finds internal links, checks them against
+ * the known CMS post URLs (by slug matching), and removes broken ones.
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -13,66 +12,14 @@ import { logger } from "@/lib/logger";
 
 export const maxDuration = 180;
 
-/** Check if a URL is reachable (non-404). Cached per run. */
-// Soft-404 patterns: CMS returns 200 but the page is actually a "not found" page
-const SOFT_404_PATTERNS = [
-  "pas trouvé la page",
-  "page introuvable",
-  "page not found",
-  "this page isn't available",
-  "cette page n'est pas disponible",
-  "n'avons pas trouvé",
-  "404",
-  "Voir plus de posts", // Wix blog specific soft-404
-];
-
-async function isUrlAlive(url: string, cache: Map<string, boolean>): Promise<boolean> {
-  const key = url.replace(/\/$/, "").toLowerCase();
-  if (cache.has(key)) return cache.get(key)!;
-
+/** Extract the last meaningful path segment (slug) from a URL */
+function extractSlug(urlStr: string): string {
   try {
-    const res = await fetch(url, {
-      method: "GET",
-      redirect: "follow",
-      signal: AbortSignal.timeout(8000),
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; RankPill-LinkChecker/1.0)" },
-    });
-
-    // Hard 404/410 = dead
-    if (res.status === 404 || res.status === 410) {
-      cache.set(key, false);
-      return false;
-    }
-
-    // 5xx = assume alive (server error, not missing)
-    if (res.status >= 500) {
-      cache.set(key, true);
-      return true;
-    }
-
-    // 200 OK — check for soft 404 (CMS shows "page not found" with status 200)
-    if (res.status === 200) {
-      const html = await res.text();
-      // Check <title> and first 3000 chars for soft-404 indicators
-      const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-      const titleText = titleMatch?.[1]?.toLowerCase() ?? "";
-      const bodySnippet = html.slice(0, 3000).toLowerCase();
-
-      for (const pattern of SOFT_404_PATTERNS) {
-        if (titleText.includes(pattern.toLowerCase()) || bodySnippet.includes(pattern.toLowerCase())) {
-          cache.set(key, false);
-          return false;
-        }
-      }
-    }
-
-    const alive = res.status < 400;
-    cache.set(key, alive);
-    return alive;
+    const path = new URL(urlStr).pathname.replace(/\/$/, "");
+    const segments = path.split("/").filter(Boolean);
+    return segments[segments.length - 1]?.toLowerCase() ?? "";
   } catch {
-    // Network error / timeout → assume alive (don't remove links on network issues)
-    cache.set(key, true);
-    return true;
+    return "";
   }
 }
 
@@ -82,7 +29,7 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "Non authentifié" }, { status: 401 });
 
-    const limited = rateLimit(user.id, { name: "cleanup-links", maxRequests: 3, windowSeconds: 3600 });
+    const limited = rateLimit(user.id, { name: "cleanup-links", maxRequests: 5, windowSeconds: 3600 });
     if (limited) return limited;
 
     const { data: site } = await supabase
@@ -107,43 +54,74 @@ export async function POST() {
     }
 
     const siteHost = new URL(site.site_url).hostname;
-    const urlCache = new Map<string, boolean>();
 
-    // Pre-populate cache: all CMS post URLs are known-alive
+    // Build sets of known-good identifiers (exact URLs + slugs)
+    const knownUrls = new Set<string>();
+    const knownSlugs = new Set<string>();
     for (const p of allPosts) {
-      if (p.url) urlCache.set(p.url.replace(/\/$/, "").toLowerCase(), true);
+      if (p.url) {
+        knownUrls.add(p.url.replace(/\/$/, "").toLowerCase());
+        const slug = extractSlug(p.url);
+        if (slug) knownSlugs.add(slug);
+      }
     }
+
+    // Also add publications from DB (may have different URL format)
+    const { data: pubs } = await supabase
+      .from("publications")
+      .select("wordpress_url")
+      .eq("user_id", user.id);
+    for (const p of pubs ?? []) {
+      if (p.wordpress_url) {
+        knownUrls.add(p.wordpress_url.replace(/\/$/, "").toLowerCase());
+        const slug = extractSlug(p.wordpress_url);
+        if (slug) knownSlugs.add(slug);
+      }
+    }
+
+    logger.info(`[cleanup-links] Known URLs: ${knownUrls.size}, Known slugs: ${knownSlugs.size}, Site host: ${siteHost}`);
 
     const details: { title: string; removed: number; broken_urls: string[] }[] = [];
     let totalCleaned = 0;
+    let totalLinksFound = 0;
 
     for (const post of allPosts) {
-      // Collect all internal links first
-      const linkRegex = /<a\s+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+      // Find all <a href="..."> in content
+      const linkRegex = /<a\s+[^>]*href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
       const internalLinks: { href: string; fullMatch: string; text: string }[] = [];
 
       let m;
       while ((m = linkRegex.exec(post.content)) !== null) {
         try {
           const linkHost = new URL(m[1]).hostname;
-          if (linkHost === siteHost) {
+          // Internal link = same domain (support both www and non-www)
+          const siteBase = siteHost.replace(/^www\./, "");
+          const linkBase = linkHost.replace(/^www\./, "");
+          if (linkBase === siteBase || linkHost === siteHost) {
             internalLinks.push({ href: m[1], fullMatch: m[0], text: m[2] });
           }
         } catch { /* skip invalid URLs */ }
       }
 
+      totalLinksFound += internalLinks.length;
       if (internalLinks.length === 0) continue;
 
-      // Check each internal link
+      // Check each link: is it in known URLs or does its slug match?
       const brokenLinks: typeof internalLinks = [];
       for (const link of internalLinks) {
-        const alive = await isUrlAlive(link.href, urlCache);
-        if (!alive) brokenLinks.push(link);
+        const normalized = link.href.replace(/\/$/, "").toLowerCase();
+        if (knownUrls.has(normalized)) continue; // exact match — alive
+
+        const slug = extractSlug(link.href);
+        if (slug && knownSlugs.has(slug)) continue; // slug match — alive
+
+        // No match found — this link is broken
+        brokenLinks.push(link);
       }
 
       if (brokenLinks.length === 0) continue;
 
-      // Remove broken links from content
+      // Remove broken links from content (keep text, unwrap <a>)
       let cleanedHtml = post.content;
       for (const link of brokenLinks) {
         cleanedHtml = cleanedHtml.replace(link.fullMatch, link.text);
@@ -169,9 +147,12 @@ export async function POST() {
       }
     }
 
+    logger.info(`[cleanup-links] Done: ${totalLinksFound} internal links found, ${totalCleaned} broken removed across ${allPosts.length} posts`);
+
     return Response.json({
       cleaned: totalCleaned,
       scanned: allPosts.length,
+      links_found: totalLinksFound,
       details,
     });
   } catch (err: unknown) {
