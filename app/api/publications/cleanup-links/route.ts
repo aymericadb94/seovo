@@ -69,6 +69,7 @@ export async function POST() {
     }
 
     logger.info(`[cleanup-links] Live CMS: ${allPosts.length} posts, ${liveUrls.size} URLs, ${liveSlugs.size} slugs`);
+    logger.info(`[cleanup-links] Live URLs: ${[...liveUrls].join(" | ")}`);
     logger.info(`[cleanup-links] Live slugs: ${[...liveSlugs].join(", ")}`);
 
     // Function to check if an internal link URL is broken

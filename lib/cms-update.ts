@@ -1523,10 +1523,11 @@ export async function wixRemoveBrokenLinks(
       if (richContentNodes.length > 0) break;
       try {
         const res = await fetch(`https://www.wixapis.com/blog/v3/posts/${postId}?fieldsets=${fs}`, { headers: hdrs });
-        if (!res.ok) continue;
+        if (!res.ok) { console.log(`[wix/cleanup] ${postId} fieldset=${fs} → ${res.status}`); continue; }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = await res.json() as any;
         const nodes = data.post?.richContent?.nodes ?? [];
+        console.log(`[wix/cleanup] ${postId} fieldset=${fs} → ${nodes.length} richContent nodes, draftJS blocks: ${data.post?.content?.blocks?.length ?? 0}`);
         if (nodes.length > richContentNodes.length) richContentNodes = nodes;
         if (nodes.length === 0 && data.post?.content?.blocks?.length > 0) {
           contentFormat = "draftJS";
@@ -1557,6 +1558,35 @@ export async function wixRemoveBrokenLinks(
 
     // ── richContent path ──
     if (contentFormat === "richContent" && richContentNodes.length > 0) {
+      // DEBUG: log all link URLs found in this post's richContent
+      function logAllLinks(nodes: WixRichNode[], postTitle: string) {
+        for (const node of nodes) {
+          if (node.textData?.decorations) {
+            for (const d of node.textData.decorations) {
+              if (d.type === "LINK" && d.linkData?.link?.url) {
+                const url = d.linkData.link.url;
+                const isBroken = isBrokenUrl(url);
+                console.log(`[wix/cleanup] POST "${postTitle}" LINK: "${url}" → ${isBroken ? "BROKEN" : "OK"}`);
+              }
+            }
+          }
+          if (node.nodes) logAllLinks(node.nodes as WixRichNode[], postTitle);
+        }
+      }
+      // We need the post title — fetch it
+      try {
+        const titleRes = await fetch(`https://www.wixapis.com/blog/v3/posts/${postId}`, { headers: hdrs });
+        if (titleRes.ok) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const titleData = await titleRes.json() as any;
+          logAllLinks(richContentNodes as WixRichNode[], titleData.post?.title ?? postId);
+        } else {
+          logAllLinks(richContentNodes as WixRichNode[], postId);
+        }
+      } catch {
+        logAllLinks(richContentNodes as WixRichNode[], postId);
+      }
+
       // Walk all nodes recursively and remove LINK decorations for broken URLs
       // Also remove entire "À lire aussi" paragraphs if only link is broken
       function cleanNodes(nodes: WixRichNode[]): WixRichNode[] {
@@ -1672,6 +1702,14 @@ export async function wixRemoveBrokenLinks(
     if (contentFormat === "draftJS" && draftJSContent) {
       const blocks = draftJSContent.blocks as WixDraftBlock[];
       const entityMap = (draftJSContent.entityMap ?? {}) as Record<string, WixDraftEntity>;
+
+      // DEBUG: log all link entities
+      for (const [key, entity] of Object.entries(entityMap)) {
+        if (entity.type === "LINK") {
+          const url = entity.data?.url ?? entity.data?.href ?? "";
+          console.log(`[wix/cleanup] DraftJS entity ${key} LINK: "${url}" → ${url && isBrokenUrl(url) ? "BROKEN" : "OK"}`);
+        }
+      }
 
       // Find broken entity keys
       const brokenEntityKeys = new Set<number>();
