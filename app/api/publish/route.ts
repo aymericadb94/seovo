@@ -3,6 +3,12 @@ import { publishToWix } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
 import { fetchPexelsImage, fetchPexelsImages, injectImagesIntoHtml } from "@/lib/pexels";
 import { shopifyFetch } from "@/lib/shopify";
+import { addRetroactiveLinks } from "@/lib/internal-linking-engine";
+import { emitEvent, createPublicationEvent, createMilestoneEvent } from "@/lib/seo-events";
+import { recordAction } from "@/lib/seo-feedback";
+import { sendArticlePublishedEmail } from "@/lib/email";
+import { logger } from "@/lib/logger";
+import type { CmsCredentials } from "@/lib/cms-update";
 
 async function uploadImageToWordPress(
   siteUrl: string, username: string, appPassword: string,
@@ -140,7 +146,7 @@ export async function POST(request: Request) {
     // Lire la config du site de l'utilisateur
     const { data: site, error: siteError } = await supabase
       .from("sites")
-      .select("id, cms, site_url, shopify_store_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, wix_member_id, custom_api_url, custom_api_key")
+      .select("id, cms, site_url, business_name, shopify_store_url, wp_username, wp_app_password, shopify_api_key, wix_api_key, wix_site_id, wix_member_id, custom_api_url, custom_api_key")
       .eq("user_id", user.id)
       .limit(1)
       .single();
@@ -210,11 +216,54 @@ export async function POST(request: Request) {
 
     if (insertError) {
       console.error("[publish] failed to record publication:", insertError.message, insertError);
-      // Article publié sur le CMS mais pas enregistré en base — on le signale
       return Response.json({
         url,
         warning: `Article publié mais non enregistré dans le dashboard : ${insertError.message}`,
       });
+    }
+
+    // ── Maillage rétroactif (même logique que le cron) ──
+    if (url) {
+      try {
+        const creds: CmsCredentials = {
+          cms: site.cms, site_url: site.site_url,
+          wp_username: site.wp_username, wp_app_password: site.wp_app_password,
+          shopify_api_key: site.shopify_api_key, shopify_store_url: site.shopify_store_url,
+          wix_api_key: site.wix_api_key, wix_site_id: site.wix_site_id,
+          custom_api_url: site.custom_api_url, custom_api_key: site.custom_api_key,
+        };
+        const retro = await addRetroactiveLinks(supabase, user.id, creds, { keyword, title, url });
+        if (retro.updated_pages.length > 0) {
+          logger.info(`[publish] Retroactive linking: ${retro.updated_pages.length} pages updated for "${title}"`);
+        }
+      } catch (err) {
+        logger.warn("Retroactive linking failed (non-blocking)", { context: "publish", userId: user.id, error: err });
+      }
+    }
+
+    // ── Événements SEO ──
+    try {
+      const pubEvent = createPublicationEvent(keyword, title, url ?? "");
+      await emitEvent(supabase, user.id, pubEvent);
+      await recordAction(supabase, user.id, "publication", keyword, url ?? "", null, [], 0);
+      const { count } = await supabase
+        .from("publications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+      const milestoneEvent = createMilestoneEvent(count ?? 0);
+      if (milestoneEvent) await emitEvent(supabase, user.id, milestoneEvent);
+    } catch (err) {
+      logger.warn("SEO event recording failed", { context: "publish", userId: user.id, error: err });
+    }
+
+    // ── Email notification ──
+    try {
+      const userEmail = user.email;
+      if (userEmail) {
+        await sendArticlePublishedEmail({ to: userEmail, title, keyword, url, businessName: site.business_name ?? "" });
+      }
+    } catch (err) {
+      logger.warn("Email notification failed", { context: "publish", userId: user.id, error: err });
     }
 
     return Response.json({ url });

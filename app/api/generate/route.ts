@@ -14,9 +14,22 @@ export async function POST(request: Request) {
     if (limited) return limited;
 
     const body = await request.json();
-    const { keyword, businessName, industry, language = "fr" } = body;
+    let { keyword, businessName, industry, language = "fr" } = body;
 
     if (!keyword) return Response.json({ error: "Mot-clé requis" }, { status: 400 });
+
+    // Garantir business_name et industry depuis la DB si absents
+    if (!businessName || !industry) {
+      const { data: site } = await supabase
+        .from("sites")
+        .select("business_name, industry")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (site) {
+        if (!businessName) businessName = site.business_name ?? "";
+        if (!industry) industry = site.industry ?? "";
+      }
+    }
 
     // SSE streaming mode — stream agent progress then final result
     const url = new URL(request.url);

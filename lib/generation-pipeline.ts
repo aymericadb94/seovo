@@ -277,9 +277,9 @@ export async function collectRankpillContext(
     }
   }
 
-  // Existing pages
+  // Existing pages — exclure les publications sans URL (sinon l'IA hallucine des URLs)
   const existing_pages: ExistingPage[] = (pubsResult.data ?? [])
-    .filter(p => p.keyword && p.keyword !== "__page__")
+    .filter(p => p.keyword && p.keyword !== "__page__" && p.wordpress_url && p.wordpress_url.startsWith("http"))
     .map(p => ({ title: p.title, keyword: p.keyword, url: p.wordpress_url }));
 
   // Cluster (from cocoon or null)
@@ -650,7 +650,17 @@ RETOURNE JSON brut uniquement :
     }
   );
 
-  return parseAiJson<LinkingOutput>(result.text) ?? { links: [] };
+  const parsed = parseAiJson<LinkingOutput>(result.text) ?? { links: [] };
+
+  // Validation stricte : ne garder que les liens dont l'URL existe réellement dans les publications
+  const knownUrls = new Set(ctx.existing_pages.map(p => p.url.replace(/\/$/, "").toLowerCase()));
+  parsed.links = parsed.links.filter(link => {
+    if (!link.target_url || !link.target_url.startsWith("http")) return false;
+    const normalized = link.target_url.replace(/\/$/, "").toLowerCase();
+    return knownUrls.has(normalized);
+  });
+
+  return parsed;
 }
 
 // ── Agent 7 : Risk ───────────────────────────────────────────────────────────

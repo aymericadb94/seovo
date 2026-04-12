@@ -196,8 +196,26 @@ FORMAT DE SORTIE : JSON uniquement.
     }>(aiResult.text);
 
     if (parsed?.updated_content) {
-      const count = parsed.links_added?.length ?? 0;
-      return { content: parsed.updated_content, links_added: count };
+      // Validation : extraire toutes les URLs <a href="..."> du HTML retourné
+      // et vérifier qu'elles font partie des pages connues
+      const knownUrls = new Set(targets.map(t => t.url.replace(/\/$/, "").toLowerCase()));
+      let validatedContent = parsed.updated_content;
+      let validLinksCount = 0;
+
+      // Trouver tous les liens ajoutés et supprimer ceux avec des URLs inconnues
+      const linkRegex = /<a\s+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+      validatedContent = validatedContent.replace(linkRegex, (match, href, anchor) => {
+        const normalized = href.replace(/\/$/, "").toLowerCase();
+        if (knownUrls.has(normalized)) {
+          validLinksCount++;
+          return match; // garder le lien
+        }
+        // URL inconnue/hallucinée → garder seulement le texte d'ancre
+        logger.warn(`Outgoing link removed: hallucinated URL "${href}"`, { context: "linking-engine" });
+        return anchor;
+      });
+
+      return { content: validatedContent, links_added: validLinksCount };
     }
   } catch (err) {
     logger.warn("Outgoing linking failed", { context: "linking-engine", error: err });
