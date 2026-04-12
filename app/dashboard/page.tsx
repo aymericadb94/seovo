@@ -89,6 +89,8 @@ export default function Dashboard() {
   const [pubFilter, setPubFilter] = useState<"all" | "articles" | "pages" | "indexed" | "not_indexed">("all");
   const [cmsPages, setCmsPages] = useState<{ id: string; title: string; url: string; keyword: string; published_at: string; page_type: "article" | "page"; cover_image?: string | null; cms_id?: string | number; blog_id?: number }[]>([]);
   const [cmsPagesLoading, setCmsPagesLoading] = useState(false);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<string | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [calRange, setCalRange] = useState<7 | 30 | 90>(90);
@@ -437,6 +439,26 @@ export default function Dashboard() {
       setSyncResult("Erreur de synchronisation");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function cleanupBrokenLinks() {
+    setCleanupLoading(true);
+    setCleanupResult(null);
+    try {
+      const res = await fetch("/api/publications/cleanup-links", { method: "POST" });
+      const json = await res.json();
+      if (json.error) {
+        setCleanupResult(`Erreur : ${json.error}`);
+      } else if (json.cleaned === 0) {
+        setCleanupResult(`${json.scanned} pages scannées — aucun lien cassé`);
+      } else {
+        setCleanupResult(`${json.cleaned} lien(s) cassé(s) supprimé(s) sur ${json.details.length} page(s)`);
+      }
+    } catch {
+      setCleanupResult("Erreur réseau");
+    } finally {
+      setCleanupLoading(false);
     }
   }
 
@@ -2168,7 +2190,11 @@ export default function Dashboard() {
                       <button onClick={() => { loadCmsPages(); }} disabled={cmsPagesLoading} className="group flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-blue-500/40 text-gray-400 hover:text-blue-400 transition-all disabled:opacity-40">
                         {cmsPagesLoading ? (<><span className="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" /> Scan CMS...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/></svg>Synchroniser</>)}
                       </button>
+                      <button onClick={cleanupBrokenLinks} disabled={cleanupLoading} className="group flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-red-500/40 text-gray-400 hover:text-red-400 transition-all disabled:opacity-40">
+                        {cleanupLoading ? (<><span className="w-3 h-3 rounded-full border-2 border-red-400 border-t-transparent animate-spin" /> Nettoyage...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/><line x1="2" y1="2" x2="22" y2="22"/></svg>Nettoyer les liens</>)}
+                      </button>
                       {syncResult && <span className="text-xs text-blue-400">{syncResult}</span>}
+                      {cleanupResult && <span className={`text-xs ${cleanupResult.startsWith("Erreur") ? "text-red-400" : "text-green-400"}`}>{cleanupResult}</span>}
                       {data.site?.gsc_connected && data.site?.gsc_site_url && (
                         <div className="relative group/tip">
                           <button onClick={checkIndexation} disabled={indexationLoading} className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 transition-all disabled:opacity-40">
