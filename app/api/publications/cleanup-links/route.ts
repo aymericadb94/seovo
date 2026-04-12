@@ -14,19 +14,59 @@ import { logger } from "@/lib/logger";
 export const maxDuration = 180;
 
 /** Check if a URL is reachable (non-404). Cached per run. */
+// Soft-404 patterns: CMS returns 200 but the page is actually a "not found" page
+const SOFT_404_PATTERNS = [
+  "pas trouvé la page",
+  "page introuvable",
+  "page not found",
+  "this page isn't available",
+  "cette page n'est pas disponible",
+  "n'avons pas trouvé",
+  "404",
+  "Voir plus de posts", // Wix blog specific soft-404
+];
+
 async function isUrlAlive(url: string, cache: Map<string, boolean>): Promise<boolean> {
   const key = url.replace(/\/$/, "").toLowerCase();
   if (cache.has(key)) return cache.get(key)!;
 
   try {
     const res = await fetch(url, {
-      method: "HEAD",
+      method: "GET",
       redirect: "follow",
-      signal: AbortSignal.timeout(5000),
-      headers: { "User-Agent": "RankPill-LinkChecker/1.0" },
+      signal: AbortSignal.timeout(8000),
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; RankPill-LinkChecker/1.0)" },
     });
-    // 2xx/3xx = alive, 404/410 = dead, 5xx = assume alive (server error, not missing)
-    const alive = res.status < 400 || res.status >= 500;
+
+    // Hard 404/410 = dead
+    if (res.status === 404 || res.status === 410) {
+      cache.set(key, false);
+      return false;
+    }
+
+    // 5xx = assume alive (server error, not missing)
+    if (res.status >= 500) {
+      cache.set(key, true);
+      return true;
+    }
+
+    // 200 OK — check for soft 404 (CMS shows "page not found" with status 200)
+    if (res.status === 200) {
+      const html = await res.text();
+      // Check <title> and first 3000 chars for soft-404 indicators
+      const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      const titleText = titleMatch?.[1]?.toLowerCase() ?? "";
+      const bodySnippet = html.slice(0, 3000).toLowerCase();
+
+      for (const pattern of SOFT_404_PATTERNS) {
+        if (titleText.includes(pattern.toLowerCase()) || bodySnippet.includes(pattern.toLowerCase())) {
+          cache.set(key, false);
+          return false;
+        }
+      }
+    }
+
+    const alive = res.status < 400;
     cache.set(key, alive);
     return alive;
   } catch {
