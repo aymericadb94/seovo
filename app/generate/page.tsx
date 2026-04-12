@@ -58,6 +58,7 @@ type GeneratedArticle = {
 const STEPS = [
   {
     id: "intent",
+    agent: "Stéphane",
     label: "Analyse d'intention",
     sub: "Intent, sous-intentions, maturité utilisateur",
     icon: (
@@ -68,6 +69,7 @@ const STEPS = [
   },
   {
     id: "serp",
+    agent: "Antoine",
     label: "Analyse SERP",
     sub: "Patterns, faiblesses, opportunités concurrentielles",
     icon: (
@@ -78,6 +80,7 @@ const STEPS = [
   },
   {
     id: "diff",
+    agent: "Julien",
     label: "Angle différenciant",
     sub: "Positionnement unique vs concurrence",
     icon: (
@@ -88,6 +91,7 @@ const STEPS = [
   },
   {
     id: "structure",
+    agent: "Jonathan",
     label: "Structure de page",
     sub: "Blocs dynamiques adaptés à l'intention",
     icon: (
@@ -98,6 +102,7 @@ const STEPS = [
   },
   {
     id: "content",
+    agent: "Zacky",
     label: "Rédaction SEO complète",
     sub: "1 500+ mots structurés, data, exemples concrets",
     icon: (
@@ -108,6 +113,7 @@ const STEPS = [
   },
   {
     id: "linking",
+    agent: "Aymeric",
     label: "Maillage interne",
     sub: "Liens stratégiques vers les pages existantes",
     icon: (
@@ -118,6 +124,7 @@ const STEPS = [
   },
   {
     id: "risk",
+    agent: "Sophie",
     label: "Audit de risques SEO",
     sub: "Détection sur-optimisation, cannibalisation, IA",
     icon: (
@@ -128,6 +135,7 @@ const STEPS = [
   },
   {
     id: "ctr",
+    agent: "Yuji",
     label: "Optimisation CTR",
     sub: "Title SEO et meta description optimisés",
     icon: (
@@ -1019,7 +1027,7 @@ export default function GeneratePage() {
                           className="absolute whitespace-nowrap text-[9px] font-bold pointer-events-none transition-all duration-500"
                           style={labelStyle}
                         >
-                          {step.label.length > 18 ? step.label.split(" ").slice(0, 2).join(" ") : step.label}
+                          {step.agent}
                         </span>
                       );
                     })()}
@@ -1032,8 +1040,11 @@ export default function GeneratePage() {
                 <div className="text-3xl font-black tabular-nums mb-1" style={{ color: allDone ? "#22c55e" : "#f97316" }} key={`step-${currentStep}`}>
                   {Math.min(currentStep + 1, STEPS.length)}<span className="text-gray-700 text-xl font-bold">/{STEPS.length}</span>
                 </div>
-                <p className="text-white font-bold text-sm leading-tight max-w-[140px]" key={`label-${clampedStep}`} style={{ animation: "fadeIn 0.4s ease" }}>
-                  {allDone ? "Termin\u00e9" : STEPS[clampedStep]?.label}
+                <p className="text-white font-bold text-sm leading-tight max-w-[160px]" key={`label-${clampedStep}`} style={{ animation: "fadeIn 0.4s ease" }}>
+                  {allDone ? "Terminé" : STEPS[clampedStep]?.agent}
+                </p>
+                <p className="text-gray-500 text-[10px] mt-0.5 max-w-[140px]" key={`sub-${clampedStep}`} style={{ animation: "fadeIn 0.4s ease 0.1s both" }}>
+                  {allDone ? "Tous les agents ont terminé" : STEPS[clampedStep]?.label}
                 </p>
               </div>
             </div>
@@ -1052,8 +1063,10 @@ export default function GeneratePage() {
                     <path d="M12 3a9 9 0 019 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
                   <span className="text-[11px] font-bold text-orange-400">
-                    {STEPS[clampedStep]?.label}
+                    {STEPS[clampedStep]?.agent}
                   </span>
+                  <span className="text-[9px] text-gray-500 mx-1">—</span>
+                  <span className="text-[10px] text-gray-500">{STEPS[clampedStep]?.label}</span>
                   <span className="text-[9px] text-gray-700 ml-auto">agent/{STEPS[clampedStep]?.id}</span>
                 </div>
                 {/* Lines */}
