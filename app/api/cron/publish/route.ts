@@ -127,7 +127,7 @@ async function publishToShopify(
   return `${publicBase}/blogs/${blogHandle}/${article.article.handle}`;
 }
 
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 // ── Handler principal ────────────────────────────────────────────────────────
 
@@ -157,9 +157,41 @@ export async function GET(request: Request) {
 
     for (const site of sites) {
       try {
-        const keywords: string[] = site.keywords ?? [];
-        if (keywords.length === 0) {
-          results.push({ site: site.site_url, cms: site.cms, status: "skip", error: "Aucun mot-clé configuré" });
+        logger.info(`[cron] Processing site "${site.site_url}" (cms: ${site.cms}, user: ${site.user_id})`);
+
+        // Vérifier que le CMS est configuré
+        const cmsConfigured =
+          (site.cms === "wordpress" && site.wp_username && site.wp_app_password) ||
+          (site.cms === "shopify" && site.shopify_api_key) ||
+          (site.cms === "wix" && site.wix_api_key && site.wix_site_id) ||
+          (site.cms === "custom" && site.custom_api_url && site.custom_api_key);
+        if (!cmsConfigured) {
+          logger.warn(`[cron] Site "${site.site_url}": CMS "${site.cms}" non configuré (identifiants manquants)`);
+          results.push({ site: site.site_url, cms: site.cms, status: "skip", error: "CMS non configuré (identifiants manquants)" });
+          continue;
+        }
+
+        // Source de mots-clés : roadmap d'abord, puis site.keywords en fallback
+        const siteKeywords: string[] = site.keywords ?? [];
+
+        const { data: roadmapRow } = await supabase
+          .from("roadmaps")
+          .select("data")
+          .eq("user_id", site.user_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const roadmapKeywords: string[] = ((roadmapRow?.data?.articles ?? []) as { keyword: string; priority: number }[])
+          .filter(a => a.keyword)
+          .sort((a, b) => a.priority - b.priority)
+          .map(a => a.keyword);
+
+        const allKeywords = [...new Set([...roadmapKeywords, ...siteKeywords])];
+
+        if (allKeywords.length === 0) {
+          logger.warn(`[cron] Site "${site.site_url}": aucun mot-clé (roadmap: ${roadmapKeywords.length}, site: ${siteKeywords.length})`);
+          results.push({ site: site.site_url, cms: site.cms, status: "skip", error: "Aucun mot-clé configuré (ni roadmap, ni site)" });
           continue;
         }
 
@@ -182,12 +214,8 @@ export async function GET(request: Request) {
         const pubsToday = pubsTodayCount ?? 0;
 
         if (pubsToday >= dailyMax && !isForced) {
+          logger.info(`[cron] Site "${site.site_url}": limite journalière (${pubsToday}/${dailyMax})`);
           results.push({ site: site.site_url, cms: site.cms, status: "skip", error: `Limite journalière atteinte (${pubsToday}/${dailyMax})` });
-          continue;
-        }
-
-        if (!userId && pubsToday > 0) {
-          results.push({ site: site.site_url, cms: site.cms, status: "skip", error: `Déjà publié aujourd'hui automatiquement` });
           continue;
         }
 
@@ -200,15 +228,6 @@ export async function GET(request: Request) {
         const remaining = dailyMax - pubsToday;
         const frequency = isManual ? 1 : Math.min(Math.max(1, site.frequency ?? 1), remaining);
 
-        // Roadmap pour l'ordre des mots-clés
-        const { data: roadmapRow } = await supabase
-          .from("roadmaps")
-          .select("data")
-          .eq("user_id", site.user_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
         // Mots-clés déjà publiés
         const { data: publishedPubs } = await supabase
           .from("publications")
@@ -220,46 +239,66 @@ export async function GET(request: Request) {
 
         function getNextKeywords(count: number): string[] {
           const result: string[] = [];
-          if ((roadmapRow?.data?.articles?.length ?? 0) > 0) {
-            const roadmapArticles = ((roadmapRow?.data?.articles ?? []) as { keyword: string; priority: number }[])
-              .filter(a => a.keyword && !publishedKeywords.has(a.keyword.toLowerCase()))
-              .sort((a, b) => a.priority - b.priority);
-            for (const a of roadmapArticles) {
-              if (result.length >= count) break;
-              result.push(a.keyword);
-              publishedKeywords.add(a.keyword.toLowerCase());
+
+          // 1. Roadmap keywords (priorité)
+          for (const kw of roadmapKeywords) {
+            if (result.length >= count) break;
+            if (!publishedKeywords.has(kw.toLowerCase())) {
+              result.push(kw);
+              publishedKeywords.add(kw.toLowerCase());
             }
           }
+
+          // 2. Site keywords (fallback)
           if (result.length < count) {
-            for (let i = 0; result.length < count; i++) {
-              const kw = keywords[(totalPublished + i) % keywords.length];
+            for (const kw of siteKeywords) {
+              if (result.length >= count) break;
               if (!publishedKeywords.has(kw.toLowerCase())) {
                 result.push(kw);
                 publishedKeywords.add(kw.toLowerCase());
               }
-              if (i >= keywords.length) break;
             }
           }
+
+          // 3. Si tout est épuisé, recycler le premier keyword de la roadmap
+          // (permet de continuer à publier même si tous les keywords ont été utilisés)
+          if (result.length === 0 && allKeywords.length > 0) {
+            const recycled = allKeywords[totalPublished % allKeywords.length];
+            result.push(recycled);
+            logger.info(`[cron] Site "${site.site_url}": tous les keywords publiés, recyclage de "${recycled}"`);
+          }
+
           return result;
         }
 
         const keywordsToPublish = getNextKeywords(frequency);
+        logger.info(`[cron] Site "${site.site_url}": ${keywordsToPublish.length} keyword(s) à publier: ${keywordsToPublish.join(", ")} (freq: ${frequency}, pubsToday: ${pubsToday}, total: ${totalPublished})`);
 
         for (let f = 0; f < frequency; f++) {
-          const keyword = keywordsToPublish[f] ?? keywords[totalPublished % keywords.length];
+          const keyword = keywordsToPublish[f];
+          if (!keyword) {
+            logger.warn(`[cron] Site "${site.site_url}": pas de keyword disponible pour publication ${f + 1}/${frequency}`);
+            break;
+          }
 
           for (const language of targetLanguages) {
-            // ── Nouveau pipeline de génération v3 ──
+            logger.info(`[cron] Generating "${keyword}" (${language}) for ${site.site_url}...`);
+            const pipelineStart = Date.now();
+
+            // ── Pipeline de génération v3 ──
             const pipeline = await runGenerationPipeline(
               supabase,
               site.user_id,
               {
                 keyword,
                 language,
-                business_name: site.business_name,
-                industry: site.industry,
+                business_name: site.business_name ?? "",
+                industry: site.industry ?? "e-commerce",
               },
             );
+
+            const pipelineDuration = Math.round((Date.now() - pipelineStart) / 1000);
+            logger.info(`[cron] Pipeline done for "${keyword}" in ${pipelineDuration}s — risk: ${pipeline.risk.risk_score}/100 (${pipeline.risk.risk_level})`);
 
             const { title, meta_description, html: generatedHtml } = pipeline;
             const cover_image_query = pipeline.content.pexels_query;
@@ -327,6 +366,8 @@ export async function GET(request: Request) {
               results.push({ site: site.site_url, cms: site.cms, status: "skip", error: "CMS non supporté" });
               break;
             }
+
+            logger.info(`[cron] Published "${title}" to ${site.cms} → ${publishedUrl}`);
 
             const { error: insertError } = await supabase.from("publications").insert({
               site_id: site.id,

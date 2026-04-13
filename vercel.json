@@ -14,13 +14,13 @@
       "maxDuration": 120
     },
     "app/api/cron/publish/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 600
     },
     "app/api/cron/trigger/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 600
     },
     "app/api/generate/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 600
     }
   }
 }
