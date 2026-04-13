@@ -53,6 +53,8 @@ export type TaskType =
   | "internal_linking"        // Intelligent internal link insertion
   | "roadmap_integration"     // Post-publish roadmap strategy update
   | "content_audit"           // SEO over-optimization & AI detection audit
+  | "serp_analysis"           // SERP competitive analysis (pipeline Agent 2)
+  | "risk_audit"              // Pre-publication risk audit (pipeline Agent 7)
   | "final_check"             // Final quality gate before publication
 
   // ── EXECUTION tasks (default: Sonnet) ──
@@ -93,6 +95,8 @@ const TASK_DEFAULTS: Record<TaskType, ModelTier> = {
   internal_linking: "sonnet",
   roadmap_integration: "sonnet",
   content_audit: "sonnet",
+  serp_analysis: "opus",
+  risk_audit: "opus",
   final_check: "sonnet",
 
   // Execution (Sonnet)
@@ -122,17 +126,19 @@ const TASK_MAX_TOKENS: Record<TaskType, number> = {
   gsc_advanced_analysis: 4000,
   risk_arbitrage: 2000,
   recalc_full: 6000,
-  intent_analysis: 2000,
+  intent_analysis: 3500,
   cocoon_positioning: 4000,
   keyword_strategy: 3000,
-  content_structure: 3000,
+  content_structure: 5000,
   featured_snippet: 1500,
   editorial_plan: 6000,
   semantic_enrichment: 10000,
   value_enhancement: 10000,
-  internal_linking: 10000,
+  internal_linking: 4000,
   roadmap_integration: 4000,
   content_audit: 10000,
+  serp_analysis: 6000,
+  risk_audit: 8000,
   final_check: 10000,
 
   content_generation: 24000,

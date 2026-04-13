@@ -593,7 +593,7 @@ async function runSerpAgent(input: PipelineInput, ctx: RankpillContext, intent: 
   const avgHeadings = scraped.length > 0 ? Math.round(scraped.reduce((sum, r) => sum + r!.headings.length, 0) / scraped.length) : 0;
 
   const result = await aiCall(
-    { task: "content_audit" },
+    { task: "serp_analysis" },
     {
       // P3 — Rôle system enrichi
       system: `${systemContext(ctx, input)}\n\nTu es un SERP Analyst senior spécialisé en intelligence concurrentielle SEO. Tu analyses les pages de résultats Google avec la rigueur d'un analyste data et l'oeil stratégique d'un consultant SEO.
@@ -1244,7 +1244,7 @@ async function runRiskAgent(
     .map(p => `"${p.title}" (kw: "${p.keyword}") → ${p.url}`);
 
   const result = await aiCall(
-    { task: "content_audit" },
+    { task: "risk_audit" },
     {
       // P3 — Rôle system enrichi
       system: `${systemContext(ctx, input)}\n\nTu es un Auditeur SEO Technique senior spécialisé en conformité et risques de contenu. Tu audites avec la rigueur d'un quality analyst et la vision stratégique d'un consultant SEO.
