@@ -162,8 +162,20 @@ export type LinkingOutput = {
 
 export type RiskOutput = {
   risk_score: number;
-  issues: string[];
-  fixes: string[];
+  risk_level: "low" | "medium" | "high";
+  issues: {
+    category: "keyword_density" | "cannibalization" | "thin_content" | "structure" | "ai_signals" | "linking" | "eeat" | "over_optimization";
+    severity: "critical" | "warning" | "info";
+    description: string;
+    fix: string;
+  }[];
+  keyword_density: number;
+  word_count: number;
+  alignment_check: {
+    intent_match: boolean;
+    structure_respected: boolean;
+    tone_consistent: boolean;
+  };
 };
 
 export type CtrOutput = {
@@ -1199,36 +1211,173 @@ RETOURNE JSON brut uniquement :
 
 // ── Agent 7 : Risk ───────────────────────────────────────────────────────────
 
-async function runRiskAgent(input: PipelineInput, ctx: RankpillContext, html: string): Promise<RiskOutput> {
+async function runRiskAgent(
+  input: PipelineInput, ctx: RankpillContext, html: string,
+  intent: IntentOutput, diff: DiffOutput, structure: StructureOutput, linking: LinkingOutput,
+): Promise<RiskOutput> {
+  // P6 — Calcul de densité côté serveur (fiable)
+  const plainText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const wordCount = plainText.split(/\s+/).filter(Boolean).length;
+  const kwLower = input.keyword.toLowerCase();
+  const kwOccurrences = plainText.toLowerCase().split(kwLower).length - 1;
+  const keywordDensity = wordCount > 0 ? Math.round((kwOccurrences / wordCount) * 1000) / 10 : 0;
+
+  // P4 — Passer plus de contenu (8000 chars ~1300 mots)
+  const htmlExtract = html.slice(0, 8000);
+
+  // P5 — Résumé du maillage pour audit
+  const linkingSummary = linking.links.length > 0
+    ? linking.links.map(l => `→ "${l.anchor}" [${l.anchor_type}] vers ${l.target_url} (section: ${l.placement})`).join("\n")
+    : "Aucun lien interne";
+
+  // Pages existantes pour vérification cannibalisation
+  const existingForCanni = ctx.existing_pages
+    .filter(p => p.keyword && p.keyword.toLowerCase() !== kwLower)
+    .slice(0, 15)
+    .map(p => `"${p.title}" (kw: "${p.keyword}") → ${p.url}`);
+
   const result = await aiCall(
     { task: "content_audit" },
     {
-      system: `${systemContext(ctx, input)}\n\nTu es un expert SEO technique.`,
+      // P3 — Rôle system enrichi
+      system: `${systemContext(ctx, input)}\n\nTu es un Auditeur SEO Technique senior spécialisé en conformité et risques de contenu. Tu audites avec la rigueur d'un quality analyst et la vision stratégique d'un consultant SEO.
+
+Tu connais :
+- Les Google Search Quality Guidelines (Helpful Content System, Spam Policies)
+- Les critères E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness)
+- Les signaux de contenu IA détectables (patterns répétitifs, transitions artificielles, manque de spécificité)
+- Les seuils de sur-optimisation et les pénalités associées
+- Les risques de cannibalisation et leur impact sur le crawl budget
+
+Tu es le dernier filet de sécurité avant publication — ton audit doit être exhaustif et objectif. Un faux négatif (risque manqué) est pire qu'un faux positif (alerte excessive).`,
       messages: [{
         role: "user",
-        content: `Analyse les risques SEO de ce contenu pour le mot-clé "${input.keyword}".
+        content: `Audite ce contenu SEO pour le mot-clé "${input.keyword}" (business: "${input.business_name}", secteur: ${input.industry}).
 
-CONTENU (extrait) :
-${html.slice(0, 3000)}
+MÉTRIQUES CALCULÉES (serveur, fiables) :
+- Word count : ${wordCount} mots
+- Densité keyword "${input.keyword}" : ${keywordDensity}% (${kwOccurrences} occurrences)
 
-Vérifie :
-- Sur-optimisation (densité mot-clé > 2%)
-- Contenu thin/dupliqué
-- Cannibalisation avec pages existantes
-- Problèmes de structure (H2 manquants, ordre logique)
-- Signaux de contenu IA détectable
+CONTENU HTML :
+${htmlExtract}
+
+STRATÉGIE PRÉVUE (contexte des agents précédents) :
+- Intent : ${intent.intent} (user stage: ${intent.user_stage})
+- Ton attendu : ${diff.tone_of_voice}
+- Format attendu : ${diff.content_strategy.recommended_format}
+- Profondeur attendue : ${diff.content_strategy.depth_level}
+- Word count cible : ${diff.content_strategy.target_word_count} mots
+- Sections planifiées (${structure.target_sections_count}) : ${structure.sections_plan.map(s => `"${s.h2}"`).join(", ")}
+- Snippet strategy : ${structure.snippet_strategy.format} → ${structure.snippet_strategy.target_block}
+
+MAILLAGE INTERNE INJECTÉ :
+${linkingSummary}
+
+${existingForCanni.length > 0 ? `PAGES EXISTANTES (vérifier cannibalisation) :\n${existingForCanni.join("\n")}` : "Aucune page existante."}
+
+AUDIT DEMANDÉ — Vérifie chaque catégorie :
+
+1. KEYWORD DENSITY (keyword_density) :
+   - Densité serveur fournie : ${keywordDensity}%
+   - Seuil safe : 0.5-2% → OK ; > 2% → warning ; > 3% → critical
+   - Vérifie aussi la densité des variantes sémantiques
+
+2. CANNIBALIZATION (cannibalization) :
+   - Compare le keyword + H2 avec les pages existantes
+   - Même keyword ou keyword très proche sur une autre page → critical
+   - Chevauchement thématique fort → warning
+
+3. THIN CONTENT (thin_content) :
+   - Word count réel (${wordCount}) vs cible (${diff.content_strategy.target_word_count})
+   - Si < 80% de la cible → warning ; si < 60% → critical
+   - Sections vides ou très courtes
+
+4. STRUCTURE (structure) :
+   - H2 présents vs planifiés (${structure.target_sections_count})
+   - Ordre logique, hiérarchie heading
+   - Présence de quick_answer si snippet strategy active
+
+5. AI SIGNALS (ai_signals) :
+   - Patterns répétitifs ("il est important", "il convient de noter")
+   - Transitions artificielles, listes trop uniformes
+   - Manque de données spécifiques, exemples vagues
+
+6. LINKING (linking) :
+   - Ancres sur-optimisées (trop d'exact_match)
+   - Concentration de liens dans une seule section
+   - Liens vers pages non pertinentes
+
+7. E-E-A-T (eeat) :
+   - Présence de données chiffrées, sources, exemples concrets
+   - Démonstration d'expertise (terminologie, insights non-évidents)
+   - Manque d'expérience terrain ou de preuves
+
+8. OVER OPTIMIZATION (over_optimization) :
+   - Keyword stuffing dans H2, alt text, strong tags
+   - Structure artificiellement optimisée
+
+ALIGNEMENT :
+- intent_match : le contenu répond-il réellement à l'intention "${intent.intent}" ?
+- structure_respected : les H2 planifiés sont-ils présents et dans l'ordre ?
+- tone_consistent : le ton "${diff.tone_of_voice}" est-il respecté dans tout le contenu ?
+
+SCORING :
+- 0-25 : low risk — publication safe
+- 26-50 : medium risk — corrections mineures recommandées
+- 51-100 : high risk — corrections obligatoires avant publication
 
 RETOURNE JSON brut uniquement :
 {
   "risk_score": 0-100,
-  "issues": ["problème 1", "..."],
-  "fixes": ["correction 1", "..."]
+  "risk_level": "low | medium | high",
+  "issues": [
+    {
+      "category": "keyword_density | cannibalization | thin_content | structure | ai_signals | linking | eeat | over_optimization",
+      "severity": "critical | warning | info",
+      "description": "description précise du problème",
+      "fix": "correction recommandée"
+    }
+  ],
+  "keyword_density": ${keywordDensity},
+  "word_count": ${wordCount},
+  "alignment_check": {
+    "intent_match": true/false,
+    "structure_respected": true/false,
+    "tone_consistent": true/false
+  }
 }`,
       }],
     }
   );
 
-  return parseAiJson<RiskOutput>(result.text) ?? { risk_score: 0, issues: [], fixes: [] };
+  const parsed = parseAiJson<RiskOutput>(result.text);
+  if (parsed?.risk_score !== undefined && parsed?.issues) {
+    // Injecter les métriques serveur fiables
+    parsed.keyword_density = keywordDensity;
+    parsed.word_count = wordCount;
+    return parsed;
+  }
+
+  // P7 — Fallback conservateur (score 40 au lieu de 0)
+  return {
+    risk_score: 40,
+    risk_level: "medium",
+    issues: [
+      {
+        category: "structure",
+        severity: "info",
+        description: "Audit automatique non disponible — vérification manuelle recommandée",
+        fix: "Relire le contenu avant publication",
+      },
+    ],
+    keyword_density: keywordDensity,
+    word_count: wordCount,
+    alignment_check: {
+      intent_match: true,
+      structure_respected: true,
+      tone_consistent: true,
+    },
+  };
 }
 
 // ── Agent 8 : CTR ────────────────────────────────────────────────────────────
@@ -1452,14 +1601,15 @@ export async function runGenerationPipeline(
     `Détection des signaux de contenu IA`,
     `Contrôle de la structure H2/H3`,
   ]);
-  const risk = await runRiskAgent(input, ctx, html);
+  const risk = await runRiskAgent(input, ctx, html, intent, diff, structure, linking);
 
   // Agent 8: CTR
   onProgress?.(8, "ctr", [
     ...(gscKw ? [`CTR actuel GSC : ${gscKw.ctr}% — optimisation ciblée`] : [`Pas de CTR GSC — optimisation from scratch`]),
     `Création du title SEO (50-60 caractères)`,
     `Rédaction meta description (150-160 caractères)`,
-    `Score de risque : ${risk.risk_score}/100${risk.issues.length > 0 ? ` — ${risk.issues.length} point(s) corrigé(s)` : " — aucun problème détecté"}`,
+    `Risque : ${risk.risk_score}/100 (${risk.risk_level}) — ${risk.word_count} mots, densité ${risk.keyword_density}%`,
+    ...(risk.issues.filter(i => i.severity === "critical").length > 0 ? [`⚠ ${risk.issues.filter(i => i.severity === "critical").length} problème(s) critique(s) détecté(s)`] : []),
   ]);
   const ctr = await runCtrAgent(input, ctx, content);
 
