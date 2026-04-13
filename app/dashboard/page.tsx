@@ -77,6 +77,8 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [cronRunning, setCronRunning] = useState(false);
+  const [cronProgress, setCronProgress] = useState(0);
+  const cronProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [cronResult, setCronResult] = useState<string | null>(null);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [showOptimizeConfirm, setShowOptimizeConfirm] = useState(false);
@@ -505,6 +507,12 @@ export default function Dashboard() {
     setShowDailyLimitModal(false);
     setCronRunning(true);
     setCronResult(null);
+    setCronProgress(0);
+    const startTime = Date.now();
+    cronProgressRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      setCronProgress(Math.min(99, Math.round(99 * (1 - Math.exp(-elapsed / 45000)))));
+    }, 500);
     try {
       const res = await fetch("/api/cron/trigger", {
         method: "POST",
@@ -524,10 +532,14 @@ export default function Dashboard() {
         ?.map((r) => r.status === "ok" ? `✓ ${r.title}` : r.status === "error" ? `❌ ${r.error}` : null)
         .filter(Boolean)
         .join(" | ") ?? "";
+      if (cronProgressRef.current) clearInterval(cronProgressRef.current);
+      setCronProgress(100);
       setCronResult(((json.message ?? json.error ?? "Terminé") as string) + (detail ? ` — ${detail}` : ""));
       await loadData();
       loadCmsPages();
     } catch (err) {
+      if (cronProgressRef.current) clearInterval(cronProgressRef.current);
+      setCronProgress(0);
       setCronResult("Erreur réseau : " + (err instanceof Error ? err.message : String(err)));
     }
     setCronRunning(false);
@@ -807,9 +819,11 @@ export default function Dashboard() {
                   disabled={cronRunning}
                   className="group relative flex items-center gap-2 px-4 py-2 rounded-xl border border-orange-500/25 bg-orange-500/[0.06] hover:bg-orange-500/[0.12] hover:border-orange-500/50 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {cronRunning && <span className="absolute inset-0 rounded-xl border border-orange-500/40 animate-ping" />}
+                  {cronRunning && (
+                    <span className="absolute bottom-0 left-0 h-[2px] rounded-full" style={{ width: `${cronProgress}%`, background: "linear-gradient(90deg, #f97316, #fb923c)", transition: "width 0.5s ease-out" }} />
+                  )}
                   {cronRunning ? (
-                    <><span className="w-3.5 h-3.5 rounded-full border-2 border-orange-400 border-t-transparent animate-spin flex-shrink-0" /><span className="text-xs font-bold text-orange-400">Publication...</span></>
+                    <><span className="w-3.5 h-3.5 rounded-full border-2 border-orange-400 border-t-transparent animate-spin flex-shrink-0" /><span className="text-xs font-bold text-orange-400 tabular-nums">{cronProgress}%</span></>
                   ) : (
                     <>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors flex-shrink-0">
