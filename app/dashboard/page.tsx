@@ -189,15 +189,13 @@ export default function Dashboard() {
     setCocoonLoading(true);
     setCocoonError(null);
     setCocoonProgress(0);
-    // Progression réaliste : rapide au début, ralentit vers la fin
+    // Progression asymptotique : monte vite au début, ralentit progressivement,
+    // tend vers 99% sans jamais l'atteindre — pas de plafond fixe
     const startTime = Date.now();
-    const estimatedDuration = 60000; // ~60s estimé
     cocoonProgressRef.current = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const ratio = Math.min(elapsed / estimatedDuration, 1);
-      // Courbe ease-out cubique : monte vite puis ralentit, plafonne à 92%
-      const eased = 1 - Math.pow(1 - ratio, 2);
-      const pct = Math.min(92, Math.round(eased * 92));
+      // Formule : 99 * (1 - e^(-t/40s)) — atteint ~70% à 50s, ~86% à 80s, ~95% à 120s, ~98% à 160s
+      const pct = Math.min(99, Math.round(99 * (1 - Math.exp(-elapsed / 40000))));
       setCocoonProgress(pct);
     }, 500);
     try {
