@@ -1,4 +1,4 @@
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";

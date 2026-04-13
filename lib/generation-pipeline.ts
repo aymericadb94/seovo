@@ -1516,7 +1516,7 @@ RETOURNE JSON brut uniquement :
 
   // Fallback
   const fallbackTitle = content.hero.title.length > 62 ? content.hero.title.slice(0, 62) + "..." : content.hero.title;
-  const fallbackMeta = content.quick_answer?.slice(0, 157) + "..." || content.hero.promise.slice(0, 157) + "...";
+  const fallbackMeta = (content.quick_answer ?? content.hero.promise ?? "").slice(0, 157) + "...";
   return {
     title: fallbackTitle,
     title_length: fallbackTitle.length,
