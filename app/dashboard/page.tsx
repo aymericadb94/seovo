@@ -578,6 +578,7 @@ export default function Dashboard() {
       } else if (json.error) {
         // Même avec une erreur API, vérifier si l'article a quand même été publié
         try {
+          await new Promise(r => setTimeout(r, 2000));
           const supabase = createClient();
           const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
           const { data: recentPubs } = await supabase
@@ -595,8 +596,12 @@ export default function Dashboard() {
             });
             localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString());
             setCronResult(null);
+            await loadData();
+            loadCmsPages();
           } else {
             setCronResult(json.error as string);
+            await loadData();
+            loadCmsPages();
           }
         } catch {
           setCronResult(json.error as string);
