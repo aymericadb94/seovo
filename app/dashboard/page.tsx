@@ -2191,9 +2191,9 @@ export default function Dashboard() {
 
                 <div className="grid grid-cols-3 gap-4">
                   {[
-                    { label: "Total pages", value: cmsPages.length || (kpis?.totalArticles ?? 0), icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>), color: "#f97316", delay: "0ms" },
-                    { label: "Articles", value: cmsPages.length > 0 ? cmsPages.filter(p => p.page_type === "article").length : (kpis?.articlesThisMonth ?? 0), icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>), color: "#fb923c", delay: "100ms" },
-                    { label: "Pages", value: cmsPages.length > 0 ? cmsPages.filter(p => p.page_type === "page").length : 0, icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>), color: "#ef4444", delay: "200ms" },
+                    { label: "Total publiés", value: cmsPages.length || (kpis?.totalArticles ?? 0), icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>), color: "#f97316", delay: "0ms" },
+                    { label: "Ce mois", value: cmsThisMonth, icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>), color: "#fb923c", delay: "100ms" },
+                    { label: "Cette semaine", value: cmsThisWeek, icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>), color: "#ef4444", delay: "200ms" },
                   ].map(s => (
                     <div key={s.label} className="relative group bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden" style={{ animationDelay: s.delay }}>
                       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl" style={{ background: `radial-gradient(ellipse at top right, ${s.color}12, transparent 60%)` }} />
@@ -2219,7 +2219,22 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={data.pubsChart} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
+                    <AreaChart data={(() => {
+                      if (cmsPages.length === 0) return data.pubsChart;
+                      // Recomputer le graphique avec les CMS pages (source de vérité)
+                      const cmsCounts = new Map<string, number>();
+                      for (const page of cmsPages) {
+                        if (!page.published_at) continue;
+                        const pd = new Date(page.published_at);
+                        const label = pd.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+                        cmsCounts.set(label, (cmsCounts.get(label) ?? 0) + 1);
+                      }
+                      // Prendre le max entre base et CMS pour chaque jour
+                      return data.pubsChart.map(d => ({
+                        ...d,
+                        articles: Math.max(d.articles, cmsCounts.get(d.date) ?? 0),
+                      }));
+                    })()} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="areaGrad2" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
