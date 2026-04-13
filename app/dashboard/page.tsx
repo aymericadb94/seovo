@@ -1553,7 +1553,57 @@ export default function Dashboard() {
                           )}
 
                           {/* Contenu roadmap */}
-                          {roadmapRecord ? (
+                          {roadmapLoading ? (
+                            <div className="relative text-center py-12 flex-1 flex flex-col items-center justify-center">
+                              {/* Spinner animé multi-layer violet */}
+                              <div className="relative inline-block mb-6">
+                                <div className="w-16 h-16 rounded-full animate-spin" style={{ border: "3px solid rgba(167,139,250,0.1)", borderTopColor: "#a78bfa" }} />
+                                <div className="absolute inset-2 rounded-full animate-spin" style={{ border: "2px solid rgba(124,58,237,0.08)", borderBottomColor: "#7c3aed", animationDirection: "reverse", animationDuration: "1.5s" }} />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" className="w-5 h-5 animate-pulse">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                                  </svg>
+                                </div>
+                              </div>
+                              <p className="text-violet-300 text-sm font-bold mb-1">Calcul de la roadmap en cours...</p>
+                              <p className="text-gray-600 text-xs mb-1">Analyse des mots-clés, priorisation, structuration du plan éditorial</p>
+                              {/* Étapes de progression */}
+                              <div className="flex items-center gap-3 mt-3 mb-4">
+                                {[
+                                  { label: "Analyse", threshold: 15 },
+                                  { label: "Priorisation", threshold: 45 },
+                                  { label: "Structuration", threshold: 75 },
+                                ].map((step, i) => (
+                                  <div key={i} className="flex items-center gap-1.5">
+                                    <div
+                                      className="w-1.5 h-1.5 rounded-full transition-all duration-500"
+                                      style={{
+                                        background: roadmapProgress >= step.threshold ? "#a78bfa" : "rgba(167,139,250,0.15)",
+                                        boxShadow: roadmapProgress >= step.threshold ? "0 0 6px rgba(167,139,250,0.5)" : "none",
+                                      }}
+                                    />
+                                    <span
+                                      className="text-[10px] font-semibold transition-colors duration-500"
+                                      style={{ color: roadmapProgress >= step.threshold ? "#c4b5fd" : "#4b5563" }}
+                                    >
+                                      {step.label}
+                                    </span>
+                                    {i < 2 && <span className="text-gray-800 text-[10px] mx-0.5">→</span>}
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Barre de progression temps réel */}
+                              <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(167,139,250,0.1)" }}>
+                                <div
+                                  className="h-full rounded-full relative overflow-hidden"
+                                  style={{ width: `${roadmapProgress}%`, background: "linear-gradient(90deg, #7c3aed, #a78bfa)", transition: "width 0.5s ease-out" }}
+                                >
+                                  <div className="absolute inset-0 animate-[shimmer_2s_linear_infinite]" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)", backgroundSize: "200% 100%" }} />
+                                </div>
+                              </div>
+                              <p className="text-gray-600 text-xs mt-2 tabular-nums">{roadmapProgress}%</p>
+                            </div>
+                          ) : roadmapRecord ? (
                             (() => {
                               const cmsTitlesLower = cmsPages.map(p => p.title.toLowerCase().trim());
                               const publishedKw = new Set((data?.recentPublications ?? []).map(p => p.keyword?.toLowerCase()).filter(Boolean));
@@ -1614,56 +1664,6 @@ export default function Dashboard() {
                                 </div>
                               );
                             })()
-                          ) : roadmapLoading ? (
-                            <div className="relative text-center py-12 flex-1 flex flex-col items-center justify-center">
-                              {/* Spinner animé multi-layer violet */}
-                              <div className="relative inline-block mb-6">
-                                <div className="w-16 h-16 rounded-full animate-spin" style={{ border: "3px solid rgba(167,139,250,0.1)", borderTopColor: "#a78bfa" }} />
-                                <div className="absolute inset-2 rounded-full animate-spin" style={{ border: "2px solid rgba(124,58,237,0.08)", borderBottomColor: "#7c3aed", animationDirection: "reverse", animationDuration: "1.5s" }} />
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" className="w-5 h-5 animate-pulse">
-                                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-                                  </svg>
-                                </div>
-                              </div>
-                              <p className="text-violet-300 text-sm font-bold mb-1">Calcul de la roadmap en cours...</p>
-                              <p className="text-gray-600 text-xs mb-1">Analyse des mots-clés, priorisation, structuration du plan éditorial</p>
-                              {/* Étapes de progression */}
-                              <div className="flex items-center gap-3 mt-3 mb-4">
-                                {[
-                                  { label: "Analyse", threshold: 15 },
-                                  { label: "Priorisation", threshold: 45 },
-                                  { label: "Structuration", threshold: 75 },
-                                ].map((step, i) => (
-                                  <div key={i} className="flex items-center gap-1.5">
-                                    <div
-                                      className="w-1.5 h-1.5 rounded-full transition-all duration-500"
-                                      style={{
-                                        background: roadmapProgress >= step.threshold ? "#a78bfa" : "rgba(167,139,250,0.15)",
-                                        boxShadow: roadmapProgress >= step.threshold ? "0 0 6px rgba(167,139,250,0.5)" : "none",
-                                      }}
-                                    />
-                                    <span
-                                      className="text-[10px] font-semibold transition-colors duration-500"
-                                      style={{ color: roadmapProgress >= step.threshold ? "#c4b5fd" : "#4b5563" }}
-                                    >
-                                      {step.label}
-                                    </span>
-                                    {i < 2 && <span className="text-gray-800 text-[10px] mx-0.5">→</span>}
-                                  </div>
-                                ))}
-                              </div>
-                              {/* Barre de progression temps réel */}
-                              <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(167,139,250,0.1)" }}>
-                                <div
-                                  className="h-full rounded-full relative overflow-hidden"
-                                  style={{ width: `${roadmapProgress}%`, background: "linear-gradient(90deg, #7c3aed, #a78bfa)", transition: "width 0.5s ease-out" }}
-                                >
-                                  <div className="absolute inset-0 animate-[shimmer_2s_linear_infinite]" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)", backgroundSize: "200% 100%" }} />
-                                </div>
-                              </div>
-                              <p className="text-gray-600 text-xs mt-2 tabular-nums">{roadmapProgress}%</p>
-                            </div>
                           ) : (
                             <div className="flex flex-col gap-5 flex-1 justify-between">
                               <div className="flex flex-col gap-4">
