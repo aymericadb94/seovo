@@ -576,7 +576,31 @@ export default function Dashboard() {
         try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
         setCronResult(null);
       } else if (json.error) {
-        setCronResult(json.error as string);
+        // Même avec une erreur API, vérifier si l'article a quand même été publié
+        try {
+          const supabase = createClient();
+          const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+          const { data: recentPubs } = await supabase
+            .from("publications")
+            .select("title, keyword, wordpress_url")
+            .gt("published_at", fiveMinAgo)
+            .order("published_at", { ascending: false })
+            .limit(1);
+          const lastSeenTs = localStorage.getItem("rankpill_last_pub_seen") ?? "1970-01-01T00:00:00Z";
+          if (recentPubs && recentPubs.length > 0 && recentPubs[0].wordpress_url && recentPubs[0].wordpress_url !== "" && new Date(fiveMinAgo) > new Date(lastSeenTs)) {
+            setPublicationPopup({
+              title: recentPubs[0].title,
+              url: recentPubs[0].wordpress_url,
+              keyword: recentPubs[0].keyword ?? undefined,
+            });
+            localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString());
+            setCronResult(null);
+          } else {
+            setCronResult(json.error as string);
+          }
+        } catch {
+          setCronResult(json.error as string);
+        }
       } else {
         const detail = results
           ?.map((r) => r.status === "ok" ? `✓ ${r.title}` : r.status === "error" ? `❌ ${r.error}` : null)
@@ -591,7 +615,33 @@ export default function Dashboard() {
     } catch (err) {
       if (cronProgressRef.current) clearInterval(cronProgressRef.current);
       setCronProgress(0);
-      setCronResult("Erreur réseau : " + (err instanceof Error ? err.message : String(err)));
+      // Même en cas d'erreur réseau / timeout, vérifier si un article a été publié entre-temps
+      try {
+        await new Promise(r => setTimeout(r, 2000));
+        const supabase = createClient();
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { data: recentPubs } = await supabase
+          .from("publications")
+          .select("title, keyword, wordpress_url")
+          .gt("published_at", fiveMinAgo)
+          .order("published_at", { ascending: false })
+          .limit(1);
+        if (recentPubs && recentPubs.length > 0 && recentPubs[0].wordpress_url) {
+          setPublicationPopup({
+            title: recentPubs[0].title,
+            url: recentPubs[0].wordpress_url,
+            keyword: recentPubs[0].keyword ?? undefined,
+          });
+          try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
+          setCronResult(null);
+          await loadData();
+          loadCmsPages();
+        } else {
+          setCronResult("Erreur réseau : " + (err instanceof Error ? err.message : String(err)));
+        }
+      } catch {
+        setCronResult("Erreur réseau : " + (err instanceof Error ? err.message : String(err)));
+      }
     }
     setCronRunning(false);
   }
@@ -867,7 +917,11 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-2.5">
             {(() => {
-              const pubsToday = data?.kpis.pubsToday ?? 0;
+              // Compter les pubs du jour : max entre API stats et CMS pages (source de vérité)
+              const apiPubsToday = data?.kpis.pubsToday ?? 0;
+              const startOfToday = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+              const cmsPubsToday = cmsPages.filter(p => new Date(p.published_at) >= startOfToday).length;
+              const pubsToday = Math.max(apiPubsToday, cmsPubsToday);
               const dailyMax = 3;
               const limitReached = pubsToday >= dailyMax;
               return (
