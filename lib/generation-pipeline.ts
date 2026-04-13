@@ -180,8 +180,15 @@ export type RiskOutput = {
 
 export type CtrOutput = {
   title: string;
+  title_length: number;
+  title_variants: string[];
   meta_description: string;
+  meta_length: number;
+  og_title: string;
+  og_description: string;
   hook: string;
+  ctr_techniques_used: string[];
+  confidence_score: number;
 };
 
 export type PipelineResult = {
@@ -1382,8 +1389,11 @@ RETOURNE JSON brut uniquement :
 
 // ── Agent 8 : CTR ────────────────────────────────────────────────────────────
 
-async function runCtrAgent(input: PipelineInput, ctx: RankpillContext, content: ContentOutput): Promise<CtrOutput> {
-  const gscCtr = ctx.gsc_data?.queries.find(q => q.query.toLowerCase().includes(input.keyword.toLowerCase()))?.ctr;
+async function runCtrAgent(
+  input: PipelineInput, ctx: RankpillContext,
+  intent: IntentOutput, diff: DiffOutput, serp: SerpOutput, risk: RiskOutput, content: ContentOutput,
+): Promise<CtrOutput> {
+  const gscKwData = ctx.gsc_data?.queries.find(q => q.query.toLowerCase().includes(input.keyword.toLowerCase()));
 
   const contentSummary = [
     content.hero.title,
@@ -1392,33 +1402,132 @@ async function runCtrAgent(input: PipelineInput, ctx: RankpillContext, content: 
     ...content.sections.map(s => s.title),
   ].join(" | ");
 
+  // P6 — Titles concurrents pour différenciation
+  const competitorTitles = serp.patterns.length > 0
+    ? `TITLES CONCURRENTS (patterns SERP) : ${serp.patterns.join(" | ")}`
+    : "Pas de données titles concurrents disponibles.";
+
   const result = await aiCall(
     { task: "meta_optimization" },
     {
-      system: `${systemContext(ctx, input)}\n\nTu es un expert en copywriting SEO.`,
+      // P3 — Rôle system enrichi
+      system: `${systemContext(ctx, input)}\n\nTu es un Copywriter CTR senior spécialisé en optimisation des taux de clics SERP. Tu combines les techniques de copywriting direct response avec l'expertise SEO technique.
+
+Tu maîtrises les techniques CTR éprouvées :
+- Power words : "ultime", "secret", "erreur", "gratuit", "rapide", "prouvé", "exclusif"
+- Numbers & brackets : "[2024]", "(+Template)", "7 étapes", "en 5 min"
+- Curiosity gap : promettre sans tout révéler, créer l'envie de cliquer
+- Urgency/freshness : signaux de contenu à jour et pertinent
+- Emotional triggers : peur de manquer, désir de résultat, frustration résolue
+- Pattern interrupt : se différencier visuellement des autres titles SERP
+
+Tu sais que :
+- Google tronque les titles à ~60 caractères et les metas à ~155 caractères — pas un char de plus
+- Le keyword DOIT apparaître dans les 40 premiers caractères du title
+- La meta description est un pitch de vente — elle doit déclencher le clic, pas résumer le contenu
+- L'Open Graph (réseaux sociaux) tolère des titles plus longs et plus accrocheurs
+
+Ta sortie est ce que l'utilisateur verra dans Google — chaque caractère compte.`,
       messages: [{
         role: "user",
-        content: `Optimise le CTR pour le mot-clé "${input.keyword}".
+        content: `Optimise le CTR SERP pour le mot-clé "${input.keyword}" (business: "${input.business_name}", secteur: ${input.industry}).
+
+CONTEXTE STRATÉGIQUE :
+- Intent : ${intent.intent} (user stage: ${intent.user_stage})
+- Angle : ${diff.angle}
+- Promesse : ${diff.promise}
+- Ton : ${diff.tone_of_voice}
+- Featured snippet probable : ${intent.featured_snippet_opportunity.likely ? `oui (${intent.featured_snippet_opportunity.format})` : "non"}
+- SERP features actives : ${[serp.serp_features.featured_snippet && "featured snippet", serp.serp_features.paa && "PAA", serp.serp_features.video_pack && "vidéos", serp.serp_features.image_pack && "images"].filter(Boolean).join(", ") || "aucune"}
 
 RÉSUMÉ DU CONTENU : ${contentSummary}
-${gscCtr ? `CTR ACTUEL GSC : ${gscCtr}%` : "Pas de CTR GSC disponible."}
+${gscKwData ? `DONNÉES GSC : position ${gscKwData.position}, CTR actuel ${gscKwData.ctr}%, ${gscKwData.impressions} impressions, ${gscKwData.clicks} clics` : "Pas de données GSC — nouveau keyword."}
 
-Crée un title SEO (50-60 chars, contient le mot-clé, optimisé CTR), une meta description (150-160 chars, incitative), et un hook d'accroche.
+${competitorTitles}
+
+AUDIT RISK : score ${risk.risk_score}/100 (${risk.risk_level}), ${risk.word_count} mots
+
+RÈGLES :
+
+TITLE SEO (obligatoire) :
+- 50-60 caractères MAX (Google tronque à ~60)
+- Keyword "${input.keyword}" dans les 40 premiers caractères
+- Utilise au moins 1 technique CTR (power word, number, bracket, curiosity gap)
+- Se différencie des titles concurrents — ne pas reproduire le même pattern
+${intent.featured_snippet_opportunity.likely ? `- Featured snippet probable → inclure une formulation question ou "comment" pour capter le snippet` : ""}
+${intent.intent === "commercial_investigation" ? `- Intent commercial → inclure un comparatif ou qualificatif (meilleur, top, vs, guide)` : ""}
+${intent.intent === "transactional" ? `- Intent transactionnel → inclure un signal d'action (prix, acheter, offre, livraison)` : ""}
+
+TITLE VARIANTS (2 alternatives) :
+- Variante A : approche différente (autre angle, autre technique CTR)
+- Variante B : formulation plus agressive ou plus safe selon le risk level
+
+META DESCRIPTION (obligatoire) :
+- 150-155 caractères MAX (Google tronque à ~155)
+- Commence par un bénéfice ou une promesse, pas par le keyword
+- Inclut un call-to-action implicite ("Découvrez", "Comparez", "Apprenez")
+- Contient le keyword naturellement (Google le met en gras)
+- Ton aligné avec "${diff.tone_of_voice}"
+
+OPEN GRAPH (réseaux sociaux) :
+- og_title : peut être plus long (70 chars max), plus accrocheur, emojis OK
+- og_description : 200 chars max, pitch social (plus émotionnel que la meta SEO)
+
+HOOK (accroche premier paragraphe) :
+- 1-2 phrases maximum
+- Interpelle le lecteur, pose un problème ou une stat choc
+- Donne envie de lire la suite
 
 RETOURNE JSON brut uniquement :
 {
-  "title": "title SEO optimisé CTR",
-  "meta_description": "meta description 150-160 chars",
-  "hook": "phrase d'accroche"
+  "title": "title SEO 50-60 chars contenant le keyword",
+  "title_length": 55,
+  "title_variants": ["variante A", "variante B"],
+  "meta_description": "meta description 150-155 chars",
+  "meta_length": 152,
+  "og_title": "titre Open Graph plus accrocheur 70 chars max",
+  "og_description": "description sociale 200 chars max",
+  "hook": "accroche 1-2 phrases pour le premier paragraphe",
+  "ctr_techniques_used": ["technique 1", "technique 2"],
+  "confidence_score": 75
 }`,
       }],
     }
   );
 
-  return parseAiJson<CtrOutput>(result.text) ?? {
-    title: content.hero.title,
-    meta_description: content.quick_answer.slice(0, 160),
+  const parsed = parseAiJson<CtrOutput>(result.text);
+  if (parsed?.title && parsed?.meta_description) {
+    // P4 — Validation de longueur côté serveur
+    if (parsed.title.length > 65) {
+      parsed.title = parsed.title.slice(0, 62) + "...";
+    }
+    if (parsed.meta_description.length > 160) {
+      parsed.meta_description = parsed.meta_description.slice(0, 157) + "...";
+    }
+    parsed.title_length = parsed.title.length;
+    parsed.meta_length = parsed.meta_description.length;
+    if (!parsed.title_variants) parsed.title_variants = [];
+    if (!parsed.og_title) parsed.og_title = parsed.title;
+    if (!parsed.og_description) parsed.og_description = parsed.meta_description;
+    if (!parsed.ctr_techniques_used) parsed.ctr_techniques_used = [];
+    if (!parsed.confidence_score) parsed.confidence_score = 50;
+    return parsed;
+  }
+
+  // Fallback
+  const fallbackTitle = content.hero.title.length > 62 ? content.hero.title.slice(0, 62) + "..." : content.hero.title;
+  const fallbackMeta = content.quick_answer?.slice(0, 157) + "..." || content.hero.promise.slice(0, 157) + "...";
+  return {
+    title: fallbackTitle,
+    title_length: fallbackTitle.length,
+    title_variants: [],
+    meta_description: fallbackMeta,
+    meta_length: fallbackMeta.length,
+    og_title: content.hero.title,
+    og_description: content.hero.promise,
     hook: content.hero.promise,
+    ctr_techniques_used: [],
+    confidence_score: 20,
   };
 }
 
@@ -1611,7 +1720,12 @@ export async function runGenerationPipeline(
     `Risque : ${risk.risk_score}/100 (${risk.risk_level}) — ${risk.word_count} mots, densité ${risk.keyword_density}%`,
     ...(risk.issues.filter(i => i.severity === "critical").length > 0 ? [`⚠ ${risk.issues.filter(i => i.severity === "critical").length} problème(s) critique(s) détecté(s)`] : []),
   ]);
-  const ctr = await runCtrAgent(input, ctx, content);
+  const ctr = await runCtrAgent(input, ctx, intent, diff, serp, risk, content);
+
+  // P7 — Injecter le hook CTR comme accroche en début de contenu
+  const finalHtml = ctr.hook
+    ? `<p><strong>${ctr.hook}</strong></p>\n${html}`
+    : html;
 
   return {
     intent,
@@ -1622,7 +1736,7 @@ export async function runGenerationPipeline(
     linking,
     risk,
     ctr,
-    html,
+    html: finalHtml,
     title: ctr.title,
     meta_description: ctr.meta_description,
   };
