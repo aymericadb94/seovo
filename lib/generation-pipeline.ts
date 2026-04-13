@@ -940,78 +940,125 @@ async function runContentAgent(
   input: PipelineInput, ctx: RankpillContext,
   intent: IntentOutput, diff: DiffOutput, structure: StructureOutput,
 ): Promise<ContentOutput> {
+  // P5 — Données GSC pour renforcer les positions existantes
+  const gscTerms = ctx.gsc_data?.queries
+    .filter(q => q.impressions > 50)
+    .sort((a, b) => b.impressions - a.impressions)
+    .slice(0, 15)
+    .map(q => `"${q.query}" (pos ${q.position}, ${q.impressions} imp)`) ?? [];
+
+  // P7 — Pages existantes pour préparer le maillage interne
+  const linkablePages = ctx.existing_pages.slice(0, 10).map(p => `"${p.keyword}" → ${p.url}`);
+
+  // P4 — Blocs optionnels
+  const hasStats = structure.blocks.includes("stats");
+  const hasComparison = structure.blocks.includes("comparison");
+
   const result = await aiCall(
     { task: "content_generation" },
     {
-      system: `${systemContext(ctx, input)}\n\nTu es un rédacteur SEO senior expert en contenu à forte valeur. Tu écris en ${input.language}. Pas de contenu générique. Inclure data, exemples, stratégie. Structure dynamique, lisible rapidement.`,
+      // P1 — Rôle system enrichi E-E-A-T + NLP
+      system: `${systemContext(ctx, input)}\n\nTu es un Rédacteur SEO Expert senior spécialisé en contenu à forte performance organique. Tu écris en ${input.language}.
+
+Tu maîtrises :
+- L'optimisation NLP : couverture d'entités, densité sémantique, co-occurrences de termes
+- Les critères E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness) : démontrer l'expertise par des données, des exemples vécus, des sources
+- Le SEO on-page : placement stratégique du keyword principal, LSI keywords dans les H2 et premiers paragraphes
+- La rédaction scannable : F-pattern, inverted pyramid, hooks en début de chaque section
+- L'optimisation featured snippet : structuration du contenu pour capturer la position 0
+
+Tu ne rédiges JAMAIS de contenu générique. Chaque phrase doit apporter une information, une donnée ou un angle que le lecteur ne trouvera pas sur les 5 premiers résultats Google.
+
+Ta sortie est le contenu final qui sera publié — il doit être prêt pour le CMS sans retouche.`,
       messages: [{
         role: "user",
-        content: `Crée une page SEO complète pour "${input.keyword}".
+        content: `Rédige la page SEO complète pour "${input.keyword}" (business: "${input.business_name}", secteur: ${input.industry}).
 
-INTENT : ${intent.intent} (mix: info ${intent.intent_mix.informational}% / commercial ${intent.intent_mix.commercial}% / transac ${intent.intent_mix.transactional}%)
+INTENTION : ${intent.intent} (mix: info ${intent.intent_mix.informational}% / commercial ${intent.intent_mix.commercial}% / transac ${intent.intent_mix.transactional}%)
 SOUS-INTENTIONS : ${intent.sub_intents.map(s => `${s.label} [${s.type}, P${s.priority}]`).join(", ")}
 STAGE UTILISATEUR : ${intent.user_stage}
-CONTENT LIFESPAN : ${intent.content_lifespan}
-FEATURED SNIPPET : ${intent.featured_snippet_opportunity.likely ? `oui → optimiser format ${intent.featured_snippet_opportunity.format}` : "non"}
-ANGLE : ${diff.angle}
-PROMESSE : ${diff.promise}
-ÉLÉMENTS UNIQUES : ${diff.unique_elements.join(", ")}
-TON : ${diff.tone_of_voice}
-FORMAT : ${diff.content_strategy.recommended_format}
-PROFONDEUR : ${diff.content_strategy.depth_level}
-DIFFÉRENCIATEURS : ${diff.content_strategy.differentiators.join(", ") || "aucun spécifié"}
-MOTS-CLÉS SÉMANTIQUES : ${intent.keyword_variations.semantic.join(", ")}
-LONGUE TRAÎNE : ${intent.keyword_variations.long_tail.join(", ")}
-QUESTIONS UTILISATEURS : ${intent.keyword_variations.related_questions.join(", ")}
+FEATURED SNIPPET : ${intent.featured_snippet_opportunity.likely ? `OUI → format ${intent.featured_snippet_opportunity.format}` : "non"}
+
+STRATÉGIE ÉDITORIALE (Agent 3) :
+- Angle : ${diff.angle}
+- Promesse : ${diff.promise}
+- Éléments uniques : ${diff.unique_elements.join(", ")}
+- Ton : ${diff.tone_of_voice}
+- Format : ${diff.content_strategy.recommended_format}
+- Profondeur : ${diff.content_strategy.depth_level}
+- Différenciateurs : ${diff.content_strategy.differentiators.join(", ") || "aucun spécifié"}
+
+STRUCTURE IMPOSÉE (Agent 4) — RESPECTE CES H2 ET BUDGETS :
+- Blocs : ${structure.blocks.join(", ")}
+- Sections H2 (${structure.target_sections_count}) :
+${structure.sections_plan.map((s, i) => `  ${i + 1}. "${s.h2}" — ~${s.estimated_words} mots — couvre: ${s.sub_intent_covered}${s.key_points.length > 0 ? `\n     Points clés obligatoires : ${s.key_points.join(", ")}` : ""}`).join("\n")}
+- Snippet : ${structure.snippet_strategy.format !== "none" ? `${structure.snippet_strategy.instruction} (bloc: ${structure.snippet_strategy.target_block}, format: ${structure.snippet_strategy.format})` : "pas de stratégie snippet"}
+
+MOTS-CLÉS À INTÉGRER NATURELLEMENT :
+- Keyword principal : "${input.keyword}" — placer dans H1, premier paragraphe, au moins 2 H2, et conclusion
+- Sémantiques : ${intent.keyword_variations.semantic.join(", ")}
+- Longue traîne (utiliser comme H2/H3 ou dans le contenu) : ${intent.keyword_variations.long_tail.join(", ")}
+- Questions utilisateurs (alimentent la FAQ) : ${intent.keyword_variations.related_questions.join(", ")}
+${gscTerms.length > 0 ? `\nTERMES GSC À RENFORCER (déjà positionnés — intègre-les naturellement pour consolider) :\n${gscTerms.join(", ")}` : ""}
+${linkablePages.length > 0 ? `\nPAGES EXISTANTES (mentionne naturellement ces sujets pour préparer le maillage interne) :\n${linkablePages.join("\n")}` : ""}
+
 CLUSTER : ${ctx.cluster ?? "non défini"}
 RÔLE COCON : ${diff.cocoon_positioning.role}
 
-STRUCTURE IMPOSÉE :
-- Blocs : ${structure.blocks.join(", ")}
-- Sections H2 planifiées (${structure.target_sections_count}) :
-${structure.sections_plan.map((s, i) => `  ${i + 1}. "${s.h2}" — ~${s.estimated_words} mots — couvre: ${s.sub_intent_covered}${s.key_points.length > 0 ? ` — points clés: ${s.key_points.join(", ")}` : ""}`).join("\n")}
-- Snippet : ${structure.snippet_strategy.format !== "none" ? `${structure.snippet_strategy.instruction} (bloc: ${structure.snippet_strategy.target_block}, format: ${structure.snippet_strategy.format})` : "pas de stratégie snippet"}
+RÈGLES SEO ON-PAGE (P2) :
+- Keyword principal "${input.keyword}" : dans le H1, dans les 100 premiers mots, dans au moins 2 H2, dans la conclusion
+- Utilise <strong> pour le keyword principal (1-2 fois max) et les termes sémantiques importants — cela signale le poids sémantique aux crawlers
+- Densité keyword : 1-2% naturelle, JAMAIS de bourrage
+- Chaque section commence par un hook (question, stat, affirmation forte) — pas par "Dans cette section..."
+- Paragraphes courts : 2-3 phrases max, séparés par des <p>
+- Listes à puces pour les énumérations de 3+ éléments
+- Au moins 1 donnée chiffrée ou exemple concret par section
 
-RÈGLES :
-- Contenu non générique, basé sur les données
-- Inclure : data chiffrées, exemples concrets, stratégie actionnable
-- Lisible en diagonale, paragraphes courts (2-3 phrases)
-- Aucune phrase de remplissage ("il est important de noter", "dans le monde actuel", etc.)
-- Adopte le ton "${diff.tone_of_voice}" : ${diff.tone_of_voice === "expert" ? "jargon assumé, insights pointus, pas de vulgarisation excessive" : diff.tone_of_voice === "accessible" ? "vulgarisation, analogies, zéro jargon technique" : diff.tone_of_voice === "provocateur" ? "remise en question, prise de position forte, ton incisif" : diff.tone_of_voice === "didactique" ? "pas-à-pas, exemples concrets à chaque étape, pédagogie" : "chiffres, comparatifs, preuves, ROI, données vérifiables"}
-- Voix active, directe
+RÈGLES DE RÉDACTION :
+- Adopte le ton "${diff.tone_of_voice}" : ${diff.tone_of_voice === "expert" ? "jargon technique assumé, insights pointus, références sectorielles" : diff.tone_of_voice === "accessible" ? "vulgarisation avec analogies, zéro jargon, exemples du quotidien" : diff.tone_of_voice === "provocateur" ? "remise en question, prise de position forte, ton incisif, interpellation directe" : diff.tone_of_voice === "didactique" ? "pas-à-pas numérotés, exemples concrets à chaque étape, pédagogie progressive" : "chiffres vérifiables, comparatifs, preuves, ROI, tableaux de données"}
+- Voix active, directe, zéro filler
+- INTERDIT : "il est important de noter", "dans le monde actuel", "il convient de", "force est de constater", "il faut savoir que", "comme nous allons le voir", "dans cette section", "en conclusion", "pour résumer"
+- INTERDIT : paragraphes de plus de 4 phrases, sections sans données/exemples, répétitions d'idées entre sections
 - ${diff.content_strategy.target_word_count} mots total (profondeur : ${diff.content_strategy.depth_level})
 - Tout en ${input.language}
 
 RETOURNE JSON brut uniquement :
 {
   "hero": {
-    "title": "H1 puissant orienté résultat",
-    "subtitle": "sous-titre clair",
-    "promise": "promesse en 1 phrase",
+    "title": "H1 contenant le keyword principal, orienté résultat (max 65 car.)",
+    "subtitle": "sous-titre avec bénéfice clair",
+    "promise": "promesse de valeur en 1 phrase",
     "cta": "texte CTA ou null"
   },
-  "quick_answer": "réponse immédiate 40-60 mots optimisée featured snippet",
+  "quick_answer": "réponse directe 40-60 mots — optimisée ${intent.featured_snippet_opportunity.likely ? intent.featured_snippet_opportunity.format : "snippet"}",
+${hasStats ? `  "stats": [
+    { "label": "description du chiffre", "value": "chiffre + unité", "source": "source optionnelle" }
+  ],` : ""}
+${hasComparison ? `  "comparison": {
+    "headers": ["Critère", "Option A", "Option B"],
+    "rows": [["critère 1", "valeur A", "valeur B"]]
+  },` : ""}
   "sections": [
     {
-      "title": "H2 court et percutant",
-      "content": "HTML (<p>, <ul>, <li>, <strong>, <em>)",
-      "tip": "conseil concret en 1 phrase",
-      "example": "exemple spécifique en 1-2 phrases"
+      "title": "H2 du sections_plan (respecter l'ordre et les titres)",
+      "content": "HTML riche (<p>, <ul>, <li>, <strong>, <em>) — respecter le budget mots estimé",
+      "tip": "conseil actionnable en 1 phrase (optionnel)",
+      "example": "exemple concret et spécifique (optionnel)"
     }
   ],
   "insights": [
-    { "type": "tip | warning | pro", "text": "texte court" }
+    { "type": "tip | warning | pro", "text": "insight court et percutant" }
   ],
   "mistakes": [
-    { "title": "erreur", "why": "explication", "consequence": "impact" }
+    { "title": "erreur concrète", "why": "explication causale", "consequence": "impact mesurable" }
   ],
   "faq": [
-    { "question": "question ?", "answer": "réponse 40-60 mots" }
+    { "question": "question naturelle (issue des related_questions) ?", "answer": "réponse directe 40-60 mots" }
   ],
-  "cta": "texte de conclusion 2-3 phrases",
-  "pexels_query": "3-5 english keywords for cover image",
-  "cover_alt_text": "alt text SEO 8-12 mots",
-  "section_image_queries": ["query section 1", "query section 2", "query section 3"]
+  "cta": "conclusion actionnable 2-3 phrases avec rappel de la promesse",
+  "pexels_query": "3-5 english keywords for relevant cover image",
+  "cover_alt_text": "alt text SEO descriptif 8-12 mots incluant le keyword",
+  "section_image_queries": ["query en anglais section 1", "query section 2", "query section 3"]
 }`,
       }],
     }
