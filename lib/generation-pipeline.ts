@@ -373,24 +373,64 @@ export async function collectRankpillContext(
       };
       const cmsPosts = await listCmsPosts(creds, 200);
       if (cmsPosts.length > 0) {
-        // Construire un Set de slugs/pathnames réels du CMS pour matching robuste
-        const cmsUrls = new Set(
-          cmsPosts.map(p => {
-            try { return new URL(p.url).pathname.replace(/\/$/, "").toLowerCase(); }
-            catch { return p.url.toLowerCase(); }
-          }).filter(u => u.length > 1)
-        );
-        const before = existing_pages.length;
-        existing_pages = existing_pages.filter(p => {
+        // Construire plusieurs Sets pour un matching multi-niveaux
+        const cmsPathnames = new Set<string>();
+        const cmsSlugs = new Set<string>();
+        const cmsTitles = new Set<string>();
+        for (const p of cmsPosts) {
           try {
             const pathname = new URL(p.url).pathname.replace(/\/$/, "").toLowerCase();
-            return cmsUrls.has(pathname);
-          } catch { return false; }
+            cmsPathnames.add(pathname);
+            // Extraire le dernier segment comme slug
+            const slug = pathname.split("/").filter(Boolean).pop() ?? "";
+            if (slug.length > 2) cmsSlugs.add(slug);
+          } catch {
+            cmsSlugs.add(p.url.toLowerCase());
+          }
+          if (p.title) cmsTitles.add(p.title.toLowerCase().trim());
+        }
+
+        console.log(`[pipeline] CMS cross-check: ${cmsPosts.length} articles CMS, ${existing_pages.length} pages en DB`);
+
+        const before = existing_pages.length;
+        existing_pages = existing_pages.filter(p => {
+          // Niveau 1 : match par pathname complet
+          try {
+            const pathname = new URL(p.url).pathname.replace(/\/$/, "").toLowerCase();
+            if (cmsPathnames.has(pathname)) return true;
+            // Niveau 2 : match par slug (dernier segment de l'URL)
+            const slug = pathname.split("/").filter(Boolean).pop() ?? "";
+            if (slug.length > 2 && cmsSlugs.has(slug)) return true;
+          } catch { /* continue */ }
+          // Niveau 3 : match par titre (au cas où les URLs diffèrent mais le contenu existe)
+          if (p.title && cmsTitles.has(p.title.toLowerCase().trim())) return true;
+          return false;
         });
         const removed = before - existing_pages.length;
         if (removed > 0) {
           console.log(`[pipeline] Maillage: ${removed} pages fantômes supprimées (supprimées du CMS mais encore en DB)`);
         }
+        console.log(`[pipeline] Maillage: ${existing_pages.length} pages validées pour le linking`);
+
+        // Aussi : enrichir existing_pages avec les articles CMS qui ne sont pas en DB
+        // (articles créés manuellement sur le CMS)
+        const existingUrls = new Set(existing_pages.map(p => {
+          try { return new URL(p.url).pathname.replace(/\/$/, "").toLowerCase(); } catch { return p.url; }
+        }));
+        for (const cp of cmsPosts) {
+          try {
+            const pathname = new URL(cp.url).pathname.replace(/\/$/, "").toLowerCase();
+            if (!existingUrls.has(pathname)) {
+              existing_pages.push({ title: cp.title, keyword: "", url: cp.url });
+              existingUrls.add(pathname);
+            }
+          } catch { /* skip */ }
+        }
+        if (existing_pages.length > before - removed) {
+          console.log(`[pipeline] Maillage: ${existing_pages.length} pages totales après enrichissement CMS`);
+        }
+      } else {
+        console.log(`[pipeline] CMS cross-check: listCmsPosts retourné 0 articles, on garde les données DB`);
       }
     } catch (err) {
       console.warn("[pipeline] CMS cross-check failed (non-blocking), using DB data as-is:", err);
