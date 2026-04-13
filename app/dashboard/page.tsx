@@ -93,7 +93,7 @@ export default function Dashboard() {
   const [cleanupResult, setCleanupResult] = useState<string | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [calRange, setCalRange] = useState<7 | 30 | 90>(90);
+  const [calRange, setCalRange] = useState<7 | 30>(30);
   const [calHover, setCalHover] = useState<{ date: string; count: number; x: number; y: number } | null>(null);
 
   // ── Tutorial (0=score, 1=cocon, 2=potentiel, 3=roadmap, 4=libre) ─────────────
@@ -444,6 +444,7 @@ export default function Dashboard() {
         if (json.pages_count > 0) parts.push(`${json.pages_count} page(s)`);
         setSyncResult(`${parts.join(" + ")} synchronisé(s)`);
         loadData();
+        loadCmsPages();
       } else {
         setSyncResult(json.message || "Déjà synchronisé");
       }
@@ -525,6 +526,7 @@ export default function Dashboard() {
         .join(" | ") ?? "";
       setCronResult(((json.message ?? json.error ?? "Terminé") as string) + (detail ? ` — ${detail}` : ""));
       await loadData();
+      loadCmsPages();
     } catch (err) {
       setCronResult("Erreur réseau : " + (err instanceof Error ? err.message : String(err)));
     }
@@ -2688,13 +2690,13 @@ export default function Dashboard() {
                   })()}
 
                   {(() => {
-                    const days = data.calendarData.filter(d => d.count > 0).length;
-                    const pct = Math.round((days / 90) * 100);
+                    const days = data.calendarData.slice(-30).filter(d => d.count > 0).length;
+                    const pct = Math.round((days / 30) * 100);
                     return (
                       <div className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 card-hover animate-fade-in-up overflow-hidden group" style={{ animationDelay: "240ms" }}>
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl" style={{ background: "radial-gradient(ellipse at top right, rgba(34,197,94,0.07), transparent 60%)" }} />
                         <div className="flex items-center justify-between mb-4">
-                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Jours publiés / 90j</p>
+                          <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Jours publiés / 30j</p>
                           <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style={{ background: "rgba(34,197,94,0.10)", color: "#22c55e" }}>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
                           </div>
@@ -2743,7 +2745,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {([7, 30, 90] as const).map(r => (
+                          {([7, 30] as const).map(r => (
                             <button key={r} onClick={() => setCalRange(r)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-300 ${calRange === r ? "bg-orange-500/20 text-orange-400 shadow-[0_0_12px_rgba(249,115,22,0.15)]" : "bg-white/[0.04] text-gray-600 hover:bg-white/[0.08] hover:text-gray-400"}`}>
                               {r}j
                             </button>
@@ -2789,7 +2791,7 @@ export default function Dashboard() {
                             );
                           })}
                         </div>
-                      ) : calRange === 30 ? (
+                      ) : (
                         /* ══════ Vue 30 jours : vrai calendrier mensuel ══════ */
                         (() => {
                           // Build proper month calendar from last 30 days
@@ -2896,104 +2898,6 @@ export default function Dashboard() {
                                     })}
                                   </div>
                                 ))}
-                              </div>
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        /* ══════ Vue 90 jours : GitHub-style horizontal ══════ */
-                        (() => {
-                          // Reorganize data: rows = days of week (Mon-Sun), columns = weeks
-                          const dayLabels = ["Lun", "", "Mer", "", "Ven", "", ""];
-                          const weeks = Math.ceil(sliced.length / 7);
-
-                          return (
-                            <div>
-                              <div className="flex">
-                                {/* Day labels column */}
-                                <div className="flex flex-col gap-[3px] mr-2 justify-center">
-                                  {dayLabels.map((label, i) => (
-                                    <div key={i} className="flex items-center" style={{ height: "13px" }}>
-                                      <span className="text-[10px] text-gray-600 font-medium w-6">{label}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                                {/* Grid */}
-                                <div className="flex-1 flex gap-[3px]">
-                                  {Array.from({ length: weeks }).map((_, weekIdx) => (
-                                    <div key={weekIdx} className="flex-1 flex flex-col gap-[3px]">
-                                      {Array.from({ length: 7 }).map((_, dayIdx) => {
-                                        const cellIdx = weekIdx * 7 + dayIdx;
-                                        const entry = sliced[cellIdx];
-                                        if (!entry) return <div key={dayIdx} className="rounded-[3px]" style={{ height: "13px" }} />;
-                                        const isToday = entry.date === todayStr;
-                                        const ratio = maxCount > 0 ? entry.count / maxCount : 0;
-                                        const dayPubs = pubs.filter(p => p.published_at.startsWith(entry.date));
-                                        const d = new Date(entry.date + "T12:00:00");
-                                        return (
-                                          <div
-                                            key={dayIdx}
-                                            className={`group relative rounded-[3px] cursor-default transition-all duration-200 hover:scale-[1.8] hover:z-10 hover:rounded-md ${isToday ? "ring-1 ring-orange-400/70" : ""}`}
-                                            style={{
-                                              height: "13px",
-                                              background: entry.count === 0
-                                                ? "rgba(255,255,255,0.035)"
-                                                : `rgba(249, 115, 22, ${0.18 + ratio * 0.72})`,
-                                              boxShadow: entry.count > 0 ? `0 0 ${3 + ratio * 6}px rgba(249,115,22,${ratio * 0.25})` : "none",
-                                            }}
-                                          >
-                                            <div className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
-                                              <div className="bg-gray-900/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 shadow-2xl whitespace-nowrap">
-                                                <p className="text-white text-xs font-bold">{d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</p>
-                                                <p className={`text-[11px] font-semibold mt-0.5 ${entry.count > 0 ? "text-orange-400" : "text-gray-600"}`}>
-                                                  {entry.count === 0 ? "Aucune publication" : `${entry.count} article${entry.count > 1 ? "s" : ""}`}
-                                                </p>
-                                                {dayPubs.length > 0 && (
-                                                  <div className="mt-1.5 pt-1.5 border-t border-white/10">
-                                                    {dayPubs.slice(0, 3).map((p, j) => (
-                                                      <p key={j} className="text-gray-400 text-[10px] truncate max-w-[200px]">{p.title}</p>
-                                                    ))}
-                                                  </div>
-                                                )}
-                                              </div>
-                                              <div className="w-2 h-2 bg-gray-900/95 border-r border-b border-white/10 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              {/* Month labels */}
-                              <div className="flex mt-2 ml-8">
-                                {(() => {
-                                  const labels: { label: string; pos: number }[] = [];
-                                  let lastMonth = -1;
-                                  for (let w = 0; w < weeks; w++) {
-                                    const idx = w * 7;
-                                    if (sliced[idx]) {
-                                      const d = new Date(sliced[idx].date + "T12:00:00");
-                                      if (d.getMonth() !== lastMonth) {
-                                        lastMonth = d.getMonth();
-                                        labels.push({ label: d.toLocaleDateString("fr-FR", { month: "short" }), pos: w });
-                                      }
-                                    }
-                                  }
-                                  return labels.map((l, i) => (
-                                    <span key={i} className="text-[10px] text-gray-600 font-medium" style={{ position: "absolute", left: `calc(${(l.pos / weeks) * 100}% + 2rem)` }}>
-                                      {l.label}
-                                    </span>
-                                  ));
-                                })()}
-                              </div>
-                              {/* Legend */}
-                              <div className="flex items-center justify-end gap-1.5 mt-5 text-[10px] text-gray-600">
-                                <span>Moins</span>
-                                {[0, 0.2, 0.4, 0.7, 1].map((v, i) => (
-                                  <div key={i} className="w-[13px] h-[13px] rounded-[3px]" style={{ background: v === 0 ? "rgba(255,255,255,0.035)" : `rgba(249,115,22,${0.18 + v * 0.72})` }} />
-                                ))}
-                                <span>Plus</span>
                               </div>
                             </div>
                           );
