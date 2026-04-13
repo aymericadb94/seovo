@@ -81,9 +81,9 @@ export default function ScoreRing({ score, locked = false, breakdown = null }: {
         <div>
           <div className="flex items-center gap-2">
             <p className="font-bold text-lg" style={{ color: locked ? "#374151" : "white" }}>Score SEO</p>
-            {trendArrow && !locked && (
-              <span className="text-xs font-black px-1.5 py-0.5 rounded-full" style={{ background: `${trendColor}20`, color: trendColor ?? undefined }}>
-                {trendArrow} {trend && Math.abs(trend.clicksDelta) > 0 ? `${trend.clicksDelta > 0 ? "+" : ""}${trend.clicksDelta}%` : ""}
+            {trendArrow && !locked && trend && Math.abs(trend.clicksDelta) > 0 && (
+              <span className="text-xs font-semibold tabular-nums" style={{ color: trendColor ?? undefined }}>
+                {trend.clicksDelta > 0 ? "+" : ""}{trend.clicksDelta}%
               </span>
             )}
           </div>
