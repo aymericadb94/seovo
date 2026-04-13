@@ -10,6 +10,7 @@ import AuditModal, { type AuditData } from "@/components/AuditModal";
 import RoadmapModal, { type RoadmapData } from "@/components/RoadmapModal";
 import Footer from "@/components/Footer";
 import LinkingGraph from "@/components/LinkingGraph";
+import PublicationSuccessPopup from "@/components/PublicationSuccessPopup";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
@@ -80,6 +81,7 @@ export default function Dashboard() {
   const [cronProgress, setCronProgress] = useState(0);
   const cronProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [cronResult, setCronResult] = useState<string | null>(null);
+  const [publicationPopup, setPublicationPopup] = useState<{ title: string; url: string; keyword?: string } | null>(null);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [showOptimizeConfirm, setShowOptimizeConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "performance" | "linking" | "publications" | "keywords" | "calendar">("overview");
@@ -353,6 +355,35 @@ export default function Dashboard() {
     return () => window.removeEventListener("focus", loadData);
   }, []);
 
+  // ── Notification persistante : vérifier les publications non vues ──
+  useEffect(() => {
+    if (loading || !data?.site) return;
+    async function checkUnseenPublications() {
+      try {
+        const lastSeen = localStorage.getItem("rankpill_last_pub_seen") ?? "1970-01-01T00:00:00Z";
+        const supabase = createClient();
+        const { data: recentPubs } = await supabase
+          .from("publications")
+          .select("title, keyword, wordpress_url, published_at")
+          .gt("published_at", lastSeen)
+          .order("published_at", { ascending: false })
+          .limit(1);
+        if (recentPubs && recentPubs.length > 0) {
+          const pub = recentPubs[0];
+          if (pub.wordpress_url && pub.title) {
+            setPublicationPopup({
+              title: pub.title,
+              url: pub.wordpress_url,
+              keyword: pub.keyword ?? undefined,
+            });
+            localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString());
+          }
+        }
+      } catch { /* silencieux */ }
+    }
+    checkUnseenPublications();
+  }, [loading, data?.site]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Détecte la fermeture du modal d'analyse → réinitialise le tutoriel
   const seoModalWasOpenRef = useRef(false);
   useEffect(() => {
@@ -528,13 +559,31 @@ export default function Dashboard() {
         setCronRunning(false);
         return;
       }
-      const detail = (json.results as {status: string; title?: string; error?: string}[] | undefined)
-        ?.map((r) => r.status === "ok" ? `✓ ${r.title}` : r.status === "error" ? `❌ ${r.error}` : null)
-        .filter(Boolean)
-        .join(" | ") ?? "";
+      const results = json.results as {status: string; title?: string; url?: string; keyword?: string; error?: string}[] | undefined;
       if (cronProgressRef.current) clearInterval(cronProgressRef.current);
       setCronProgress(100);
-      setCronResult(((json.message ?? json.error ?? "Terminé") as string) + (detail ? ` — ${detail}` : ""));
+
+      // Chercher un article publié avec succès dans les résultats
+      const successResult = results?.find(r => r.status === "ok" && r.title);
+      if (successResult?.title) {
+        // Afficher le popup animé
+        setPublicationPopup({
+          title: successResult.title,
+          url: successResult.url ?? "",
+          keyword: successResult.keyword,
+        });
+        // Sauvegarder en localStorage pour ne pas re-notifier
+        try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
+        setCronResult(null);
+      } else if (json.error) {
+        setCronResult(json.error as string);
+      } else {
+        const detail = results
+          ?.map((r) => r.status === "ok" ? `✓ ${r.title}` : r.status === "error" ? `❌ ${r.error}` : null)
+          .filter(Boolean)
+          .join(" | ") ?? "";
+        setCronResult(((json.message ?? "Terminé") as string) + (detail ? ` — ${detail}` : ""));
+      }
       await loadData();
       loadCmsPages();
     } catch (err) {
@@ -689,6 +738,12 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Popup succès publication */}
+      <PublicationSuccessPopup
+        publication={publicationPopup}
+        onClose={() => setPublicationPopup(null)}
+      />
 
       {/* Modale limite journalière */}
       {showDailyLimitModal && (

@@ -143,7 +143,7 @@ export async function GET(request: Request) {
   const isForced = url.searchParams.get("force") === "1";
 
   const supabase = createAdminClient();
-  const results: { site: string; cms: string; status: string; title?: string; error?: string }[] = [];
+  const results: { site: string; cms: string; status: string; title?: string; url?: string; keyword?: string; error?: string }[] = [];
 
   try {
     let query = supabase.from("sites").select("*");
@@ -437,7 +437,7 @@ export async function GET(request: Request) {
               logger.warn("Email notification failed", { context: "cron/publish", userId: site.user_id, error: err });
             }
 
-            results.push({ site: site.site_url, cms: site.cms, status: "ok", title });
+            results.push({ site: site.site_url, cms: site.cms, status: "ok", title, url: publishedUrl, keyword });
             await new Promise((r) => setTimeout(r, 1000));
           }
         }

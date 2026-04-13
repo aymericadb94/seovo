@@ -17,6 +17,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aiCall, parseAiJson } from "@/lib/ai-router";
 import { getValidGscToken } from "@/lib/gsc-utils";
+import { listCmsPosts } from "@/lib/cms-update";
+import type { CmsCredentials } from "@/lib/cms-update";
 
 // ── Types d'entrée / sortie ──────────────────────────────────────────────────
 
@@ -225,7 +227,7 @@ export async function collectRankpillContext(
 ): Promise<RankpillContext> {
   // Fetch site, cocoon, roadmap, publications in parallel
   const [siteResult, cocoonResult, roadmapResult, pubsResult] = await Promise.all([
-    supabase.from("sites").select("google_access_token, google_refresh_token, google_token_expiry, gsc_site_url").eq("user_id", userId).maybeSingle(),
+    supabase.from("sites").select("google_access_token, google_refresh_token, google_token_expiry, gsc_site_url, cms, site_url, wp_username, wp_app_password, shopify_api_key, shopify_store_url, wix_api_key, wix_site_id, custom_api_url, custom_api_key").eq("user_id", userId).maybeSingle(),
     supabase.from("semantic_cocoons").select("data").eq("user_id", userId).maybeSingle(),
     supabase.from("roadmaps").select("data").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("publications").select("title, keyword, wordpress_url").eq("user_id", userId),
@@ -354,10 +356,46 @@ export async function collectRankpillContext(
     }
   }
 
-  // Existing pages — exclure les publications sans URL (sinon l'IA hallucine des URLs)
-  const existing_pages: ExistingPage[] = (pubsResult.data ?? [])
+  // Existing pages — cross-référencer DB avec le CMS réel pour éliminer les pages supprimées
+  let existing_pages: ExistingPage[] = (pubsResult.data ?? [])
     .filter(p => p.keyword && p.keyword !== "__page__" && p.wordpress_url && p.wordpress_url.startsWith("http"))
     .map(p => ({ title: p.title, keyword: p.keyword, url: p.wordpress_url }));
+
+  // Vérifier que les URLs existent réellement dans le CMS
+  if (site?.cms && site?.site_url && existing_pages.length > 0) {
+    try {
+      const creds: CmsCredentials = {
+        cms: site.cms, site_url: site.site_url,
+        wp_username: site.wp_username, wp_app_password: site.wp_app_password,
+        shopify_api_key: site.shopify_api_key, shopify_store_url: site.shopify_store_url,
+        wix_api_key: site.wix_api_key, wix_site_id: site.wix_site_id,
+        custom_api_url: site.custom_api_url, custom_api_key: site.custom_api_key,
+      };
+      const cmsPosts = await listCmsPosts(creds, 200);
+      if (cmsPosts.length > 0) {
+        // Construire un Set de slugs/pathnames réels du CMS pour matching robuste
+        const cmsUrls = new Set(
+          cmsPosts.map(p => {
+            try { return new URL(p.url).pathname.replace(/\/$/, "").toLowerCase(); }
+            catch { return p.url.toLowerCase(); }
+          }).filter(u => u.length > 1)
+        );
+        const before = existing_pages.length;
+        existing_pages = existing_pages.filter(p => {
+          try {
+            const pathname = new URL(p.url).pathname.replace(/\/$/, "").toLowerCase();
+            return cmsUrls.has(pathname);
+          } catch { return false; }
+        });
+        const removed = before - existing_pages.length;
+        if (removed > 0) {
+          console.log(`[pipeline] Maillage: ${removed} pages fantômes supprimées (supprimées du CMS mais encore en DB)`);
+        }
+      }
+    } catch (err) {
+      console.warn("[pipeline] CMS cross-check failed (non-blocking), using DB data as-is:", err);
+    }
+  }
 
   // Cluster (from cocoon or null)
   const cluster = cocoon?.cluster ?? null;
