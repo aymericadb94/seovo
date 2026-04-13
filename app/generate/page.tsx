@@ -156,7 +156,7 @@ const SOURCE_BADGES: Record<string, { label: string; color: string; bg: string }
 const ROLE_LABELS: Record<string, string> = {
   pillar: "Pilier",
   support: "Support",
-  opportunity: "Opportunit\u00e9",
+  opportunity: "Opportunité",
   unknown: "",
 };
 
@@ -590,7 +590,7 @@ export default function GeneratePage() {
             {/* Keyword picker — Top recommendations + dropdown */}
             <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
               <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-4">
-                1. Mot-cl\u00e9 cible
+                1. Mot-clé cible
               </label>
 
               {/* Top 5 recommendations */}
@@ -606,7 +606,8 @@ export default function GeneratePage() {
                         key={kw.keyword}
                         type="button"
                         onClick={() => { setKeyword(kw.keyword); setCustomKeyword(""); setShowAllKw(false); }}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
+                        style={{ animationDelay: `${i * 100}ms`, animationFillMode: "both" }}
+                        className={`animate-fade-in-up flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
                           isSelected
                             ? "bg-orange-500/15 border-orange-500/40 shadow-[0_0_15px_rgba(249,115,22,0.1)]"
                             : "bg-white/[0.02] border-white/[0.06] hover:border-orange-500/25 hover:bg-white/[0.04]"
@@ -633,7 +634,7 @@ export default function GeneratePage() {
                           </span>
                           <span className="text-[10px] text-gray-600 block mt-0.5 truncate">
                             {kw.reason}
-                            {kw.gsc ? ` \u00b7 pos ${kw.gsc.position} \u00b7 ${kw.gsc.impressions} imp` : ""}
+                            {kw.gsc ? ` · pos ${kw.gsc.position} · ${kw.gsc.impressions} imp` : ""}
                           </span>
                         </div>
                         {/* Badges */}
@@ -667,7 +668,7 @@ export default function GeneratePage() {
                     onClick={() => setShowAllKw(!showAllKw)}
                     className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] text-gray-500 hover:text-gray-300 text-xs font-bold transition-all"
                   >
-                    <span>{smartKeywords.length - 5} autres mots-cl\u00e9s disponibles</span>
+                    <span>{smartKeywords.length - 5} autres mots-clés disponibles</span>
                     <svg
                       viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                       className={`w-3.5 h-3.5 transition-transform ${showAllKw ? "rotate-180" : ""}`}
@@ -746,7 +747,7 @@ export default function GeneratePage() {
                   type="text"
                   value={customKeyword}
                   onChange={(e) => setCustomKeyword(e.target.value)}
-                  placeholder="Ou saisir un mot-cl\u00e9 personnalis\u00e9..."
+                  placeholder="Ou saisir un mot-clé personnalisé..."
                   className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 transition-colors text-sm"
                 />
                 {customKeyword && (
@@ -755,13 +756,13 @@ export default function GeneratePage() {
                     onClick={() => setCustomKeyword("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400"
                   >
-                    \u00d7
+                    ×
                   </button>
                 )}
               </div>
               {activeKeyword && (
                 <p className="mt-3 text-xs text-gray-500">
-                  Mot-cl\u00e9 s\u00e9lectionn\u00e9 : <span className="text-orange-400 font-bold">{activeKeyword}</span>
+                  Mot-clé sélectionné : <span className="text-orange-400 font-bold">{activeKeyword}</span>
                 </p>
               )}
             </div>
@@ -863,7 +864,7 @@ export default function GeneratePage() {
                 </div>
                 <div>
                   <h2 className="text-white font-black text-sm tracking-tight">
-                    {allDone ? "Finalisation" : status === "publishing" ? "Publication" : "G\u00e9n\u00e9ration"} en cours
+                    {allDone ? "Finalisation" : status === "publishing" ? "Publication" : "Génération"} en cours
                   </h2>
                   <p className="text-gray-600 text-[11px]">
                     <span className="text-orange-400 font-bold">{activeKeyword}</span> &middot; {localeNames[language]}
@@ -1089,7 +1090,7 @@ export default function GeneratePage() {
                         style={{ animation: "fadeSlideIn 0.3s ease-out" }}
                       >
                         <span className="flex-shrink-0 mt-1 text-[10px] font-mono" style={{ color: isLast ? "#fb923c" : "rgba(249,115,22,0.3)" }}>
-                          {isLast ? "\u25B8" : "\u2713"}
+                          {isLast ? "▸" : "✓"}
                         </span>
                         <span className="text-[11px] font-mono leading-relaxed" style={{ color: isLast ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)" }}>
                           {detail}
@@ -1111,10 +1112,10 @@ export default function GeneratePage() {
                 style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)", animation: "scaleIn 0.5s cubic-bezier(0.16,1,0.3,1)" }}
               >
                 <p className="text-green-400 font-bold text-sm">
-                  {status === "publishing" ? "Publication sur votre CMS..." : "Article g\u00e9n\u00e9r\u00e9 avec succ\u00e8s"}
+                  {status === "publishing" ? "Publication sur votre CMS..." : "Article généré avec succès"}
                 </p>
                 <p className="text-gray-600 text-[11px] mt-1">
-                  {status === "publishing" ? "Envoi vers votre site en cours" : "Pr\u00e9paration de la publication"}
+                  {status === "publishing" ? "Envoi vers votre site en cours" : "Préparation de la publication"}
                 </p>
               </div>
             )}
