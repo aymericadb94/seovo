@@ -80,6 +80,22 @@ export type SerpOutput = {
   patterns: string[];
   weaknesses: string[];
   content_gaps: string[];
+  serp_features: {
+    featured_snippet: boolean;
+    paa: boolean;
+    video_pack: boolean;
+    image_pack: boolean;
+    knowledge_panel: boolean;
+    local_pack: boolean;
+  };
+  competitive_benchmark: {
+    avg_word_count: number;
+    avg_headings_count: number;
+    difficulty_estimate: "low" | "medium" | "high" | "very_high";
+    top_formats: string[];
+  };
+  opportunities: { type: string; description: string; priority: 1 | 2 | 3 }[];
+  data_source: "scraped" | "estimated";
 };
 
 export type DiffOutput = {
@@ -501,7 +517,7 @@ async function scrapeSerpPage(url: string): Promise<{ title: string; headings: s
   } catch { return null; }
 }
 
-async function runSerpAgent(input: PipelineInput, ctx: RankpillContext): Promise<SerpOutput> {
+async function runSerpAgent(input: PipelineInput, ctx: RankpillContext, intent: IntentOutput): Promise<SerpOutput> {
   // Scrape SERP
   const urls = await fetchGoogleSerpUrls(input.keyword, input.language);
   const scraped = (await Promise.all(urls.map(u => scrapeSerpPage(u)))).filter(Boolean);
@@ -513,34 +529,122 @@ async function runSerpAgent(input: PipelineInput, ctx: RankpillContext): Promise
     wordCount: r!.wordCount,
   }));
 
+  const dataSource: "scraped" | "estimated" = scraped.length >= 3 ? "scraped" : "estimated";
+
   const serpDataBlock = scraped.length > 0
-    ? `RÉSULTATS SERP TOP ${scraped.length} :\n${JSON.stringify(serpInput, null, 2)}`
-    : `Aucun résultat SERP n'a pu être récupéré (blocage Google). Utilise tes connaissances SEO pour analyser ce que les pages positionnées sur "${input.keyword}" font typiquement.`;
+    ? `RÉSULTATS SERP TOP ${scraped.length} (données scrapées) :\n${serpInput.map((r, i) => `#${i + 1} "${r.title}" — ${r.wordCount} mots, ${r.headings.length} H2 : ${r.headings.join(" | ")}\nExtrait : ${r.summary.slice(0, 200)}...`).join("\n\n")}`
+    : `Aucun résultat SERP récupéré (blocage Google). Analyse basée sur tes connaissances SEO pour "${input.keyword}". Marque tes estimations comme telles.`;
+
+  // Calcul benchmark local si données scrapées (P5)
+  const avgWordCount = scraped.length > 0 ? Math.round(scraped.reduce((sum, r) => sum + r!.wordCount, 0) / scraped.length) : 0;
+  const avgHeadings = scraped.length > 0 ? Math.round(scraped.reduce((sum, r) => sum + r!.headings.length, 0) / scraped.length) : 0;
 
   const result = await aiCall(
     { task: "content_audit" },
     {
-      system: `${systemContext(ctx, input)}\n\nTu es un expert SEO spécialisé en analyse SERP.`,
+      // P3 — Rôle system enrichi
+      system: `${systemContext(ctx, input)}\n\nTu es un SERP Analyst senior spécialisé en intelligence concurrentielle SEO. Tu analyses les pages de résultats Google avec la rigueur d'un analyste data et l'oeil stratégique d'un consultant SEO.
+
+Tu maîtrises :
+- L'analyse des SERP features (featured snippets, PAA, video/image packs, knowledge panels, local packs)
+- Le reverse-engineering des stratégies de contenu des pages positionnées
+- L'identification des gaps exploitables que la concurrence ignore
+- Le scoring de difficulté concurrentielle basé sur les signaux observables
+
+Ta sortie alimente l'Agent 3 (Différenciation) et l'Agent 4 (Structure) — la qualité de ton analyse détermine la pertinence de l'angle éditorial et de l'architecture de page.`,
       messages: [{
         role: "user",
-        content: `Analyse les résultats Google pour "${input.keyword}" et identifie patterns, faiblesses et opportunités.
+        content: `Analyse la SERP Google pour "${input.keyword}" (business: "${input.business_name}", secteur: ${input.industry}).
+
+INTENTION DE RECHERCHE (Agent 1) :
+- Intent dominant : ${intent.intent} (mix: info ${intent.intent_mix.informational}% / commercial ${intent.intent_mix.commercial}% / transac ${intent.intent_mix.transactional}%)
+- User stage : ${intent.user_stage}
+- Sous-intentions : ${intent.sub_intents.map(s => `${s.label} [${s.type}]`).join(", ")}
+- Featured snippet probable : ${intent.featured_snippet_opportunity.likely ? `oui (${intent.featured_snippet_opportunity.format})` : "non"}
+- Content lifespan : ${intent.content_lifespan}
 
 ${serpDataBlock}
 
-${ctx.roadmap ? `CONTEXTE ROADMAP : phase ${ctx.roadmap.phase}, priorité ${ctx.roadmap.priority}, objectif: ${ctx.roadmap.objective}` : ""}
+${scraped.length > 0 ? `BENCHMARK CALCULÉ : word count moyen ${avgWordCount} mots, ${avgHeadings} H2 en moyenne` : ""}
+${ctx.roadmap ? `ROADMAP SEO : phase ${ctx.roadmap.phase}, priorité ${ctx.roadmap.priority}, objectif: ${ctx.roadmap.objective}` : ""}
 ${ctx.cluster ? `CLUSTER SEO : ${ctx.cluster}` : ""}
+
+ANALYSE DEMANDÉE :
+
+1. PATTERNS — Identifie les patterns récurrents dans les pages positionnées (formats, angles, types de contenu, structures)
+2. WEAKNESSES — Détecte les faiblesses exploitables (contenu daté, faible profondeur, mauvaise UX, manque de data)
+3. CONTENT GAPS — Repère ce que PERSONNE ne couvre bien (sous-intentions non satisfaites, questions sans réponse, angles ignorés)
+4. SERP FEATURES — Détecte quelles features Google sont présentes pour ce keyword (utilise les données scrapées + tes connaissances)
+5. COMPETITIVE BENCHMARK — Évalue la difficulté concurrentielle :
+   - low : contenu faible/daté, peu de concurrents sérieux
+   - medium : quelques pages solides mais des gaps exploitables
+   - high : pages bien optimisées, beaucoup de contenu de qualité
+   - very_high : SERP dominée par des autorités (Wikipedia, sites gouvernementaux, grandes marques)
+6. OPPORTUNITIES — Liste 3-5 opportunités concrètes avec priorité (1=critique, 2=importante, 3=bonus)
 
 RETOURNE JSON brut uniquement :
 {
-  "patterns": ["pattern commun 1", "..."],
-  "weaknesses": ["faiblesse 1", "..."],
-  "content_gaps": ["gap 1", "..."]
+  "patterns": ["pattern 1", "pattern 2"],
+  "weaknesses": ["faiblesse exploitable 1", "faiblesse 2"],
+  "content_gaps": ["gap non couvert 1", "gap 2"],
+  "serp_features": {
+    "featured_snippet": true/false,
+    "paa": true/false,
+    "video_pack": true/false,
+    "image_pack": true/false,
+    "knowledge_panel": true/false,
+    "local_pack": true/false
+  },
+  "competitive_benchmark": {
+    "avg_word_count": ${avgWordCount || '"estimer"'},
+    "avg_headings_count": ${avgHeadings || '"estimer"'},
+    "difficulty_estimate": "low | medium | high | very_high",
+    "top_formats": ["format dominant 1", "format 2"]
+  },
+  "opportunities": [
+    { "type": "content_gap | format | depth | freshness | snippet", "description": "description", "priority": 1 }
+  ]
 }`,
       }],
     }
   );
 
-  return parseAiJson<SerpOutput>(result.text) ?? { patterns: [], weaknesses: [], content_gaps: [] };
+  const parsed = parseAiJson<SerpOutput>(result.text);
+  if (parsed?.patterns && parsed?.serp_features) {
+    parsed.data_source = dataSource;
+    // Injecter le benchmark calculé si l'AI n'a pas rempli
+    if (avgWordCount > 0 && (!parsed.competitive_benchmark?.avg_word_count || parsed.competitive_benchmark.avg_word_count === 0)) {
+      parsed.competitive_benchmark = {
+        ...parsed.competitive_benchmark,
+        avg_word_count: avgWordCount,
+        avg_headings_count: avgHeadings,
+      };
+    }
+    return parsed;
+  }
+
+  // P7 — Fallback structuré
+  return {
+    patterns: [],
+    weaknesses: [],
+    content_gaps: [],
+    serp_features: {
+      featured_snippet: intent.featured_snippet_opportunity.likely,
+      paa: intent.intent === "informational" || intent.intent === "commercial_investigation",
+      video_pack: false,
+      image_pack: false,
+      knowledge_panel: false,
+      local_pack: intent.intent === "local",
+    },
+    competitive_benchmark: {
+      avg_word_count: avgWordCount || 1500,
+      avg_headings_count: avgHeadings || 6,
+      difficulty_estimate: "medium",
+      top_formats: [],
+    },
+    opportunities: [],
+    data_source: "estimated",
+  };
 }
 
 // ── Agent 3 : Diff ───────────────────────────────────────────────────────────
@@ -554,8 +658,14 @@ async function runDiffAgent(input: PipelineInput, ctx: RankpillContext, serp: Se
         role: "user",
         content: `Crée un angle différenciant pour "${input.keyword}" basé sur l'analyse SERP, la roadmap SEO et le cocon sémantique.
 
-ANALYSE SERP :
-${JSON.stringify(serp, null, 2)}
+ANALYSE SERP (${serp.data_source === "scraped" ? "données réelles" : "estimations"}) :
+- Patterns : ${serp.patterns.join(" | ") || "aucun"}
+- Faiblesses exploitables : ${serp.weaknesses.join(" | ") || "aucune"}
+- Content gaps : ${serp.content_gaps.join(" | ") || "aucun"}
+- Difficulté : ${serp.competitive_benchmark.difficulty_estimate} (${serp.competitive_benchmark.avg_word_count} mots moy., ${serp.competitive_benchmark.avg_headings_count} H2 moy.)
+- Formats dominants : ${serp.competitive_benchmark.top_formats.join(", ") || "non identifiés"}
+- SERP features : ${[serp.serp_features.featured_snippet && "featured snippet", serp.serp_features.paa && "PAA", serp.serp_features.video_pack && "vidéos", serp.serp_features.image_pack && "images", serp.serp_features.knowledge_panel && "knowledge panel", serp.serp_features.local_pack && "local pack"].filter(Boolean).join(", ") || "aucune"}
+- Opportunités : ${serp.opportunities.map(o => `${o.description} [P${o.priority}]`).join(" | ") || "aucune"}
 
 ${ctx.roadmap ? `ROADMAP : phase ${ctx.roadmap.phase}, priorité ${ctx.roadmap.priority}, objectif: ${ctx.roadmap.objective}` : "Pas de roadmap disponible."}
 ${ctx.cluster ? `CLUSTER SEO : ${ctx.cluster}` : "Pas de cluster défini."}
@@ -930,11 +1040,13 @@ export async function runGenerationPipeline(
     `Extraction des patterns de contenu, faiblesses et opportunités`,
     `Identification des content gaps exploitables`,
   ]);
-  const serp = await runSerpAgent(input, ctx);
+  const serp = await runSerpAgent(input, ctx, intent);
 
   // Agent 3: Diff
   onProgress?.(3, "diff", [
-    `${serp.patterns.length} patterns SERP identifiés, ${serp.weaknesses.length} faiblesses détectées`,
+    `${serp.patterns.length} patterns SERP, ${serp.weaknesses.length} faiblesses, ${serp.content_gaps.length} gaps (source: ${serp.data_source})`,
+    `Difficulté : ${serp.competitive_benchmark.difficulty_estimate} — benchmark ${serp.competitive_benchmark.avg_word_count} mots / ${serp.competitive_benchmark.avg_headings_count} H2`,
+    `${serp.opportunities.length} opportunités identifiées`,
     ...(roadmapPhase ? [`Intégration de la roadmap SEO — phase ${roadmapPhase}, priorité ${roadmapPriority}`] : []),
     ...(cocoonCluster ? [`Positionnement dans le cluster "${cocoonCluster}" — ${siblings.length} pages sœurs`] : []),
     `Création d'un angle unique vs concurrence`,
