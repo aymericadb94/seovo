@@ -203,6 +203,11 @@ export async function POST(request: Request) {
       return Response.json({ error: `CMS non supporté : ${site.cms}` }, { status: 400 });
     }
 
+    // Normaliser l'URL publiée — résoudre les relatives
+    if (url && !url.startsWith("http")) {
+      try { url = new URL(url, site.site_url).href; } catch { /* keep as-is */ }
+    }
+
     // Enregistrer la publication en base (avec l'URL de l'image)
     const { error: insertError } = await supabase.from("publications").insert({
       site_id: site.id,

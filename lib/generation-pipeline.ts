@@ -1230,13 +1230,45 @@ RETOURNE JSON brut uniquement :
   const parsed = parseAiJson<LinkingOutput>(result.text) ?? { links: [], strategy_summary: "" };
 
   // Validation stricte : ne garder que les liens dont l'URL existe réellement
+  // Double matching : URL complète OU même slug (protège contre les changements de protocole/www)
   const knownUrls = new Set(ctx.existing_pages.map(p => p.url.replace(/\/$/, "").toLowerCase()));
-  parsed.links = parsed.links.filter(link => {
-    if (!link.target_url || !link.target_url.startsWith("http")) return false;
-    const normalized = link.target_url.replace(/\/$/, "").toLowerCase();
-    return knownUrls.has(normalized);
-  });
+  const knownSlugs = new Set(
+    ctx.existing_pages
+      .map(p => { try { return new URL(p.url).pathname.replace(/\/$/, "").toLowerCase(); } catch { return ""; } })
+      .filter(s => s.length > 3)
+  );
 
+  const validatedLinks: typeof parsed.links = [];
+  for (const link of parsed.links) {
+    if (!link.target_url || !link.target_url.startsWith("http")) continue;
+    const normalized = link.target_url.replace(/\/$/, "").toLowerCase();
+
+    // Match par URL complète
+    if (knownUrls.has(normalized)) {
+      validatedLinks.push(link);
+      continue;
+    }
+
+    // Match par slug (fallback si URL légèrement différente)
+    try {
+      const slug = new URL(link.target_url).pathname.replace(/\/$/, "").toLowerCase();
+      if (slug.length > 3 && knownSlugs.has(slug)) {
+        // Corriger l'URL vers celle qu'on connaît
+        const correctPage = ctx.existing_pages.find(p => {
+          try { return new URL(p.url).pathname.replace(/\/$/, "").toLowerCase() === slug; } catch { return false; }
+        });
+        if (correctPage) {
+          link.target_url = correctPage.url;
+          validatedLinks.push(link);
+          continue;
+        }
+      }
+    } catch { /* URL malformée → skip */ }
+
+    console.warn(`[pipeline/linking] URL rejetée (non trouvée) : ${link.target_url}`);
+  }
+
+  parsed.links = validatedLinks;
   return parsed;
 }
 
@@ -1583,19 +1615,32 @@ function assembleHtml(content: ContentOutput, linking: LinkingOutput): string {
   }
 
   // Sections with link injection
-  for (const sec of content.sections) {
+  // Track which links have been injected to avoid duplicates
+  const injectedLinks = new Set<number>();
+
+  for (let secIdx = 0; secIdx < content.sections.length; secIdx++) {
+    const sec = content.sections[secIdx];
     parts.push(`<h2>${sec.title}</h2>`);
     let sectionHtml = sec.content;
 
-    // Inject links targeted at this section (P5 — matching amélioré)
-    for (const link of linking.links) {
+    // Inject links targeted at this section (P5 — matching robuste)
+    for (let linkIdx = 0; linkIdx < linking.links.length; linkIdx++) {
+      if (injectedLinks.has(linkIdx)) continue; // déjà injecté
+      const link = linking.links[linkIdx];
       const placementNorm = link.placement.toLowerCase().trim();
       const titleNorm = sec.title.toLowerCase().trim();
-      const isMatch = placementNorm.includes(titleNorm.slice(0, 15)) ||
-        titleNorm.includes(placementNorm.slice(0, 15)) ||
-        linking.links.indexOf(link) === content.sections.indexOf(sec);
+
+      // Matching multi-critères : mots communs significatifs
+      const placementWords = placementNorm.split(/\s+/).filter(w => w.length > 3);
+      const titleWords = titleNorm.split(/\s+/).filter(w => w.length > 3);
+      const commonWords = placementWords.filter(w => titleWords.some(tw => tw.includes(w) || w.includes(tw)));
+      const wordMatch = placementWords.length > 0 && commonWords.length >= Math.ceil(placementWords.length * 0.5);
+
+      const isMatch = placementNorm.includes(titleNorm.slice(0, 20)) ||
+        titleNorm.includes(placementNorm.slice(0, 20)) ||
+        wordMatch;
+
       if (isMatch) {
-        // Insert as contextual sentence before the last paragraph when possible
         const lastPIdx = sectionHtml.lastIndexOf("</p>");
         const linkHtml = `<a href="${link.target_url}">${link.anchor}</a>`;
         if (lastPIdx > 0 && sectionHtml.includes("<p>")) {
@@ -1603,12 +1648,20 @@ function assembleHtml(content: ContentOutput, linking: LinkingOutput): string {
         } else {
           sectionHtml += `\n<p>${linkHtml}</p>`;
         }
+        injectedLinks.add(linkIdx);
       }
     }
 
     parts.push(sectionHtml);
     if (sec.tip) parts.push(`<p><strong>💡</strong> ${sec.tip}</p>`);
     if (sec.example) parts.push(`<p><em>Exemple : ${sec.example}</em></p>`);
+  }
+
+  // Liens non injectés : fallback en fin de dernière section
+  const uninjected = linking.links.filter((_, i) => !injectedLinks.has(i));
+  if (uninjected.length > 0 && parts.length > 0) {
+    const orphanLinks = uninjected.map(l => `<a href="${l.target_url}">${l.anchor}</a>`).join(", ");
+    parts.push(`<p>À lire aussi : ${orphanLinks}</p>`);
   }
 
   // Insights
@@ -1747,9 +1800,44 @@ export async function runGenerationPipeline(
   const ctr = await runCtrAgent(input, ctx, intent, diff, serp, risk, content);
 
   // P7 — Injecter le hook CTR comme accroche en début de contenu
-  const finalHtml = ctr.hook
+  let finalHtml = ctr.hook
     ? `<p><strong>${ctr.hook}</strong></p>\n${html}`
     : html;
+
+  // P8 — Validation finale : supprimer les liens internes vers des pages inexistantes
+  if (ctx.existing_pages.length > 0) {
+    const validUrls = new Set(ctx.existing_pages.map(p => p.url.replace(/\/$/, "").toLowerCase()));
+    const validSlugs = new Set(
+      ctx.existing_pages
+        .map(p => { try { return new URL(p.url).pathname.replace(/\/$/, "").toLowerCase(); } catch { return ""; } })
+        .filter(s => s.length > 3)
+    );
+    // Extract site domain from existing pages
+    let siteDomain = "";
+    try { siteDomain = new URL(ctx.existing_pages[0].url).hostname; } catch { /* */ }
+
+    finalHtml = finalHtml.replace(/<a\s+href="([^"]+)"[^>]*>(.*?)<\/a>/gi, (fullMatch, href: string, anchor: string) => {
+      // Skip external links (different domain or no domain match)
+      try {
+        const linkDomain = new URL(href).hostname;
+        if (siteDomain && linkDomain !== siteDomain) return fullMatch; // external → keep
+      } catch {
+        return fullMatch; // relative or malformed → keep
+      }
+
+      const normalized = href.replace(/\/$/, "").toLowerCase();
+      if (validUrls.has(normalized)) return fullMatch; // known URL → keep
+
+      try {
+        const slug = new URL(href).pathname.replace(/\/$/, "").toLowerCase();
+        if (slug.length > 3 && validSlugs.has(slug)) return fullMatch; // known slug → keep
+      } catch { /* */ }
+
+      // Internal link to unknown page → remove the <a> tag, keep the text
+      console.warn(`[pipeline/html] Lien interne supprimé (page inexistante) : ${href}`);
+      return anchor;
+    });
+  }
 
   return {
     intent,

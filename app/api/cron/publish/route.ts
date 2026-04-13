@@ -367,6 +367,11 @@ export async function GET(request: Request) {
               break;
             }
 
+            // Normaliser l'URL publiée — résoudre les relatives, valider le domaine
+            if (publishedUrl && !publishedUrl.startsWith("http")) {
+              try { publishedUrl = new URL(publishedUrl, site.site_url).href; } catch { /* keep as-is */ }
+            }
+
             logger.info(`[cron] Published "${title}" to ${site.cms} → ${publishedUrl}`);
 
             const { error: insertError } = await supabase.from("publications").insert({
