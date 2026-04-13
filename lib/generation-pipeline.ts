@@ -1092,9 +1092,33 @@ ${hasComparison ? `  "comparison": {
     }
   );
 
-  const parsed = parseAiJson<ContentOutput>(result.text);
+  let parsed = parseAiJson<ContentOutput>(result.text);
+
+  // Retry once if JSON is invalid (often due to max_tokens truncation)
   if (!parsed?.sections?.length) {
-    throw new Error("Agent Content : réponse invalide ou vide");
+    console.warn(`[pipeline] Agent Content: parse failed (stop_reason: ${result.stop_reason}, text length: ${result.text.length}). Retrying...`);
+    const retry = await aiCall(
+      { task: "content_generation" },
+      {
+        system: `Tu es un rédacteur SEO. Génère le contenu en JSON valide. Sois plus concis pour que le JSON soit complet.`,
+        messages: [{
+          role: "user",
+          content: `Rédige une page SEO pour "${input.keyword}" (${input.business_name}, ${input.industry}).
+
+STRUCTURE : ${structure.sections_plan.map(s => `"${s.h2}"`).join(", ")}
+ANGLE : ${diff.angle}
+TON : ${diff.tone_of_voice}
+~${diff.content_strategy.target_word_count} mots, en ${input.language}.
+
+JSON : { "hero": { "title": "H1", "subtitle": "...", "promise": "...", "cta": null }, "quick_answer": "40-60 mots", "sections": [{ "title": "H2", "content": "HTML" }], "insights": [], "mistakes": [], "faq": [{ "question": "?", "answer": "..." }], "cta": "conclusion", "pexels_query": "en anglais", "cover_alt_text": "alt text", "section_image_queries": [] }`,
+        }],
+      }
+    );
+    parsed = parseAiJson<ContentOutput>(retry.text);
+  }
+
+  if (!parsed?.sections?.length) {
+    throw new Error("Agent Content : réponse invalide ou vide après retry");
   }
   return parsed;
 }
