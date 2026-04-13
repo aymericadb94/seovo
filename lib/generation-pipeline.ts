@@ -148,7 +148,16 @@ export type ContentOutput = {
 };
 
 export type LinkingOutput = {
-  links: { target_url: string; anchor: string; placement: string }[];
+  links: {
+    target_url: string;
+    anchor: string;
+    anchor_type: "exact_match" | "partial_match" | "semantic" | "contextual" | "branded";
+    placement: string;
+    objective: "seo" | "ux" | "conversion";
+    priority: "haute" | "moyenne" | "faible";
+    justification: string;
+  }[];
+  strategy_summary: string;
 };
 
 export type RiskOutput = {
@@ -1073,56 +1082,111 @@ ${hasComparison ? `  "comparison": {
 
 // ── Agent 6 : Linking ────────────────────────────────────────────────────────
 
-async function runLinkingAgent(input: PipelineInput, ctx: RankpillContext, content: ContentOutput): Promise<LinkingOutput> {
+async function runLinkingAgent(
+  input: PipelineInput, ctx: RankpillContext,
+  intent: IntentOutput, diff: DiffOutput, content: ContentOutput,
+): Promise<LinkingOutput> {
   if (ctx.existing_pages.length === 0) {
-    return { links: [] };
+    return { links: [], strategy_summary: "Aucune page existante — maillage impossible" };
   }
 
-  const currentPage = {
-    keyword: input.keyword,
-    title: content.hero.title,
-    sections: content.sections.map(s => s.title),
-  };
+  // P6 — Nombre de liens adaptatif
+  const sectionCount = content.sections.length;
+  const clusterPages = ctx.cocoon
+    ? ctx.existing_pages.filter(p => p.keyword && ctx.cocoon!.sibling_keywords.some(sk => p.keyword.toLowerCase().includes(sk.toLowerCase())))
+    : [];
+  const minLinks = Math.max(2, Math.min(sectionCount - 1, 3));
+  const maxLinks = Math.min(sectionCount + 1, 6, ctx.existing_pages.length);
+
+  // P2 — Données GSC pour prioriser les liens vers pages à booster
+  const gscPages = ctx.gsc_data?.pages
+    .filter(p => p.position > 5 && p.position < 30 && p.impressions > 20)
+    .sort((a, b) => b.impressions - a.impressions)
+    .slice(0, 5)
+    .map(p => `${p.url} (pos ${p.position}, ${p.impressions} imp — à booster)`) ?? [];
 
   const result = await aiCall(
     { task: "internal_linking" },
     {
-      system: `${systemContext(ctx, input)}\n\nTu es un expert SEO spécialisé en maillage interne.`,
+      // P3 — Rôle system enrichi
+      system: `${systemContext(ctx, input)}\n\nTu es un Architecte de Maillage Interne senior. Tu conçois des stratégies de liens internes qui maximisent le flux de PageRank, renforcent l'autorité topique et améliorent le crawl budget.
+
+Tu maîtrises :
+- La distribution du PageRank via les liens internes (pages piliers → supports → complémentaires)
+- Les types d'ancres et leur impact : exact_match (puissant mais risqué), partial_match (équilibré), semantic (thématique), contextual (naturel), branded (safe)
+- Le placement contextuel : un lien inséré naturellement dans un paragraphe pertinent a plus de poids qu'un lien en fin de section
+- La règle du cluster : liens intra-cluster prioritaires pour renforcer l'autorité topique
+- L'équilibre SEO/UX : chaque lien doit servir le lecteur ET les moteurs
+
+Ta sortie est exécutée directement dans le HTML — les ancres et placements doivent être exploitables sans retouche.`,
       messages: [{
         role: "user",
-        content: `Crée des liens internes réels pour la page "${input.keyword}".
+        content: `Conçois le maillage interne pour la page "${input.keyword}" (business: "${input.business_name}").
 
 PAGE ACTUELLE :
-${JSON.stringify(currentPage, null, 2)}
+- Keyword : "${input.keyword}"
+- Titre H1 : "${content.hero.title}"
+- Intent : ${intent.intent} (user stage: ${intent.user_stage})
+- Ton : ${diff.tone_of_voice}
+- Rôle cocon : ${diff.cocoon_positioning.role}
+- Sections H2 : ${content.sections.map((s, i) => `${i + 1}. "${s.title}"`).join(", ")}
 
-PAGES EXISTANTES :
-${ctx.existing_pages.slice(0, 30).map(p => `- "${p.title}" (${p.keyword}) → ${p.url}`).join("\n")}
+PAGES EXISTANTES (cibles potentielles) :
+${ctx.existing_pages.slice(0, 30).map(p => `- "${p.title}" (kw: "${p.keyword}") → ${p.url}`).join("\n")}
 
-${ctx.cocoon ? `CLUSTER ACTUEL : ${ctx.cocoon.cluster} (priorité au même cluster)` : ""}
+${clusterPages.length > 0 ? `PAGES DU MÊME CLUSTER (prioritaires) :\n${clusterPages.map(p => `- "${p.title}" → ${p.url}`).join("\n")}` : ""}
+${ctx.cocoon ? `COCON SÉMANTIQUE : cluster "${ctx.cocoon.cluster}", type ${ctx.cocoon.page_type}, relation: ${ctx.cocoon.pillar_relation}\nPages sœurs : ${ctx.cocoon.sibling_keywords.join(", ")}` : ""}
+${gscPages.length > 0 ? `\nPAGES GSC À BOOSTER (position 5-30, fort potentiel) :\n${gscPages.join("\n")}` : ""}
 
-RÈGLES :
-- 2 à 4 liens max
-- Pertinence sémantique obligatoire
-- Même cluster prioritaire
-- Ancres naturelles (pas de "cliquez ici")
+RÈGLES DE MAILLAGE :
+
+NOMBRE DE LIENS : ${minLinks} à ${maxLinks} liens (adapté à ${sectionCount} sections et ${ctx.existing_pages.length} pages existantes)
+
+DISTRIBUTION DES ANCRES (P7 — diversité obligatoire) :
+- Maximum 1 ancre exact_match (keyword cible de la page liée tel quel)
+- 1-2 ancres partial_match (variation du keyword cible)
+- 1-2 ancres semantic ou contextual (reformulation naturelle, phrase intégrée)
+- INTERDIT : "cliquez ici", "en savoir plus", "lire la suite", ancres génériques
+- L'ancre doit s'intégrer grammaticalement dans une phrase du contenu
+
+PRIORITÉ DE SÉLECTION :
+1. Pages du même cluster sémantique (renforce l'autorité topique)
+2. Pages GSC en position 5-30 (boost de liens internes = gain de positions)
+3. Pages thématiquement proches (même secteur, sujet connexe)
+4. Pages piliers si l'article actuel est support/complémentaire
+
+PLACEMENT :
+- Indique le titre H2 de la section où placer chaque lien
+- Place les liens dans les sections les plus pertinentes sémantiquement (pas tous dans la même section)
+- Répartis les liens sur différentes sections
+
+OBJECTIF PAR LIEN :
+- "seo" : transfert de PageRank, boost de position
+- "ux" : aide le lecteur à approfondir un sujet mentionné
+- "conversion" : guide vers une page transactionnelle/service
 
 RETOURNE JSON brut uniquement :
 {
   "links": [
     {
-      "target_url": "url réelle d'une page existante",
-      "anchor": "texte d'ancrage naturel",
-      "placement": "dans quelle section H2 placer ce lien"
+      "target_url": "URL exacte d'une page existante",
+      "anchor": "texte d'ancrage naturel intégrable dans une phrase",
+      "anchor_type": "exact_match | partial_match | semantic | contextual | branded",
+      "placement": "titre H2 de la section cible",
+      "objective": "seo | ux | conversion",
+      "priority": "haute | moyenne | faible",
+      "justification": "pourquoi ce lien, cette ancre, ce placement"
     }
-  ]
+  ],
+  "strategy_summary": "résumé en 1 phrase de la stratégie de maillage choisie"
 }`,
       }],
     }
   );
 
-  const parsed = parseAiJson<LinkingOutput>(result.text) ?? { links: [] };
+  const parsed = parseAiJson<LinkingOutput>(result.text) ?? { links: [], strategy_summary: "" };
 
-  // Validation stricte : ne garder que les liens dont l'URL existe réellement dans les publications
+  // Validation stricte : ne garder que les liens dont l'URL existe réellement
   const knownUrls = new Set(ctx.existing_pages.map(p => p.url.replace(/\/$/, "").toLowerCase()));
   parsed.links = parsed.links.filter(link => {
     if (!link.target_url || !link.target_url.startsWith("http")) return false;
@@ -1241,12 +1305,22 @@ function assembleHtml(content: ContentOutput, linking: LinkingOutput): string {
     parts.push(`<h2>${sec.title}</h2>`);
     let sectionHtml = sec.content;
 
-    // Inject links targeted at this section
+    // Inject links targeted at this section (P5 — matching amélioré)
     for (const link of linking.links) {
-      if (link.placement.toLowerCase().includes(sec.title.toLowerCase().slice(0, 15)) ||
-          linking.links.indexOf(link) === content.sections.indexOf(sec)) {
-        // Append link naturally at end of section
-        sectionHtml += `\n<p><a href="${link.target_url}">${link.anchor}</a></p>`;
+      const placementNorm = link.placement.toLowerCase().trim();
+      const titleNorm = sec.title.toLowerCase().trim();
+      const isMatch = placementNorm.includes(titleNorm.slice(0, 15)) ||
+        titleNorm.includes(placementNorm.slice(0, 15)) ||
+        linking.links.indexOf(link) === content.sections.indexOf(sec);
+      if (isMatch) {
+        // Insert as contextual sentence before the last paragraph when possible
+        const lastPIdx = sectionHtml.lastIndexOf("</p>");
+        const linkHtml = `<a href="${link.target_url}">${link.anchor}</a>`;
+        if (lastPIdx > 0 && sectionHtml.includes("<p>")) {
+          sectionHtml = sectionHtml.slice(0, lastPIdx) + ` ${linkHtml}` + sectionHtml.slice(lastPIdx);
+        } else {
+          sectionHtml += `\n<p>${linkHtml}</p>`;
+        }
       }
     }
 
@@ -1360,12 +1434,13 @@ export async function runGenerationPipeline(
     ...(pagesCount > 0 ? [
       `${pagesCount} pages existantes analysées pour le maillage`,
       ...(cocoonCluster ? [`Priorité aux liens du cluster "${cocoonCluster}"`] : []),
-      `Insertion de 2-4 liens internes avec ancres naturelles`,
+      `Stratégie d'ancres diversifiées (exact, partial, semantic, contextual)`,
+      `Placement contextuel dans les sections H2 pertinentes`,
     ] : [
       `Aucune page existante — maillage interne ignoré`,
     ]),
   ]);
-  const linking = await runLinkingAgent(input, ctx, content);
+  const linking = await runLinkingAgent(input, ctx, intent, diff, content);
 
   // Assemble HTML
   const html = assembleHtml(content, linking);
