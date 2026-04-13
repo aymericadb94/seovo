@@ -128,6 +128,8 @@ export default function Dashboard() {
   const [roadmapRecord, setRoadmapRecord] = useState<RoadmapRecord | null>(null);
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
   const [roadmapLoading, setRoadmapLoading] = useState(false);
+  const [roadmapProgress, setRoadmapProgress] = useState(0);
+  const roadmapProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Cocon sémantique ───────────────────────────────────────────────────────
   type CocoonCluster = {
@@ -297,17 +299,29 @@ export default function Dashboard() {
 
   async function generateRoadmap() {
     setRoadmapLoading(true);
+    setRoadmapProgress(0);
+    const startTime = Date.now();
+    roadmapProgressRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const pct = Math.min(99, Math.round(99 * (1 - Math.exp(-elapsed / 30000))));
+      setRoadmapProgress(pct);
+    }, 500);
     try {
       const res = await fetch("/api/roadmap", { method: "POST" });
+      if (roadmapProgressRef.current) clearInterval(roadmapProgressRef.current);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
+      setRoadmapProgress(100);
       setRoadmapRecord(json.roadmap);
       setTutorialStep(prev => {
         if (prev === 2) { localStorage.setItem("rankpill_onboarding", "3"); return 3; }
         return prev;
       });
-    } catch { /* ignore */ } finally {
+    } catch {
+      if (roadmapProgressRef.current) clearInterval(roadmapProgressRef.current);
+      setRoadmapProgress(0);
+    } finally {
       setRoadmapLoading(false);
     }
   }
@@ -1600,6 +1614,56 @@ export default function Dashboard() {
                                 </div>
                               );
                             })()
+                          ) : roadmapLoading ? (
+                            <div className="relative text-center py-12 flex-1 flex flex-col items-center justify-center">
+                              {/* Spinner animé multi-layer violet */}
+                              <div className="relative inline-block mb-6">
+                                <div className="w-16 h-16 rounded-full animate-spin" style={{ border: "3px solid rgba(167,139,250,0.1)", borderTopColor: "#a78bfa" }} />
+                                <div className="absolute inset-2 rounded-full animate-spin" style={{ border: "2px solid rgba(124,58,237,0.08)", borderBottomColor: "#7c3aed", animationDirection: "reverse", animationDuration: "1.5s" }} />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" className="w-5 h-5 animate-pulse">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                                  </svg>
+                                </div>
+                              </div>
+                              <p className="text-violet-300 text-sm font-bold mb-1">Calcul de la roadmap en cours...</p>
+                              <p className="text-gray-600 text-xs mb-1">Analyse des mots-clés, priorisation, structuration du plan éditorial</p>
+                              {/* Étapes de progression */}
+                              <div className="flex items-center gap-3 mt-3 mb-4">
+                                {[
+                                  { label: "Analyse", threshold: 15 },
+                                  { label: "Priorisation", threshold: 45 },
+                                  { label: "Structuration", threshold: 75 },
+                                ].map((step, i) => (
+                                  <div key={i} className="flex items-center gap-1.5">
+                                    <div
+                                      className="w-1.5 h-1.5 rounded-full transition-all duration-500"
+                                      style={{
+                                        background: roadmapProgress >= step.threshold ? "#a78bfa" : "rgba(167,139,250,0.15)",
+                                        boxShadow: roadmapProgress >= step.threshold ? "0 0 6px rgba(167,139,250,0.5)" : "none",
+                                      }}
+                                    />
+                                    <span
+                                      className="text-[10px] font-semibold transition-colors duration-500"
+                                      style={{ color: roadmapProgress >= step.threshold ? "#c4b5fd" : "#4b5563" }}
+                                    >
+                                      {step.label}
+                                    </span>
+                                    {i < 2 && <span className="text-gray-800 text-[10px] mx-0.5">→</span>}
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Barre de progression temps réel */}
+                              <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(167,139,250,0.1)" }}>
+                                <div
+                                  className="h-full rounded-full relative overflow-hidden"
+                                  style={{ width: `${roadmapProgress}%`, background: "linear-gradient(90deg, #7c3aed, #a78bfa)", transition: "width 0.5s ease-out" }}
+                                >
+                                  <div className="absolute inset-0 animate-[shimmer_2s_linear_infinite]" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)", backgroundSize: "200% 100%" }} />
+                                </div>
+                              </div>
+                              <p className="text-gray-600 text-xs mt-2 tabular-nums">{roadmapProgress}%</p>
+                            </div>
                           ) : (
                             <div className="flex flex-col gap-5 flex-1 justify-between">
                               <div className="flex flex-col gap-4">
@@ -1629,17 +1693,12 @@ export default function Dashboard() {
                               </div>
                               <button
                                 onClick={generateRoadmap}
-                                disabled={roadmapLoading}
-                                className="relative w-full overflow-hidden py-4 rounded-xl font-black text-white text-sm uppercase tracking-wide transition-all disabled:opacity-60 group"
+                                className="relative w-full overflow-hidden py-4 rounded-xl font-black text-white text-sm uppercase tracking-wide transition-all group"
                                 style={{ background: "linear-gradient(135deg, #7c3aed, #a78bfa)", boxShadow: "0 8px 32px rgba(124,58,237,0.35)" }}
                               >
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
                                 <span className="relative flex items-center justify-center gap-2">
-                                  {roadmapLoading ? (
-                                    <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Génération en cours…</>
-                                  ) : (
-                                    <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Calculer ma roadmap SEO</>
-                                  )}
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Calculer ma roadmap SEO
                                 </span>
                               </button>
                             </div>
