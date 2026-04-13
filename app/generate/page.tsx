@@ -288,6 +288,7 @@ export default function GeneratePage() {
 
     // Use SSE streaming for progress, fallback to non-streaming
     let apiResult: ApiResult | null = null;
+    let streamMaxStep = -1;
 
     try {
       const genRes = await fetch("/api/generate?stream=1", {
@@ -346,6 +347,7 @@ export default function GeneratePage() {
                   setStepDetails(prev => ({ ...prev, [idx]: event.details! }));
                 }
                 setCurrentStep(idx);
+                streamMaxStep = Math.max(streamMaxStep, idx);
               }
             } else if (event.type === "done" && event.result) {
               apiResult = event.result;
@@ -370,8 +372,15 @@ export default function GeneratePage() {
       }
     }
 
-    // Fallback: non-streaming call if SSE failed silently
+    // Fallback: non-streaming call only if stream returned nothing at all
+    // (i.e. SSE never connected). If stream progressed past step 2, it was
+    // a late timeout — retrying the full pipeline would just timeout again.
     if (!apiResult) {
+      if (streamMaxStep >= 2) {
+        // Stream progressed far — retrying the full pipeline would just timeout again
+        throw new Error("La génération a été interrompue par un timeout serveur. Réessayez — le pipeline reprendra du début.");
+      }
+
       console.warn("[generate] SSE stream returned no result, falling back to non-streaming API");
 
       // Simulate step progression during non-streaming call
@@ -393,7 +402,7 @@ export default function GeneratePage() {
         });
       } catch (fetchErr) {
         clearInterval(progressInterval);
-        throw fetchErr;
+        throw new Error("Erreur réseau — vérifiez votre connexion et réessayez");
       }
 
       clearInterval(progressInterval);
