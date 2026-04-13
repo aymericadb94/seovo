@@ -103,6 +103,17 @@ export type DiffOutput = {
   promise: string;
   positioning: string;
   unique_elements: string[];
+  tone_of_voice: "expert" | "accessible" | "provocateur" | "didactique" | "data-driven";
+  content_strategy: {
+    target_word_count: number;
+    depth_level: "survol" | "approfondi" | "exhaustif";
+    recommended_format: string;
+    differentiators: string[];
+  };
+  cocoon_positioning: {
+    role: "pillar" | "support" | "complementary" | "standalone";
+    relation_to_cluster: string;
+  };
 };
 
 export type StructureOutput = {
@@ -649,40 +660,123 @@ RETOURNE JSON brut uniquement :
 
 // ── Agent 3 : Diff ───────────────────────────────────────────────────────────
 
-async function runDiffAgent(input: PipelineInput, ctx: RankpillContext, serp: SerpOutput): Promise<DiffOutput> {
+async function runDiffAgent(input: PipelineInput, ctx: RankpillContext, intent: IntentOutput, serp: SerpOutput): Promise<DiffOutput> {
+  // Données cocon sémantique formatées (P7)
+  const cocoonBlock = ctx.cocoon
+    ? `COCON SÉMANTIQUE :
+- Type de page : ${ctx.cocoon.page_type}
+- Cluster : ${ctx.cocoon.cluster}
+- Relation au pilier : ${ctx.cocoon.pillar_relation}
+- Pages sœurs : ${ctx.cocoon.sibling_keywords.join(", ")}`
+    : "Pas de cocon sémantique défini — article standalone.";
+
   const result = await aiCall(
     { task: "roadmap_strategy" },
     {
-      system: `${systemContext(ctx, input)}\n\nTu es un expert SEO stratégique.`,
+      // P3 — Rôle system enrichi
+      system: `${systemContext(ctx, input)}\n\nTu es un Stratège SEO Éditorial senior spécialisé en positionnement différenciant. Tu combines les frameworks de différenciation (Blue Ocean, USP, content gap exploitation) avec une expertise SEO avancée.
+
+Tu sais que :
+- Un article sans angle différenciant sera un clone SERP de plus → pas de ranking
+- L'angle doit être ACTIONNABLE : il doit se traduire en choix concrets de ton, format, profondeur et structure
+- La stratégie de contenu doit être calibrée sur le benchmark concurrentiel (faire mieux, pas pareil)
+- Le positionnement dans le cocon sémantique conditionne le maillage interne et l'autorité topique
+
+Ta sortie est la directive éditoriale pour les agents Structure (4) et Content (5) — elle doit être suffisamment précise pour guider la rédaction.`,
       messages: [{
         role: "user",
-        content: `Crée un angle différenciant pour "${input.keyword}" basé sur l'analyse SERP, la roadmap SEO et le cocon sémantique.
+        content: `Crée une stratégie de différenciation complète pour "${input.keyword}" (business: "${input.business_name}", secteur: ${input.industry}).
 
-ANALYSE SERP (${serp.data_source === "scraped" ? "données réelles" : "estimations"}) :
+INTENTION DE RECHERCHE (Agent 1) :
+- Intent : ${intent.intent} (mix: info ${intent.intent_mix.informational}% / commercial ${intent.intent_mix.commercial}% / transac ${intent.intent_mix.transactional}%)
+- User stage : ${intent.user_stage}
+- Sous-intentions : ${intent.sub_intents.map(s => `${s.label} [${s.type}, P${s.priority}]`).join(", ")}
+- Content lifespan : ${intent.content_lifespan}
+- Featured snippet : ${intent.featured_snippet_opportunity.likely ? `oui (${intent.featured_snippet_opportunity.format})` : "non"}
+- Keywords sémantiques : ${intent.keyword_variations.semantic.join(", ")}
+
+ANALYSE SERP (Agent 2, ${serp.data_source === "scraped" ? "données réelles" : "estimations"}) :
 - Patterns : ${serp.patterns.join(" | ") || "aucun"}
 - Faiblesses exploitables : ${serp.weaknesses.join(" | ") || "aucune"}
 - Content gaps : ${serp.content_gaps.join(" | ") || "aucun"}
-- Difficulté : ${serp.competitive_benchmark.difficulty_estimate} (${serp.competitive_benchmark.avg_word_count} mots moy., ${serp.competitive_benchmark.avg_headings_count} H2 moy.)
+- Difficulté : ${serp.competitive_benchmark.difficulty_estimate} (benchmark: ${serp.competitive_benchmark.avg_word_count} mots, ${serp.competitive_benchmark.avg_headings_count} H2)
 - Formats dominants : ${serp.competitive_benchmark.top_formats.join(", ") || "non identifiés"}
 - SERP features : ${[serp.serp_features.featured_snippet && "featured snippet", serp.serp_features.paa && "PAA", serp.serp_features.video_pack && "vidéos", serp.serp_features.image_pack && "images", serp.serp_features.knowledge_panel && "knowledge panel", serp.serp_features.local_pack && "local pack"].filter(Boolean).join(", ") || "aucune"}
-- Opportunités : ${serp.opportunities.map(o => `${o.description} [P${o.priority}]`).join(" | ") || "aucune"}
+- Opportunités P1 : ${serp.opportunities.filter(o => o.priority === 1).map(o => o.description).join(" | ") || "aucune"}
 
-${ctx.roadmap ? `ROADMAP : phase ${ctx.roadmap.phase}, priorité ${ctx.roadmap.priority}, objectif: ${ctx.roadmap.objective}` : "Pas de roadmap disponible."}
-${ctx.cluster ? `CLUSTER SEO : ${ctx.cluster}` : "Pas de cluster défini."}
+${cocoonBlock}
+${ctx.roadmap ? `ROADMAP SEO : phase ${ctx.roadmap.phase}, priorité ${ctx.roadmap.priority}, objectif: ${ctx.roadmap.objective}` : "Pas de roadmap disponible."}
+
+RÈGLES DE DIFFÉRENCIATION :
+
+ANGLE — Trouve ce que la concurrence ne fait PAS ou fait MAL :
+- Exploite les content gaps et faiblesses SERP identifiés par l'Agent 2
+- L'angle doit être spécifique et mémorable (pas "guide complet" ou "tout savoir sur")
+- Aligne l'angle avec les sous-intentions prioritaires (P1) de l'utilisateur
+
+TONE OF VOICE — Choisis en fonction du user_stage et de l'intent :
+- "expert" : audience avancée, intent informationnel profond → jargon assumé, insights pointus
+- "accessible" : débutant, intent informationnel large → vulgarisation, analogies, pas de jargon
+- "provocateur" : commercial_investigation → remise en question des idées reçues, prise de position
+- "didactique" : informationnel + débutant/intermédiaire → pas-à-pas, exemples concrets
+- "data-driven" : transactionnel ou commercial → chiffres, comparatifs, preuves, ROI
+
+CONTENT STRATEGY — Calibre sur le benchmark SERP :
+- target_word_count : si difficulté high/very_high → benchmark × 1.3 ; si medium → benchmark × 1.1 ; si low → min 1200 mots
+- depth_level : "survol" (intro rapide), "approfondi" (couvre les sous-intentions P1+P2), "exhaustif" (toutes sous-intentions + données exclusives)
+- recommended_format : déduis du format dominant SERP + intent (guide, listicle, comparatif, tutoriel, étude de cas, FAQ étendue...)
+- differentiators : 3-5 éléments concrets qui rendent cet article différent (data exclusive, angle inédit, format innovant, expertise terrain)
+
+COCOON POSITIONING — Positionne dans le cocon sémantique :
+- role : "pillar" (article fondation du cluster), "support" (approfondit un aspect du pilier), "complementary" (angle connexe), "standalone" (hors cocon)
+- relation_to_cluster : comment cet article renforce le cluster et le maillage interne
 
 RETOURNE JSON brut uniquement :
 {
-  "angle": "angle différenciant en 1 phrase",
-  "promise": "promesse au lecteur",
-  "positioning": "positionnement vs concurrence",
-  "unique_elements": ["élément unique 1", "..."]
+  "angle": "angle différenciant en 1 phrase percutante",
+  "promise": "promesse de valeur pour le lecteur en 1 phrase",
+  "positioning": "comment cet article se positionne vs la concurrence",
+  "unique_elements": ["élément différenciant 1", "élément 2", "..."],
+  "tone_of_voice": "expert | accessible | provocateur | didactique | data-driven",
+  "content_strategy": {
+    "target_word_count": 1800,
+    "depth_level": "survol | approfondi | exhaustif",
+    "recommended_format": "format recommandé",
+    "differentiators": ["différenciateur 1", "différenciateur 2"]
+  },
+  "cocoon_positioning": {
+    "role": "pillar | support | complementary | standalone",
+    "relation_to_cluster": "explication du rôle dans le cocon"
+  }
 }`,
       }],
     }
   );
 
-  return parseAiJson<DiffOutput>(result.text) ?? {
-    angle: "", promise: "", positioning: "", unique_elements: [],
+  const parsed = parseAiJson<DiffOutput>(result.text);
+  if (parsed?.angle && parsed?.tone_of_voice && parsed?.content_strategy) return parsed;
+
+  // P6 — Fallback intelligent basé sur intent + SERP
+  const benchmarkWc = serp.competitive_benchmark.avg_word_count || 1500;
+  const difficultyMultiplier = serp.competitive_benchmark.difficulty_estimate === "very_high" ? 1.3
+    : serp.competitive_benchmark.difficulty_estimate === "high" ? 1.2 : 1.1;
+
+  return {
+    angle: `Guide ${intent.intent === "commercial_investigation" ? "comparatif" : "actionnable"} sur ${input.keyword}`,
+    promise: `Tout ce qu'il faut savoir sur ${input.keyword} pour ${intent.user_stage === "débutant" ? "bien démarrer" : "passer au niveau supérieur"}`,
+    positioning: "Contenu plus complet et à jour que la concurrence",
+    unique_elements: serp.content_gaps.slice(0, 3),
+    tone_of_voice: intent.user_stage === "avancé" ? "expert" : intent.user_stage === "débutant" ? "accessible" : "didactique",
+    content_strategy: {
+      target_word_count: Math.round(benchmarkWc * difficultyMultiplier),
+      depth_level: intent.sub_intents.length > 4 ? "exhaustif" : "approfondi",
+      recommended_format: serp.competitive_benchmark.top_formats[0] ?? "guide",
+      differentiators: [],
+    },
+    cocoon_positioning: {
+      role: ctx.cocoon?.page_type ?? "standalone",
+      relation_to_cluster: ctx.cocoon ? `Support du cluster ${ctx.cocoon.cluster}` : "Article standalone",
+    },
   };
 }
 
@@ -705,9 +799,14 @@ FEATURED SNIPPET : ${intent.featured_snippet_opportunity.likely ? `oui (${intent
 CLUSTER : ${ctx.cluster ?? "non défini"}
 ANGLE : ${diff.angle}
 POSITIONNEMENT : ${diff.positioning}
+TON : ${diff.tone_of_voice}
+FORMAT RECOMMANDÉ : ${diff.content_strategy.recommended_format}
+PROFONDEUR : ${diff.content_strategy.depth_level}
+TARGET WORD COUNT : ${diff.content_strategy.target_word_count} mots
+RÔLE COCON : ${diff.cocoon_positioning.role} — ${diff.cocoon_positioning.relation_to_cluster}
 
 Choisis les blocs pertinents parmi : hero, quick_answer, stats, simulation, sections, insights, mistakes, faq, comparison, cta.
-N'inclus que les blocs qui servent l'intention et l'angle.
+N'inclus que les blocs qui servent l'intention, l'angle et le format recommandé.
 
 RETOURNE JSON brut uniquement :
 {
@@ -744,10 +843,15 @@ FEATURED SNIPPET : ${intent.featured_snippet_opportunity.likely ? `oui → optim
 ANGLE : ${diff.angle}
 PROMESSE : ${diff.promise}
 ÉLÉMENTS UNIQUES : ${diff.unique_elements.join(", ")}
+TON : ${diff.tone_of_voice}
+FORMAT : ${diff.content_strategy.recommended_format}
+PROFONDEUR : ${diff.content_strategy.depth_level}
+DIFFÉRENCIATEURS : ${diff.content_strategy.differentiators.join(", ") || "aucun spécifié"}
 MOTS-CLÉS SÉMANTIQUES : ${intent.keyword_variations.semantic.join(", ")}
 LONGUE TRAÎNE : ${intent.keyword_variations.long_tail.join(", ")}
 QUESTIONS UTILISATEURS : ${intent.keyword_variations.related_questions.join(", ")}
 CLUSTER : ${ctx.cluster ?? "non défini"}
+RÔLE COCON : ${diff.cocoon_positioning.role}
 
 STRUCTURE IMPOSÉE (blocs à rédiger) : ${structure.blocks.join(", ")}
 
@@ -756,8 +860,9 @@ RÈGLES :
 - Inclure : data chiffrées, exemples concrets, stratégie actionnable
 - Lisible en diagonale, paragraphes courts (2-3 phrases)
 - Aucune phrase de remplissage ("il est important de noter", "dans le monde actuel", etc.)
-- Voix active, directe, experte
-- 1500-2200 mots total
+- Adopte le ton "${diff.tone_of_voice}" : ${diff.tone_of_voice === "expert" ? "jargon assumé, insights pointus, pas de vulgarisation excessive" : diff.tone_of_voice === "accessible" ? "vulgarisation, analogies, zéro jargon technique" : diff.tone_of_voice === "provocateur" ? "remise en question, prise de position forte, ton incisif" : diff.tone_of_voice === "didactique" ? "pas-à-pas, exemples concrets à chaque étape, pédagogie" : "chiffres, comparatifs, preuves, ROI, données vérifiables"}
+- Voix active, directe
+- ${diff.content_strategy.target_word_count} mots total (profondeur : ${diff.content_strategy.depth_level})
 - Tout en ${input.language}
 
 RETOURNE JSON brut uniquement :
@@ -1051,21 +1156,22 @@ export async function runGenerationPipeline(
     ...(cocoonCluster ? [`Positionnement dans le cluster "${cocoonCluster}" — ${siblings.length} pages sœurs`] : []),
     `Création d'un angle unique vs concurrence`,
   ]);
-  const diff = await runDiffAgent(input, ctx, serp);
+  const diff = await runDiffAgent(input, ctx, intent, serp);
 
   // Agent 4: Structure
   onProgress?.(4, "structure", [
     `Intent détecté : ${intent.intent} (${intent.content_lifespan}) — utilisateur ${intent.user_stage}`,
-    `Angle retenu : "${diff.angle}"`,
-    `Sélection des blocs de contenu adaptés à l'intention`,
-    `Construction de la structure de page dynamique`,
+    `Angle retenu : "${diff.angle}" — ton ${diff.tone_of_voice}`,
+    `Stratégie : ${diff.content_strategy.recommended_format}, ${diff.content_strategy.depth_level}, ${diff.content_strategy.target_word_count} mots`,
+    `Cocon : ${diff.cocoon_positioning.role} — ${diff.cocoon_positioning.relation_to_cluster}`,
+    `Sélection des blocs de contenu adaptés à l'intention et au format`,
   ]);
   const structure = await runStructureAgent(input, ctx, intent, diff);
 
   // Agent 5: Content
   onProgress?.(5, "content", [
     `Structure validée : ${structure.blocks.length} blocs (${structure.blocks.join(", ")})`,
-    `Rédaction SEO 1 500+ mots avec données chiffrées`,
+    `Rédaction SEO ${diff.content_strategy.target_word_count} mots — ton ${diff.tone_of_voice}, profondeur ${diff.content_strategy.depth_level}`,
     ...(gscCount > 0 ? [`Intégration des ${gscCount} requêtes GSC dans le champ sémantique`] : []),
     `Variations mot-clé : ${[...intent.keyword_variations.semantic.slice(0, 2), ...intent.keyword_variations.long_tail.slice(0, 2)].join(", ")}`,
     `Promesse : "${diff.promise}"`,
