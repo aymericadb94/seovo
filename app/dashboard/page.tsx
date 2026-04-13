@@ -77,13 +77,7 @@ export default function Dashboard() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [cronRunning, setCronRunning] = useState(false);
-  const [cronProgress, setCronProgress] = useState(0);
-  const cronProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [cronResult, setCronResult] = useState<string | null>(null);
   const [publicationPopup, setPublicationPopup] = useState<{ title: string; url: string; keyword?: string } | null>(null);
-  const [localPubsToday, setLocalPubsToday] = useState<number>(0);
-  const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [showOptimizeConfirm, setShowOptimizeConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "performance" | "linking" | "publications" | "keywords" | "calendar">("overview");
   const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null);
@@ -336,7 +330,6 @@ export default function Dashboard() {
     const json = await res.json();
     if (!json.error) {
       setData(json);
-      setLocalPubsToday(prev => Math.max(prev, json.kpis?.pubsToday ?? 0));
       setShowSeoModal(json.site ? !json.site.seo_analysis_done : false);
     } else {
       setShowSeoModal(false);
@@ -531,114 +524,6 @@ export default function Dashboard() {
     setIndexationLoading(false);
   }
 
-  // Ref pour stocker les URLs connues avant le clic de publication
-  const cmsUrlsBeforePublishRef = useRef<Set<string>>(new Set());
-
-  // Après un timeout / "fetch failed", vérifier si la publication a quand même réussi
-  // Le publish route continue de tourner en background même si le trigger a timeout
-  async function recoverFromError(fallbackMsg: string) {
-    // Poll : vérifier les CMS pages directement (source de vérité)
-    for (let attempt = 0; attempt < 5; attempt++) {
-      await new Promise(r => setTimeout(r, attempt === 0 ? 4000 : 6000));
-      try {
-        // Recharger les CMS pages et comparer avec les URLs d'avant
-        const res = await fetch("/api/publications/list");
-        const json = await res.json();
-        if (json.pages && Array.isArray(json.pages)) {
-          const freshPages = json.pages as typeof cmsPages;
-          const newPage = freshPages.find(p => p.url && !cmsUrlsBeforePublishRef.current.has(p.url));
-          if (newPage) {
-            setCmsPages(freshPages);
-            setPublicationPopup({
-              title: newPage.title,
-              url: newPage.url,
-              keyword: newPage.keyword ?? undefined,
-            });
-            try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
-            setCronResult(null);
-            setLocalPubsToday(prev => prev + 1);
-            await loadData();
-            return;
-          }
-        }
-      } catch { /* retry */ }
-    }
-
-    // Aucune nouvelle page détectée après 34s de polling
-    setCronResult(fallbackMsg);
-    await loadData();
-    loadCmsPages();
-  }
-
-  async function handleManualPublish(force = false) {
-    const pubsToday = data?.kpis.pubsToday ?? 0;
-    if (pubsToday >= 3 && !force) {
-      setShowDailyLimitModal(true);
-      return;
-    }
-    setShowDailyLimitModal(false);
-    setCronRunning(true);
-    setCronResult(null);
-    setCronProgress(0);
-    // Sauvegarder les URLs CMS connues avant la publication pour détecter les nouvelles
-    cmsUrlsBeforePublishRef.current = new Set(cmsPages.map(p => p.url));
-    const startTime = Date.now();
-    cronProgressRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      setCronProgress(Math.min(99, Math.round(99 * (1 - Math.exp(-elapsed / 45000)))));
-    }, 500);
-    try {
-      const res = await fetch("/api/cron/trigger", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(force ? { force: true } : {}),
-      });
-      const text = await res.text();
-      let json: Record<string, unknown>;
-      try {
-        json = JSON.parse(text);
-      } catch {
-        setCronResult(`Erreur serveur (${res.status}): ${text.slice(0, 150)}`);
-        setCronRunning(false);
-        return;
-      }
-      const results = json.results as {status: string; title?: string; url?: string; keyword?: string; error?: string}[] | undefined;
-      if (cronProgressRef.current) clearInterval(cronProgressRef.current);
-      setCronProgress(100);
-
-      // Chercher un article publié avec succès dans les résultats
-      const successResult = results?.find(r => r.status === "ok" && r.title);
-      if (successResult?.title) {
-        setPublicationPopup({
-          title: successResult.title,
-          url: successResult.url ?? "",
-          keyword: successResult.keyword,
-        });
-        try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
-        setCronResult(null);
-        setLocalPubsToday(prev => prev + 1);
-      } else if (json.error) {
-        // Erreur API (souvent timeout "fetch failed") → l'article a peut-être quand même été publié
-        // On attend puis on vérifie via le CMS directement
-        await recoverFromError(json.error as string);
-      } else {
-        const detail = results
-          ?.map((r) => r.status === "ok" ? `✓ ${r.title}` : r.status === "error" ? `❌ ${r.error}` : null)
-          .filter(Boolean)
-          .join(" | ") ?? "";
-        setCronResult(((json.message ?? "Terminé") as string) + (detail ? ` — ${detail}` : ""));
-      }
-      await new Promise(r => setTimeout(r, 1500));
-      await loadData();
-      loadCmsPages();
-    } catch (err) {
-      if (cronProgressRef.current) clearInterval(cronProgressRef.current);
-      setCronProgress(0);
-      await recoverFromError("Erreur réseau : " + (err instanceof Error ? err.message : String(err)));
-    }
-    setCronRunning(false);
-  }
-
   const kpis = data?.kpis;
 
   // KPIs basés sur CMS (source de vérité) quand disponible
@@ -790,49 +675,6 @@ export default function Dashboard() {
         onClose={() => setPublicationPopup(null)}
       />
 
-      {/* Modale limite journalière */}
-      {showDailyLimitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-          <div className="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ animation: "modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1) both" }}>
-            <div className="absolute inset-0 rounded-2xl" style={{ background: "linear-gradient(135deg, #1a0e00 0%, #120800 40%, #0e0e0e 100%)" }} />
-            <div className="absolute inset-0 rounded-2xl p-px" style={{ background: "linear-gradient(135deg, rgba(251,146,60,0.5), rgba(239,68,68,0.3), rgba(251,146,60,0.1))" }}>
-              <div className="absolute inset-0 rounded-2xl" style={{ background: "linear-gradient(135deg, #1a0e00 0%, #120800 40%, #0e0e0e 100%)" }} />
-            </div>
-            <div className="absolute top-0 left-0 w-64 h-64 pointer-events-none" style={{ background: "radial-gradient(ellipse at top left, rgba(251,146,60,0.15) 0%, transparent 65%)" }} />
-            <div className="relative p-7">
-              <div className="flex items-start gap-4 mb-5">
-                <div className="relative flex-shrink-0">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(251,146,60,0.2), rgba(239,68,68,0.15))", border: "1px solid rgba(251,146,60,0.3)" }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-orange-400">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                  </div>
-                  <div className="absolute inset-0 rounded-2xl animate-ping opacity-20" style={{ background: "rgba(251,146,60,0.4)", animationDuration: "2s" }} />
-                </div>
-                <div>
-                  <h3 className="text-white font-black text-lg leading-tight">Limite journalière<br/>atteinte</h3>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    {[1,2,3].map(i => <div key={i} className="w-5 h-1.5 rounded-full" style={{ background: "linear-gradient(90deg, #fb923c, #ef4444)" }} />)}
-                    <span className="text-orange-400 text-xs font-bold ml-1">3/3</span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-white/70 text-sm leading-relaxed mb-2">
-                Vous avez atteint la limite recommandée de <span className="font-bold" style={{ background: "linear-gradient(90deg, #fb923c, #f97316)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>3 publications par jour</span>. Publier davantage peut nuire à votre référencement.
-              </p>
-              <p className="text-white/35 text-xs leading-relaxed mb-7">Google peut interpréter un volume excessif comme du spam. Attendez demain pour maintenir une croissance organique optimale.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowDailyLimitModal(false)} className="flex-1 px-4 py-3 rounded-xl text-white/50 hover:text-white/80 transition-all text-sm font-medium" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>Annuler</button>
-                <button onClick={() => handleManualPublish(true)} className="flex-1 px-4 py-3 rounded-xl text-white font-bold text-sm transition-all hover:opacity-90 active:scale-95 relative overflow-hidden" style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 4px 24px rgba(249,115,22,0.35)" }}>
-                  <span className="relative z-10">Générer quand même</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Popup confirmation optimisation automatique */}
       {showOptimizeConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
@@ -866,7 +708,7 @@ export default function Dashboard() {
                   Annuler
                 </button>
                 <button
-                  onClick={() => { setShowOptimizeConfirm(false); handleManualPublish(); }}
+                  onClick={() => { setShowOptimizeConfirm(false); router.push("/generate"); }}
                   className="flex-1 px-4 py-3 rounded-xl text-white font-bold text-sm transition-all hover:opacity-90 active:scale-[0.97] relative overflow-hidden"
                   style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", boxShadow: "0 4px 24px rgba(34,197,94,0.35)" }}
                 >
@@ -909,40 +751,6 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            {(() => {
-              // Compter les pubs du jour : max entre API stats, CMS pages, et compteur local
-              const apiPubsToday = data?.kpis.pubsToday ?? 0;
-              const startOfToday = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
-              const cmsPubsToday = cmsPages.filter(p => new Date(p.published_at) >= startOfToday).length;
-              const pubsToday = Math.max(apiPubsToday, cmsPubsToday, localPubsToday);
-              const dailyMax = 3;
-              const limitReached = pubsToday >= dailyMax;
-              return (
-                <button
-                  onClick={() => handleManualPublish()}
-                  disabled={cronRunning}
-                  className="group relative flex items-center gap-2 px-4 py-2 rounded-xl border border-orange-500/25 bg-orange-500/[0.06] hover:bg-orange-500/[0.12] hover:border-orange-500/50 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {cronRunning && (
-                    <span className="absolute bottom-0 left-0 h-[2px] rounded-full" style={{ width: `${cronProgress}%`, background: "linear-gradient(90deg, #f97316, #fb923c)", transition: "width 0.5s ease-out" }} />
-                  )}
-                  {cronRunning ? (
-                    <><span className="w-3.5 h-3.5 rounded-full border-2 border-orange-400 border-t-transparent animate-spin flex-shrink-0" /><span className="text-xs font-bold text-orange-400 tabular-nums">{cronProgress}%</span></>
-                  ) : (
-                    <>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors flex-shrink-0">
-                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" stroke="none"/>
-                      </svg>
-                      <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300 transition-colors">{pubsToday}/{dailyMax}</span>
-                      <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1a1a1a] border border-white/10 text-gray-400 text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
-                        {limitReached ? "Limite journalière atteinte (3/3)" : `${pubsToday} publication${pubsToday > 1 ? "s" : ""} aujourd'hui`}
-                      </span>
-                    </>
-                  )}
-                </button>
-              );
-            })()}
-
             <Link href="/generate" className="group relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-xs shadow-lg shadow-orange-500/25 hover:shadow-orange-500/45 transition-all duration-300 hover:scale-[1.03]">
               <span className="absolute inset-0 animate-[sweep_2.5s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)" }} />
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 flex-shrink-0 relative">
@@ -992,14 +800,6 @@ export default function Dashboard() {
       </nav>
 
       <div className="max-w-screen-xl mx-auto px-6 py-8">
-
-        {/* Notification cron */}
-        {cronResult && (
-          <div className="mb-6 bg-orange-500/10 border border-orange-500/20 rounded-xl px-5 py-3 flex items-center justify-between">
-            <p className="text-orange-400 font-bold text-sm">✓ {cronResult}</p>
-            <button onClick={() => setCronResult(null)} className="text-gray-500 hover:text-white text-xs">✕</button>
-          </div>
-        )}
 
         {/* Bandeau GSC non connecté */}
         {!loading && data?.site && !data.site.gsc_connected && (tutorialStep ?? 0) >= 4 && (
@@ -2338,7 +2138,6 @@ export default function Dashboard() {
                   </div>
                   <ResponsiveContainer width="100%" height={200}>
                     <AreaChart data={(() => {
-                      const todayLabel = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
                       // Recomputer le graphique avec les CMS pages (source de vérité)
                       const cmsCounts = new Map<string, number>();
                       for (const page of cmsPages) {
@@ -2347,15 +2146,11 @@ export default function Dashboard() {
                         const label = pd.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
                         cmsCounts.set(label, (cmsCounts.get(label) ?? 0) + 1);
                       }
-                      // Prendre le max entre base, CMS, et compteur local pour chaque jour
-                      return data.pubsChart.map(d => {
-                        let articles = Math.max(d.articles, cmsCounts.get(d.date) ?? 0);
-                        // Pour aujourd'hui, utiliser aussi le compteur local (toujours à jour)
-                        if (d.date === todayLabel && localPubsToday > articles) {
-                          articles = localPubsToday;
-                        }
-                        return { ...d, articles };
-                      });
+                      // Prendre le max entre base et CMS pour chaque jour
+                      return data.pubsChart.map(d => ({
+                        ...d,
+                        articles: Math.max(d.articles, cmsCounts.get(d.date) ?? 0),
+                      }));
                     })()} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="areaGrad2" x1="0" y1="0" x2="0" y2="1">
@@ -2776,10 +2571,10 @@ export default function Dashboard() {
                     <p className="text-white font-bold group-hover:text-orange-400 transition-colors">Modifier les mots-clés</p>
                     <p className="text-gray-600 text-xs mt-1">Ajouter ou supprimer des mots-clés cibles</p>
                   </Link>
-                  <button onClick={() => handleManualPublish()} disabled={cronRunning} className="flex-1 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 hover:border-orange-500/40 rounded-xl p-4 text-center transition-colors disabled:opacity-40">
-                    <p className="text-orange-400 font-bold">{cronRunning ? "En cours..." : "Générer un article maintenant"}</p>
-                    <p className="text-gray-600 text-xs mt-1">Couvre le prochain mot-clé non traité</p>
-                  </button>
+                  <Link href="/generate" className="flex-1 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 hover:border-orange-500/40 rounded-xl p-4 text-center transition-colors">
+                    <p className="text-orange-400 font-bold">Créer un article</p>
+                    <p className="text-gray-600 text-xs mt-1">Choisir le mot-clé et prévisualiser</p>
+                  </Link>
                 </div>
               </div>
               );
