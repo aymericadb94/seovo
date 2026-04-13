@@ -62,10 +62,18 @@ export type ExistingPage = {
 // Agent outputs
 
 export type IntentOutput = {
-  intent: "info" | "business" | "transactionnel";
-  sub_intents: string[];
+  intent: "informational" | "commercial_investigation" | "transactional" | "navigational" | "local";
+  intent_mix: { informational: number; commercial: number; transactional: number };
+  sub_intents: { label: string; type: "question" | "action" | "comparison" | "definition" | "list"; priority: 1 | 2 | 3 }[];
   user_stage: "débutant" | "intermédiaire" | "avancé";
-  keyword_variations: string[];
+  keyword_variations: {
+    semantic: string[];
+    long_tail: string[];
+    related_questions: string[];
+  };
+  content_lifespan: "evergreen" | "seasonal" | "trending";
+  search_volume_signal: "high" | "medium" | "low" | "unknown";
+  featured_snippet_opportunity: { likely: boolean; format: "paragraph" | "list" | "table" | "none" };
 };
 
 export type SerpOutput = {
@@ -333,38 +341,113 @@ function systemContext(ctx: RankpillContext, input: PipelineInput): string {
 
 // ── Agent 1 : Intent ─────────────────────────────────────────────────────────
 
+// P7 — Fallback heuristique basé sur le keyword
+function intentKeywordHeuristic(keyword: string): Pick<IntentOutput, "intent"> {
+  const kw = keyword.toLowerCase();
+  if (/acheter|prix|commander|fournisseur|grossiste|devis|tarif|stock|lot\b/.test(kw))
+    return { intent: "transactional" };
+  if (/meilleur|comparatif|avis|vs\b|top\s?\d|quel\b|ou\strouver/.test(kw))
+    return { intent: "commercial_investigation" };
+  if (/\b(paris|lyon|marseille|bordeaux|lille|nantes|toulouse|montpellier|montreuil|aubervilliers)\b|près de|à\s[A-Z]/.test(kw))
+    return { intent: "local" };
+  return { intent: "informational" };
+}
+
 async function runIntentAgent(input: PipelineInput, ctx: RankpillContext): Promise<IntentOutput> {
   const gscForKeyword = ctx.gsc_data?.queries.find(q => q.query.toLowerCase().includes(input.keyword.toLowerCase()));
 
   const result = await aiCall(
     { task: "intent_analysis" },
     {
-      system: `${systemContext(ctx, input)}\n\nTu es un expert SEO spécialisé dans l'analyse d'intention de recherche.`,
+      // P8 — Rôle system enrichi
+      system: `${systemContext(ctx, input)}\n\nTu es un SEO Intent Analyst senior. Tu analyses les mots-clés avec la rigueur d'un data scientist et la vision stratégique d'un directeur SEO.
+
+Tu connais la taxonomie Google des intentions de recherche (informational, commercial_investigation, transactional, navigational, local) et tu sais que la majorité des keywords sont multi-intentionnels.
+
+Ta sortie conditionne 7 agents en aval — une erreur de classification ici se propage à tout le contenu. Sois précis et justifié.`,
       messages: [{
         role: "user",
-        content: `Analyse le mot-clé "${input.keyword}" et comprends l'intention réelle utilisateur.
+        content: `Analyse le mot-clé "${input.keyword}" pour le business "${input.business_name}" (secteur : ${input.industry}).
 
-${gscForKeyword ? `Données GSC pour ce mot-clé : position ${gscForKeyword.position}, ${gscForKeyword.impressions} impressions, ${gscForKeyword.clicks} clics, CTR ${gscForKeyword.ctr}%` : "Pas de données GSC pour ce mot-clé."}
+${gscForKeyword ? `DONNÉES GSC pour ce mot-clé : position ${gscForKeyword.position}, ${gscForKeyword.impressions} impressions, ${gscForKeyword.clicks} clics, CTR ${gscForKeyword.ctr}%` : "Pas de données GSC pour ce mot-clé (nouveau keyword)."}
 
-Détermine :
-- intent principal (info, business, transactionnel)
-- sous-intentions
-- niveau de maturité utilisateur (débutant, intermédiaire, avancé)
-- variations du mot-clé opportunes
+RÈGLES DE CLASSIFICATION :
+
+INTENT — analyse le mot-clé + son contexte sémantique :
+- "comment", "pourquoi", "c'est quoi", "guide", "tuto", "définition" → informational
+- "meilleur", "comparatif", "avis", "vs", "top", "quel", "où trouver" → commercial_investigation
+- "acheter", "prix", "commander", "fournisseur", "grossiste", "devis", "tarif" → transactional
+- Nom de marque ou entreprise spécifique → navigational
+- Ville, "près de", "à [ville]", adresse → local
+- Si le mot-clé mélange plusieurs intents → marque l'intent dominant ET remplis intent_mix avec les %
+
+USER STAGE — utilise le mot-clé + données GSC :
+- Mot-clé large (1-2 mots) + fort volume potentiel → débutant
+- Longue traîne (4+ mots) avec termes techniques → avancé
+- GSC position < 5 → audience qualifiée → intermédiaire ou avancé
+- GSC position > 20 + beaucoup d'impressions → découverte → débutant
+- Modificateurs "pro", "avancé", "expert", "technique" → avancé
+- Modificateurs "débutant", "facile", "simple", "c'est quoi" → débutant
+
+CONTENT LIFESPAN :
+- Contient une année, "soldes", "promo", "black friday", événement daté → seasonal
+- Actualité, tendance récente, lancement → trending
+- Sujet intemporel, guide de fond → evergreen
+
+SEARCH VOLUME SIGNAL :
+- Utilise les données GSC (impressions) si disponibles : > 1000 imp/mois → high, 200-1000 → medium, < 200 → low
+- Sans GSC : estime à partir de la généralité du keyword (1-2 mots génériques → high, longue traîne niche → low)
+
+FEATURED SNIPPET :
+- "qu'est-ce que", "définition", "pourquoi" → likely, format paragraph
+- "comment", "étapes", "tuto" → likely, format list
+- "meilleur", "top", "comparatif", "vs" → likely, format table ou list
+- Keyword transactionnel pur → unlikely, format none
+
+SUB-INTENTS — identifie 3 à 6 sous-intentions :
+- Chaque sous-intention a un type : question (interrogation), action (l'utilisateur veut faire), comparison (comparer), definition (comprendre), list (lister/classer)
+- Chaque sous-intention a une priorité : 1 (essentielle), 2 (importante), 3 (secondaire)
+
+KEYWORD VARIATIONS — catégorise en 3 groupes :
+- semantic : synonymes et reformulations du mot-clé principal (3-5)
+- long_tail : extensions longue traîne exploitables comme H2/H3 (3-5)
+- related_questions : questions que les utilisateurs posent (type PAA Google) (3-5)
 
 RETOURNE JSON brut uniquement :
 {
-  "intent": "info | business | transactionnel",
-  "sub_intents": ["..."],
+  "intent": "informational | commercial_investigation | transactional | navigational | local",
+  "intent_mix": { "informational": 30, "commercial": 50, "transactional": 20 },
+  "sub_intents": [
+    { "label": "description claire", "type": "question | action | comparison | definition | list", "priority": 1 }
+  ],
   "user_stage": "débutant | intermédiaire | avancé",
-  "keyword_variations": ["..."]
+  "keyword_variations": {
+    "semantic": ["synonyme 1", "synonyme 2"],
+    "long_tail": ["extension longue traîne 1"],
+    "related_questions": ["question utilisateur 1 ?"]
+  },
+  "content_lifespan": "evergreen | seasonal | trending",
+  "search_volume_signal": "high | medium | low | unknown",
+  "featured_snippet_opportunity": { "likely": true, "format": "paragraph | list | table | none" }
 }`,
       }],
     }
   );
 
-  return parseAiJson<IntentOutput>(result.text) ?? {
-    intent: "info", sub_intents: [], user_stage: "intermédiaire", keyword_variations: [],
+  const parsed = parseAiJson<IntentOutput>(result.text);
+  if (parsed?.intent && parsed?.sub_intents) return parsed;
+
+  // P7 — Fallback intelligent
+  const heuristic = intentKeywordHeuristic(input.keyword);
+  return {
+    intent: heuristic.intent,
+    intent_mix: { informational: heuristic.intent === "informational" ? 80 : 20, commercial: heuristic.intent === "commercial_investigation" ? 80 : 20, transactional: heuristic.intent === "transactional" ? 80 : 10 },
+    sub_intents: [],
+    user_stage: "intermédiaire",
+    keyword_variations: { semantic: [], long_tail: [], related_questions: [] },
+    content_lifespan: "evergreen",
+    search_volume_signal: "unknown",
+    featured_snippet_opportunity: { likely: false, format: "none" },
   };
 }
 
@@ -504,8 +587,11 @@ async function runStructureAgent(input: PipelineInput, ctx: RankpillContext, int
         role: "user",
         content: `Crée une structure de page dynamique pour "${input.keyword}".
 
-INTENT : ${intent.intent} (sous-intentions : ${intent.sub_intents.join(", ")})
+INTENT : ${intent.intent} (mix: info ${intent.intent_mix.informational}% / commercial ${intent.intent_mix.commercial}% / transac ${intent.intent_mix.transactional}%)
+SOUS-INTENTIONS : ${intent.sub_intents.map(s => `${s.label} [${s.type}, P${s.priority}]`).join(", ")}
 STAGE UTILISATEUR : ${intent.user_stage}
+CONTENT LIFESPAN : ${intent.content_lifespan}
+FEATURED SNIPPET : ${intent.featured_snippet_opportunity.likely ? `oui (${intent.featured_snippet_opportunity.format})` : "non"}
 CLUSTER : ${ctx.cluster ?? "non défini"}
 ANGLE : ${diff.angle}
 POSITIONNEMENT : ${diff.positioning}
@@ -540,12 +626,17 @@ async function runContentAgent(
         role: "user",
         content: `Crée une page SEO complète pour "${input.keyword}".
 
-INTENT : ${intent.intent} — ${intent.sub_intents.join(", ")}
+INTENT : ${intent.intent} (mix: info ${intent.intent_mix.informational}% / commercial ${intent.intent_mix.commercial}% / transac ${intent.intent_mix.transactional}%)
+SOUS-INTENTIONS : ${intent.sub_intents.map(s => `${s.label} [${s.type}, P${s.priority}]`).join(", ")}
 STAGE UTILISATEUR : ${intent.user_stage}
+CONTENT LIFESPAN : ${intent.content_lifespan}
+FEATURED SNIPPET : ${intent.featured_snippet_opportunity.likely ? `oui → optimiser format ${intent.featured_snippet_opportunity.format}` : "non"}
 ANGLE : ${diff.angle}
 PROMESSE : ${diff.promise}
 ÉLÉMENTS UNIQUES : ${diff.unique_elements.join(", ")}
-MOTS-CLÉS ASSOCIÉS : ${intent.keyword_variations.join(", ")}
+MOTS-CLÉS SÉMANTIQUES : ${intent.keyword_variations.semantic.join(", ")}
+LONGUE TRAÎNE : ${intent.keyword_variations.long_tail.join(", ")}
+QUESTIONS UTILISATEURS : ${intent.keyword_variations.related_questions.join(", ")}
 CLUSTER : ${ctx.cluster ?? "non défini"}
 
 STRUCTURE IMPOSÉE (blocs à rédiger) : ${structure.blocks.join(", ")}
@@ -852,7 +943,7 @@ export async function runGenerationPipeline(
 
   // Agent 4: Structure
   onProgress?.(4, "structure", [
-    `Intent détecté : ${intent.intent} — utilisateur ${intent.user_stage}`,
+    `Intent détecté : ${intent.intent} (${intent.content_lifespan}) — utilisateur ${intent.user_stage}`,
     `Angle retenu : "${diff.angle}"`,
     `Sélection des blocs de contenu adaptés à l'intention`,
     `Construction de la structure de page dynamique`,
@@ -864,7 +955,7 @@ export async function runGenerationPipeline(
     `Structure validée : ${structure.blocks.length} blocs (${structure.blocks.join(", ")})`,
     `Rédaction SEO 1 500+ mots avec données chiffrées`,
     ...(gscCount > 0 ? [`Intégration des ${gscCount} requêtes GSC dans le champ sémantique`] : []),
-    `Variations mot-clé : ${intent.keyword_variations.slice(0, 4).join(", ")}`,
+    `Variations mot-clé : ${[...intent.keyword_variations.semantic.slice(0, 2), ...intent.keyword_variations.long_tail.slice(0, 2)].join(", ")}`,
     `Promesse : "${diff.promise}"`,
   ]);
   const content = await runContentAgent(input, ctx, intent, diff, structure);
