@@ -2359,7 +2359,7 @@ export default function Dashboard() {
                   </div>
                   <ResponsiveContainer width="100%" height={200}>
                     <AreaChart data={(() => {
-                      if (cmsPages.length === 0) return data.pubsChart;
+                      const todayLabel = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
                       // Recomputer le graphique avec les CMS pages (source de vérité)
                       const cmsCounts = new Map<string, number>();
                       for (const page of cmsPages) {
@@ -2368,11 +2368,15 @@ export default function Dashboard() {
                         const label = pd.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
                         cmsCounts.set(label, (cmsCounts.get(label) ?? 0) + 1);
                       }
-                      // Prendre le max entre base et CMS pour chaque jour
-                      return data.pubsChart.map(d => ({
-                        ...d,
-                        articles: Math.max(d.articles, cmsCounts.get(d.date) ?? 0),
-                      }));
+                      // Prendre le max entre base, CMS, et compteur local pour chaque jour
+                      return data.pubsChart.map(d => {
+                        let articles = Math.max(d.articles, cmsCounts.get(d.date) ?? 0);
+                        // Pour aujourd'hui, utiliser aussi le compteur local (toujours à jour)
+                        if (d.date === todayLabel && localPubsToday > articles) {
+                          articles = localPubsToday;
+                        }
+                        return { ...d, articles };
+                      });
                     })()} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="areaGrad2" x1="0" y1="0" x2="0" y2="1">
