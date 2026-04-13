@@ -507,6 +507,9 @@ export default function GeneratePage() {
 
       setResult({ title: article.title, url: data.url, meta: article.meta_description });
 
+      // Retirer le mot-clé publié de la liste de suggestions
+      setSmartKeywords(prev => prev.filter(k => k.keyword.toLowerCase() !== activeKeyword.toLowerCase()));
+
       // Roadmap integration (non-blocking)
       try {
         await fetch("/api/roadmap/integrate", {
@@ -948,7 +951,16 @@ export default function GeneratePage() {
                   Voir l&apos;article →
                 </a>
                 <button
-                  onClick={() => { setStatus("idle"); setResult(null); setCustomKeyword(""); setGenerated(null); }}
+                  onClick={() => {
+                    setStatus("idle"); setResult(null); setCustomKeyword(""); setGenerated(null);
+                    // Recharger les suggestions pour exclure les articles publiés
+                    fetch("/api/keywords/suggest").then(r => r.json()).then(kwData => {
+                      if (!kwData.error && kwData.suggestions) {
+                        setSmartKeywords(kwData.suggestions);
+                        if (kwData.suggestions.length > 0) setKeyword(kwData.suggestions[0].keyword);
+                      }
+                    });
+                  }}
                   className="flex-1 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.1] text-gray-300 font-bold py-3 rounded-xl transition-all text-sm"
                 >
                   Générer un autre
