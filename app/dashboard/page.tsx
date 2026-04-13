@@ -82,6 +82,7 @@ export default function Dashboard() {
   const cronProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [cronResult, setCronResult] = useState<string | null>(null);
   const [publicationPopup, setPublicationPopup] = useState<{ title: string; url: string; keyword?: string } | null>(null);
+  const [localPubsToday, setLocalPubsToday] = useState<number>(0);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [showOptimizeConfirm, setShowOptimizeConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "performance" | "linking" | "publications" | "keywords" | "calendar">("overview");
@@ -335,6 +336,7 @@ export default function Dashboard() {
     const json = await res.json();
     if (!json.error) {
       setData(json);
+      setLocalPubsToday(prev => Math.max(prev, json.kpis?.pubsToday ?? 0));
       setShowSeoModal(json.site ? !json.site.seo_analysis_done : false);
     } else {
       setShowSeoModal(false);
@@ -529,6 +531,68 @@ export default function Dashboard() {
     setIndexationLoading(false);
   }
 
+  // Après un timeout / "fetch failed", vérifier si la publication a quand même réussi
+  // Le publish route continue de tourner en background même si le trigger a timeout
+  // → on poll la DB avec plusieurs tentatives espacées
+  async function recoverFromError(fallbackMsg: string) {
+    const pubCountBefore = cmsPages.length;
+    const startTs = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10 min window
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await new Promise(r => setTimeout(r, attempt === 0 ? 3000 : 5000));
+      try {
+        const supabase = createClient();
+        const { data: recentPubs } = await supabase
+          .from("publications")
+          .select("title, keyword, wordpress_url, published_at")
+          .gt("published_at", startTs)
+          .order("published_at", { ascending: false })
+          .limit(5);
+
+        // Comparer avec les pubs qu'on connaissait avant le clic
+        const newPub = recentPubs?.find(p =>
+          p.wordpress_url &&
+          p.wordpress_url.startsWith("http") &&
+          !cmsPages.some(cp => cp.url === p.wordpress_url)
+        );
+
+        if (newPub) {
+          setPublicationPopup({
+            title: newPub.title,
+            url: newPub.wordpress_url,
+            keyword: newPub.keyword ?? undefined,
+          });
+          try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
+          setCronResult(null);
+          setLocalPubsToday(prev => prev + 1);
+          await loadData();
+          loadCmsPages();
+          return;
+        }
+      } catch { /* retry */ }
+    }
+
+    // Dernier recours : checker les CMS pages directement
+    try {
+      await loadCmsPages();
+      if (cmsPages.length > pubCountBefore) {
+        const newest = cmsPages[0]; // trié par date décroissante
+        if (newest) {
+          setPublicationPopup({ title: newest.title, url: newest.url, keyword: newest.keyword ?? undefined });
+          try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
+          setCronResult(null);
+          setLocalPubsToday(prev => prev + 1);
+          await loadData();
+          return;
+        }
+      }
+    } catch { /* fallback */ }
+
+    setCronResult(fallbackMsg);
+    await loadData();
+    loadCmsPages();
+  }
+
   async function handleManualPublish(force = false) {
     const pubsToday = data?.kpis.pubsToday ?? 0;
     if (pubsToday >= 3 && !force) {
@@ -566,46 +630,18 @@ export default function Dashboard() {
       // Chercher un article publié avec succès dans les résultats
       const successResult = results?.find(r => r.status === "ok" && r.title);
       if (successResult?.title) {
-        // Afficher le popup animé
         setPublicationPopup({
           title: successResult.title,
           url: successResult.url ?? "",
           keyword: successResult.keyword,
         });
-        // Sauvegarder en localStorage pour ne pas re-notifier
         try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
         setCronResult(null);
+        setLocalPubsToday(prev => prev + 1);
       } else if (json.error) {
-        // Même avec une erreur API, vérifier si l'article a quand même été publié
-        try {
-          await new Promise(r => setTimeout(r, 2000));
-          const supabase = createClient();
-          const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-          const { data: recentPubs } = await supabase
-            .from("publications")
-            .select("title, keyword, wordpress_url")
-            .gt("published_at", fiveMinAgo)
-            .order("published_at", { ascending: false })
-            .limit(1);
-          const lastSeenTs = localStorage.getItem("rankpill_last_pub_seen") ?? "1970-01-01T00:00:00Z";
-          if (recentPubs && recentPubs.length > 0 && recentPubs[0].wordpress_url && recentPubs[0].wordpress_url !== "" && new Date(fiveMinAgo) > new Date(lastSeenTs)) {
-            setPublicationPopup({
-              title: recentPubs[0].title,
-              url: recentPubs[0].wordpress_url,
-              keyword: recentPubs[0].keyword ?? undefined,
-            });
-            localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString());
-            setCronResult(null);
-            await loadData();
-            loadCmsPages();
-          } else {
-            setCronResult(json.error as string);
-            await loadData();
-            loadCmsPages();
-          }
-        } catch {
-          setCronResult(json.error as string);
-        }
+        // Erreur API (souvent timeout "fetch failed") → l'article a peut-être quand même été publié
+        // On attend puis on vérifie via le CMS directement
+        await recoverFromError(json.error as string);
       } else {
         const detail = results
           ?.map((r) => r.status === "ok" ? `✓ ${r.title}` : r.status === "error" ? `❌ ${r.error}` : null)
@@ -613,40 +649,13 @@ export default function Dashboard() {
           .join(" | ") ?? "";
         setCronResult(((json.message ?? "Terminé") as string) + (detail ? ` — ${detail}` : ""));
       }
-      // Petit délai pour laisser Supabase propager l'insert (service_role → RLS)
       await new Promise(r => setTimeout(r, 1500));
       await loadData();
       loadCmsPages();
     } catch (err) {
       if (cronProgressRef.current) clearInterval(cronProgressRef.current);
       setCronProgress(0);
-      // Même en cas d'erreur réseau / timeout, vérifier si un article a été publié entre-temps
-      try {
-        await new Promise(r => setTimeout(r, 2000));
-        const supabase = createClient();
-        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-        const { data: recentPubs } = await supabase
-          .from("publications")
-          .select("title, keyword, wordpress_url")
-          .gt("published_at", fiveMinAgo)
-          .order("published_at", { ascending: false })
-          .limit(1);
-        if (recentPubs && recentPubs.length > 0 && recentPubs[0].wordpress_url) {
-          setPublicationPopup({
-            title: recentPubs[0].title,
-            url: recentPubs[0].wordpress_url,
-            keyword: recentPubs[0].keyword ?? undefined,
-          });
-          try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
-          setCronResult(null);
-          await loadData();
-          loadCmsPages();
-        } else {
-          setCronResult("Erreur réseau : " + (err instanceof Error ? err.message : String(err)));
-        }
-      } catch {
-        setCronResult("Erreur réseau : " + (err instanceof Error ? err.message : String(err)));
-      }
+      await recoverFromError("Erreur réseau : " + (err instanceof Error ? err.message : String(err)));
     }
     setCronRunning(false);
   }
@@ -922,11 +931,11 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-2.5">
             {(() => {
-              // Compter les pubs du jour : max entre API stats et CMS pages (source de vérité)
+              // Compter les pubs du jour : max entre API stats, CMS pages, et compteur local
               const apiPubsToday = data?.kpis.pubsToday ?? 0;
               const startOfToday = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
               const cmsPubsToday = cmsPages.filter(p => new Date(p.published_at) >= startOfToday).length;
-              const pubsToday = Math.max(apiPubsToday, cmsPubsToday);
+              const pubsToday = Math.max(apiPubsToday, cmsPubsToday, localPubsToday);
               const dailyMax = 3;
               const limitReached = pubsToday >= dailyMax;
               return (
