@@ -118,11 +118,25 @@ export type DiffOutput = {
 
 export type StructureOutput = {
   blocks: string[];
+  sections_plan: {
+    h2: string;
+    sub_intent_covered: string;
+    estimated_words: number;
+    key_points: string[];
+  }[];
+  snippet_strategy: {
+    target_block: string;
+    format: "paragraph" | "list" | "table" | "none";
+    instruction: string;
+  };
+  target_sections_count: number;
 };
 
 export type ContentOutput = {
   hero: { title: string; subtitle: string; promise: string; cta: string | null };
   quick_answer: string;
+  stats?: { label: string; value: string; source?: string }[];
+  comparison?: { headers: string[]; rows: string[][] };
   sections: { title: string; content: string; tip?: string; example?: string }[];
   insights: { type: "tip" | "warning" | "pro"; text: string }[];
   mistakes: { title: string; why: string; consequence: string }[];
@@ -782,42 +796,141 @@ RETOURNE JSON brut uniquement :
 
 // ── Agent 4 : Structure ──────────────────────────────────────────────────────
 
-async function runStructureAgent(input: PipelineInput, ctx: RankpillContext, intent: IntentOutput, diff: DiffOutput): Promise<StructureOutput> {
+async function runStructureAgent(input: PipelineInput, ctx: RankpillContext, intent: IntentOutput, diff: DiffOutput, serp: SerpOutput): Promise<StructureOutput> {
   const result = await aiCall(
     { task: "content_structure" },
     {
-      system: `${systemContext(ctx, input)}\n\nTu es un expert en SEO + UX.`,
+      // P2 — Rôle system enrichi
+      system: `${systemContext(ctx, input)}\n\nTu es un Architecte de Contenu SEO senior spécialisé en structure de pages à forte performance organique. Tu combines UX writing, information architecture et SEO technique.
+
+Tu maîtrises :
+- La hiérarchie de headings (H1 → H2 → H3) et son impact sur le crawl sémantique
+- L'information scent : chaque bloc doit répondre à une promesse claire pour le lecteur
+- Le F-pattern / inverted pyramid : information critique en haut, détails en bas
+- L'optimisation featured snippet : structurer le contenu pour capturer la position 0
+- Le calibrage du nombre de sections basé sur le benchmark concurrentiel
+
+Ta structure est le plan de construction que l'Agent 5 (Content) va exécuter — elle doit être suffisamment détaillée pour guider la rédaction sans ambiguïté.`,
       messages: [{
         role: "user",
-        content: `Crée une structure de page dynamique pour "${input.keyword}".
+        content: `Crée une structure de page optimisée pour "${input.keyword}" (business: "${input.business_name}", secteur: ${input.industry}).
 
-INTENT : ${intent.intent} (mix: info ${intent.intent_mix.informational}% / commercial ${intent.intent_mix.commercial}% / transac ${intent.intent_mix.transactional}%)
-SOUS-INTENTIONS : ${intent.sub_intents.map(s => `${s.label} [${s.type}, P${s.priority}]`).join(", ")}
-STAGE UTILISATEUR : ${intent.user_stage}
-CONTENT LIFESPAN : ${intent.content_lifespan}
-FEATURED SNIPPET : ${intent.featured_snippet_opportunity.likely ? `oui (${intent.featured_snippet_opportunity.format})` : "non"}
+INTENTION DE RECHERCHE (Agent 1) :
+- Intent : ${intent.intent} (mix: info ${intent.intent_mix.informational}% / commercial ${intent.intent_mix.commercial}% / transac ${intent.intent_mix.transactional}%)
+- Sous-intentions : ${intent.sub_intents.map(s => `"${s.label}" [${s.type}, P${s.priority}]`).join(", ")}
+- User stage : ${intent.user_stage}
+- Content lifespan : ${intent.content_lifespan}
+- Featured snippet : ${intent.featured_snippet_opportunity.likely ? `OUI → format ${intent.featured_snippet_opportunity.format}` : "non probable"}
+- Questions utilisateurs : ${intent.keyword_variations.related_questions.join(", ")}
+
+STRATÉGIE ÉDITORIALE (Agent 3) :
+- Angle : ${diff.angle}
+- Ton : ${diff.tone_of_voice}
+- Format recommandé : ${diff.content_strategy.recommended_format}
+- Profondeur : ${diff.content_strategy.depth_level}
+- Target : ${diff.content_strategy.target_word_count} mots
+- Différenciateurs : ${diff.content_strategy.differentiators.join(", ") || "aucun"}
+- Rôle cocon : ${diff.cocoon_positioning.role}
+
+BENCHMARK SERP (Agent 2) :
+- H2 moyen concurrence : ${serp.competitive_benchmark.avg_headings_count}
+- Word count moyen : ${serp.competitive_benchmark.avg_word_count} mots
+- Difficulté : ${serp.competitive_benchmark.difficulty_estimate}
+- SERP features actives : ${[serp.serp_features.featured_snippet && "featured snippet", serp.serp_features.paa && "PAA", serp.serp_features.video_pack && "vidéos", serp.serp_features.image_pack && "images"].filter(Boolean).join(", ") || "aucune"}
+
 CLUSTER : ${ctx.cluster ?? "non défini"}
-ANGLE : ${diff.angle}
-POSITIONNEMENT : ${diff.positioning}
-TON : ${diff.tone_of_voice}
-FORMAT RECOMMANDÉ : ${diff.content_strategy.recommended_format}
-PROFONDEUR : ${diff.content_strategy.depth_level}
-TARGET WORD COUNT : ${diff.content_strategy.target_word_count} mots
-RÔLE COCON : ${diff.cocoon_positioning.role} — ${diff.cocoon_positioning.relation_to_cluster}
 
-Choisis les blocs pertinents parmi : hero, quick_answer, stats, simulation, sections, insights, mistakes, faq, comparison, cta.
-N'inclus que les blocs qui servent l'intention, l'angle et le format recommandé.
+RÈGLES DE STRUCTURATION :
+
+MAPPING SOUS-INTENTIONS → SECTIONS (P3) :
+- Sous-intention P1 (essentielle) → section H2 dédiée obligatoire
+- Sous-intention P2 (importante) → section H2 ou intégrée dans une section P1 existante
+- Sous-intention P3 (secondaire) → intégrable en FAQ ou omise si hors-scope
+- Les related_questions de l'Agent 1 alimentent les FAQ
+
+BLOCS DISPONIBLES :
+- hero : toujours inclus — H1 + subtitle + promesse
+- quick_answer : réponse directe en 2-3 phrases (obligatoire si featured snippet probable)
+- stats : bloc chiffres clés (si intent data-driven ou comparatif)
+- sections : blocs H2 principaux — le cœur du contenu
+- comparison : tableau comparatif (si intent commercial_investigation ou sous-intention "comparison")
+- insights : tips/warnings/pro tips (si intent informationnel + user stage débutant/intermédiaire)
+- mistakes : erreurs à éviter (si intent informationnel ou didactique, PAS pour transactionnel)
+- faq : questions/réponses — alimenté par les related_questions et sous-intentions P3
+- cta : appel à l'action (toujours en dernier)
+
+CALIBRAGE (P5) :
+- Nombre de H2 sections : benchmark concurrence ${serp.competitive_benchmark.avg_headings_count} H2 → vise ${serp.competitive_benchmark.avg_headings_count + 1}-${serp.competitive_benchmark.avg_headings_count + 3} H2 pour surpasser
+- Répartition mots par section : ${diff.content_strategy.target_word_count} mots ÷ nombre de sections
+
+FEATURED SNIPPET (P4) :
+${intent.featured_snippet_opportunity.likely
+  ? `- Format cible : ${intent.featured_snippet_opportunity.format}
+- Si "paragraph" → quick_answer doit contenir une définition/réponse concise (40-60 mots)
+- Si "list" → premier H2 doit être une liste à puces/numérotée
+- Si "table" → inclure un bloc comparison avec tableau structuré`
+  : "- Pas de stratégie snippet spécifique"}
 
 RETOURNE JSON brut uniquement :
 {
-  "blocks": ["hero", "quick_answer", "..."]
+  "blocks": ["hero", "quick_answer", "sections", "..."],
+  "sections_plan": [
+    {
+      "h2": "Titre H2 proposé",
+      "sub_intent_covered": "label de la sous-intention couverte",
+      "estimated_words": 300,
+      "key_points": ["point clé 1 à couvrir", "point clé 2"]
+    }
+  ],
+  "snippet_strategy": {
+    "target_block": "quick_answer | premier H2 | comparison | none",
+    "format": "paragraph | list | table | none",
+    "instruction": "consigne précise pour l'Agent 5"
+  },
+  "target_sections_count": 6
 }`,
       }],
     }
   );
 
-  return parseAiJson<StructureOutput>(result.text) ?? {
-    blocks: ["hero", "quick_answer", "sections", "insights", "mistakes", "faq", "cta"],
+  const parsed = parseAiJson<StructureOutput>(result.text);
+  if (parsed?.blocks && parsed?.sections_plan && parsed.sections_plan.length > 0) return parsed;
+
+  // P6 — Fallback intelligent basé sur intent + diff
+  const isTransactional = intent.intent === "transactional";
+  const isCommercial = intent.intent === "commercial_investigation";
+  const fallbackBlocks = [
+    "hero",
+    ...(intent.featured_snippet_opportunity.likely ? ["quick_answer"] : []),
+    ...(isCommercial ? ["comparison"] : []),
+    "sections",
+    ...(!isTransactional ? ["insights"] : []),
+    ...(!isTransactional && !isCommercial ? ["mistakes"] : []),
+    "faq",
+    "cta",
+  ];
+  const fallbackSections = intent.sub_intents
+    .filter(s => s.priority <= 2)
+    .map(s => ({
+      h2: s.label,
+      sub_intent_covered: s.label,
+      estimated_words: Math.round(diff.content_strategy.target_word_count / Math.max(intent.sub_intents.filter(si => si.priority <= 2).length, 3)),
+      key_points: [],
+    }));
+
+  return {
+    blocks: fallbackBlocks,
+    sections_plan: fallbackSections.length > 0 ? fallbackSections : [
+      { h2: `Comprendre ${input.keyword}`, sub_intent_covered: "définition", estimated_words: 400, key_points: [] },
+      { h2: `Comment ${input.keyword}`, sub_intent_covered: "action", estimated_words: 400, key_points: [] },
+      { h2: `Conseils pour ${input.keyword}`, sub_intent_covered: "tips", estimated_words: 300, key_points: [] },
+    ],
+    snippet_strategy: {
+      target_block: intent.featured_snippet_opportunity.likely ? "quick_answer" : "none",
+      format: intent.featured_snippet_opportunity.format,
+      instruction: intent.featured_snippet_opportunity.likely ? "Réponse directe en 40-60 mots" : "Pas de stratégie snippet",
+    },
+    target_sections_count: fallbackSections.length || 3,
   };
 }
 
@@ -853,7 +966,11 @@ QUESTIONS UTILISATEURS : ${intent.keyword_variations.related_questions.join(", "
 CLUSTER : ${ctx.cluster ?? "non défini"}
 RÔLE COCON : ${diff.cocoon_positioning.role}
 
-STRUCTURE IMPOSÉE (blocs à rédiger) : ${structure.blocks.join(", ")}
+STRUCTURE IMPOSÉE :
+- Blocs : ${structure.blocks.join(", ")}
+- Sections H2 planifiées (${structure.target_sections_count}) :
+${structure.sections_plan.map((s, i) => `  ${i + 1}. "${s.h2}" — ~${s.estimated_words} mots — couvre: ${s.sub_intent_covered}${s.key_points.length > 0 ? ` — points clés: ${s.key_points.join(", ")}` : ""}`).join("\n")}
+- Snippet : ${structure.snippet_strategy.format !== "none" ? `${structure.snippet_strategy.instruction} (bloc: ${structure.snippet_strategy.target_block}, format: ${structure.snippet_strategy.format})` : "pas de stratégie snippet"}
 
 RÈGLES :
 - Contenu non générique, basé sur les données
@@ -1060,6 +1177,18 @@ function assembleHtml(content: ContentOutput, linking: LinkingOutput): string {
     parts.push(`<p>${content.quick_answer}</p>`);
   }
 
+  // Stats
+  if (content.stats && content.stats.length > 0) {
+    parts.push(`<h2>Chiffres clés</h2>`);
+    parts.push(`<ul>${content.stats.map(s => `<li><strong>${s.value}</strong> — ${s.label}${s.source ? ` <em>(${s.source})</em>` : ""}</li>`).join("")}</ul>`);
+  }
+
+  // Comparison table
+  if (content.comparison && content.comparison.headers.length > 0) {
+    parts.push(`<h2>Comparatif</h2>`);
+    parts.push(`<table><thead><tr>${content.comparison.headers.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${content.comparison.rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+  }
+
   // Sections with link injection
   for (const sec of content.sections) {
     parts.push(`<h2>${sec.title}</h2>`);
@@ -1166,11 +1295,12 @@ export async function runGenerationPipeline(
     `Cocon : ${diff.cocoon_positioning.role} — ${diff.cocoon_positioning.relation_to_cluster}`,
     `Sélection des blocs de contenu adaptés à l'intention et au format`,
   ]);
-  const structure = await runStructureAgent(input, ctx, intent, diff);
+  const structure = await runStructureAgent(input, ctx, intent, diff, serp);
 
   // Agent 5: Content
   onProgress?.(5, "content", [
-    `Structure validée : ${structure.blocks.length} blocs (${structure.blocks.join(", ")})`,
+    `Structure validée : ${structure.blocks.length} blocs, ${structure.sections_plan.length} sections H2 planifiées`,
+    `Snippet : ${structure.snippet_strategy.format !== "none" ? `${structure.snippet_strategy.format} → ${structure.snippet_strategy.target_block}` : "pas de stratégie"}`,
     `Rédaction SEO ${diff.content_strategy.target_word_count} mots — ton ${diff.tone_of_voice}, profondeur ${diff.content_strategy.depth_level}`,
     ...(gscCount > 0 ? [`Intégration des ${gscCount} requêtes GSC dans le champ sémantique`] : []),
     `Variations mot-clé : ${[...intent.keyword_variations.semantic.slice(0, 2), ...intent.keyword_variations.long_tail.slice(0, 2)].join(", ")}`,
