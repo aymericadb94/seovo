@@ -584,6 +584,8 @@ export default function Dashboard() {
           .join(" | ") ?? "";
         setCronResult(((json.message ?? "Terminé") as string) + (detail ? ` — ${detail}` : ""));
       }
+      // Petit délai pour laisser Supabase propager l'insert (service_role → RLS)
+      await new Promise(r => setTimeout(r, 1500));
       await loadData();
       loadCmsPages();
     } catch (err) {
@@ -884,9 +886,9 @@ export default function Dashboard() {
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300 transition-colors flex-shrink-0">
                         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" stroke="none"/>
                       </svg>
-                      <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300 transition-colors">{limitReached ? "3/3" : `${pubsToday + 1}/3`}</span>
+                      <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300 transition-colors">{pubsToday}/{dailyMax}</span>
                       <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1a1a1a] border border-white/10 text-gray-400 text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
-                        {limitReached ? "Limite journalière atteinte (3/3)" : "Publie automatiquement le prochain mot-clé"}
+                        {limitReached ? "Limite journalière atteinte (3/3)" : `${pubsToday} publication${pubsToday > 1 ? "s" : ""} aujourd'hui`}
                       </span>
                     </>
                   )}
