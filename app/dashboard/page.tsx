@@ -531,63 +531,40 @@ export default function Dashboard() {
     setIndexationLoading(false);
   }
 
+  // Ref pour stocker les URLs connues avant le clic de publication
+  const cmsUrlsBeforePublishRef = useRef<Set<string>>(new Set());
+
   // Après un timeout / "fetch failed", vérifier si la publication a quand même réussi
   // Le publish route continue de tourner en background même si le trigger a timeout
-  // → on poll la DB avec plusieurs tentatives espacées
   async function recoverFromError(fallbackMsg: string) {
-    const pubCountBefore = cmsPages.length;
-    const startTs = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10 min window
-
-    for (let attempt = 0; attempt < 4; attempt++) {
-      await new Promise(r => setTimeout(r, attempt === 0 ? 3000 : 5000));
+    // Poll : vérifier les CMS pages directement (source de vérité)
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await new Promise(r => setTimeout(r, attempt === 0 ? 4000 : 6000));
       try {
-        const supabase = createClient();
-        const { data: recentPubs } = await supabase
-          .from("publications")
-          .select("title, keyword, wordpress_url, published_at")
-          .gt("published_at", startTs)
-          .order("published_at", { ascending: false })
-          .limit(5);
-
-        // Comparer avec les pubs qu'on connaissait avant le clic
-        const newPub = recentPubs?.find(p =>
-          p.wordpress_url &&
-          p.wordpress_url.startsWith("http") &&
-          !cmsPages.some(cp => cp.url === p.wordpress_url)
-        );
-
-        if (newPub) {
-          setPublicationPopup({
-            title: newPub.title,
-            url: newPub.wordpress_url,
-            keyword: newPub.keyword ?? undefined,
-          });
-          try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
-          setCronResult(null);
-          setLocalPubsToday(prev => prev + 1);
-          await loadData();
-          loadCmsPages();
-          return;
+        // Recharger les CMS pages et comparer avec les URLs d'avant
+        const res = await fetch("/api/publications/list");
+        const json = await res.json();
+        if (json.pages && Array.isArray(json.pages)) {
+          const freshPages = json.pages as typeof cmsPages;
+          const newPage = freshPages.find(p => p.url && !cmsUrlsBeforePublishRef.current.has(p.url));
+          if (newPage) {
+            setCmsPages(freshPages);
+            setPublicationPopup({
+              title: newPage.title,
+              url: newPage.url,
+              keyword: newPage.keyword ?? undefined,
+            });
+            try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
+            setCronResult(null);
+            setLocalPubsToday(prev => prev + 1);
+            await loadData();
+            return;
+          }
         }
       } catch { /* retry */ }
     }
 
-    // Dernier recours : checker les CMS pages directement
-    try {
-      await loadCmsPages();
-      if (cmsPages.length > pubCountBefore) {
-        const newest = cmsPages[0]; // trié par date décroissante
-        if (newest) {
-          setPublicationPopup({ title: newest.title, url: newest.url, keyword: newest.keyword ?? undefined });
-          try { localStorage.setItem("rankpill_last_pub_seen", new Date().toISOString()); } catch {}
-          setCronResult(null);
-          setLocalPubsToday(prev => prev + 1);
-          await loadData();
-          return;
-        }
-      }
-    } catch { /* fallback */ }
-
+    // Aucune nouvelle page détectée après 34s de polling
     setCronResult(fallbackMsg);
     await loadData();
     loadCmsPages();
@@ -603,6 +580,8 @@ export default function Dashboard() {
     setCronRunning(true);
     setCronResult(null);
     setCronProgress(0);
+    // Sauvegarder les URLs CMS connues avant la publication pour détecter les nouvelles
+    cmsUrlsBeforePublishRef.current = new Set(cmsPages.map(p => p.url));
     const startTime = Date.now();
     cronProgressRef.current = setInterval(() => {
       const elapsed = Date.now() - startTime;
