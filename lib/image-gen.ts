@@ -1,9 +1,9 @@
 /**
  * Génération d'images via DALL-E 3 (OpenAI API)
- *
- * Remplace Pexels pour des images uniques et pertinentes au contenu.
- * Même interface que lib/pexels.ts pour un remplacement transparent.
+ * Fallback automatique vers Pexels si DALL-E échoue.
  */
+
+import { fetchPexelsImage, fetchPexelsImages, type PexelsImage } from "@/lib/pexels";
 
 export type GeneratedImage = {
   url: string;
@@ -19,8 +19,8 @@ export async function generateImage(
 ): Promise<GeneratedImage | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
-    console.error("[image-gen] OPENAI_API_KEY manquante");
-    return null;
+    console.warn("[image-gen] OPENAI_API_KEY manquante, fallback Pexels");
+    return pexelsFallback(query);
   }
 
   const { size = "1792x1024", style = "natural" } = options;
@@ -45,7 +45,7 @@ export async function generateImage(
     if (!res.ok) {
       const err = await res.text();
       console.error(`[image-gen] DALL-E error ${res.status}:`, err);
-      return null;
+      return pexelsFallback(query);
     }
 
     const data = await res.json() as {
@@ -55,7 +55,7 @@ export async function generateImage(
     const img = data.data?.[0];
     if (!img?.url) {
       console.error("[image-gen] aucune image retournée");
-      return null;
+      return pexelsFallback(query);
     }
 
     console.log(`[image-gen] image générée pour "${query}"`);
@@ -64,14 +64,24 @@ export async function generateImage(
       alt: query,
     };
   } catch (err) {
-    console.error("[image-gen] exception:", err);
-    return null;
+    console.error("[image-gen] DALL-E exception:", err);
+    return pexelsFallback(query);
   }
 }
 
 /**
+ * Fallback Pexels
+ */
+async function pexelsFallback(query: string): Promise<GeneratedImage | null> {
+  console.log(`[image-gen] fallback Pexels pour "${query}"`);
+  const img = await fetchPexelsImage(query);
+  if (!img) return null;
+  return { url: img.url, alt: img.alt };
+}
+
+/**
  * Génère plusieurs images pour des queries différentes.
- * Séquentiel pour respecter les rate limits DALL-E.
+ * DALL-E séquentiel, fallback Pexels si échec.
  */
 export async function generateImages(
   queries: string[],
@@ -80,7 +90,6 @@ export async function generateImages(
   const uniqueQueries = [...new Set(queries)].slice(0, maxResults);
   const results = new Map<string, GeneratedImage>();
 
-  // Séquentiel pour DALL-E rate limits (5 img/min sur free tier)
   for (const query of uniqueQueries) {
     const img = await generateImage(query, { size: "1792x1024" });
     if (img) {
