@@ -305,6 +305,23 @@ export default function PillGenerationView({
               <p className="text-gray-600 text-sm">
                 {status === "publishing" ? "Envoi vers votre CMS" : "Tous les agents ont terminé"}
               </p>
+
+              {/* Barre de publication animée */}
+              {status === "publishing" && (
+                <div className="w-64 mt-4" style={{ animation: "fadeIn 0.5s ease-out 0.6s both" }}>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.15)" }}>
+                    <div className="h-full rounded-full" style={{
+                      background: "linear-gradient(90deg, #22c55e, #16a34a, #22c55e)",
+                      backgroundSize: "200% 100%",
+                      animation: "publishBar 2s ease-in-out infinite, publishGrow 8s ease-out forwards",
+                      boxShadow: "0 0 12px rgba(34,197,94,0.4)",
+                    }} />
+                  </div>
+                  <p className="text-[10px] font-mono text-green-400/40 text-center mt-2" style={{ animation: "fadeIn 0.3s ease-out 1s both" }}>
+                    Envoi des données, images et métadonnées...
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             /* ── Active generation ── */
@@ -508,6 +525,17 @@ export default function PillGenerationView({
         @keyframes greenFlash {
           0% { opacity: 0.8; transform: scale(1); }
           100% { opacity: 0; transform: scale(1.8); }
+        }
+        @keyframes publishBar {
+          0% { background-position: 0% 0%; }
+          100% { background-position: 200% 0%; }
+        }
+        @keyframes publishGrow {
+          0% { width: 5%; }
+          30% { width: 40%; }
+          60% { width: 65%; }
+          80% { width: 80%; }
+          100% { width: 95%; }
         }
       `}</style>
     </div>
