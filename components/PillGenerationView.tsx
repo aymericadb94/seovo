@@ -313,7 +313,7 @@ export default function PillGenerationView({
                     <div className="h-full rounded-full" style={{
                       background: "linear-gradient(90deg, #22c55e, #16a34a, #22c55e)",
                       backgroundSize: "200% 100%",
-                      animation: "publishBar 2s ease-in-out infinite, publishGrow 8s ease-out forwards",
+                      animation: "publishBar 2s ease-in-out infinite, publishGrow 20s ease-out forwards",
                       boxShadow: "0 0 12px rgba(34,197,94,0.4)",
                     }} />
                   </div>
@@ -532,10 +532,12 @@ export default function PillGenerationView({
         }
         @keyframes publishGrow {
           0% { width: 5%; }
-          30% { width: 40%; }
-          60% { width: 65%; }
-          80% { width: 80%; }
-          100% { width: 95%; }
+          15% { width: 20%; }
+          35% { width: 45%; }
+          55% { width: 60%; }
+          75% { width: 75%; }
+          90% { width: 85%; }
+          100% { width: 92%; }
         }
       `}</style>
     </div>
