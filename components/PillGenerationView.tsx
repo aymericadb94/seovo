@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 type Step = {
   id: string;
@@ -43,6 +43,36 @@ export default function PillGenerationView({
   const activeDetails = stepDetails[clampedStep] ?? [];
   const activeVisibleCount = visibleDetails[clampedStep] ?? (allDone ? activeDetails.length : 0);
 
+  // ── Console animation phases ──
+  // Phase 1: step number zoom-in → Phase 2: label morphs in → Phase 3: details typewriter
+  const [consolePhase, setConsolePhase] = useState<"number" | "label" | "details">("number");
+  const [prevStep, setPrevStep] = useState(clampedStep);
+
+  useEffect(() => {
+    if (allDone) return;
+
+    // New step detected
+    if (clampedStep !== prevStep) {
+      setPrevStep(clampedStep);
+      setConsolePhase("number");
+
+      const t1 = setTimeout(() => setConsolePhase("label"), 800);
+      const t2 = setTimeout(() => setConsolePhase("details"), 1800);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, [clampedStep, prevStep, allDone]);
+
+  // On mount, start with phase sequence for step 0
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (initialized.current || allDone) return;
+    initialized.current = true;
+    setConsolePhase("number");
+    const t1 = setTimeout(() => setConsolePhase("label"), 800);
+    const t2 = setTimeout(() => setConsolePhase("details"), 1800);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [allDone]);
+
   // Green cascade animation
   const [greenIndex, setGreenIndex] = useState(-1);
   const [showFinalBurst, setShowFinalBurst] = useState(false);
@@ -51,21 +81,19 @@ export default function PillGenerationView({
   useEffect(() => {
     if (allDone && !cascadeStarted.current) {
       cascadeStarted.current = true;
-      // Cascade: each pill turns green one by one
       for (let i = 0; i < steps.length; i++) {
         setTimeout(() => setGreenIndex(i), i * 120);
       }
-      // Final burst after all pills are green
       setTimeout(() => setShowFinalBurst(true), steps.length * 120 + 200);
     }
   }, [allDone, steps.length]);
 
-  // Typewriter for center details
+  // Typewriter for current detail line
   const [typedText, setTypedText] = useState("");
   const lastDetailRef = useRef("");
 
   useEffect(() => {
-    if (allDone) return;
+    if (allDone || consolePhase !== "details") return;
     const details = stepDetails[clampedStep] ?? [];
     const visCount = visibleDetails[clampedStep] ?? 0;
     const lastDetail = details[visCount - 1] ?? "";
@@ -81,7 +109,7 @@ export default function PillGenerationView({
       }, 15);
       return () => clearInterval(interval);
     }
-  }, [clampedStep, stepDetails, visibleDetails, allDone]);
+  }, [clampedStep, stepDetails, visibleDetails, allDone, consolePhase]);
 
   // Particles for final burst
   const particles = useRef(
@@ -132,9 +160,7 @@ export default function PillGenerationView({
 
         {/* SVG orbit track + progress arc */}
         <svg className="absolute inset-0 w-full h-full" viewBox={viewBox}>
-          {/* Track */}
           <circle cx={cx} cy={cy} r={orbitRadius} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-          {/* Progress arc */}
           <circle
             cx={cx} cy={cy} r={orbitRadius}
             fill="none" stroke={allDone ? "url(#pillGradGreen)" : "url(#pillGradOrange)"} strokeWidth="2"
@@ -183,37 +209,28 @@ export default function PillGenerationView({
           const x = Math.cos(rad) * orbitRadius;
           const y = Math.sin(rad) * orbitRadius;
 
-          // Pill dimensions
           const pillW = isActive ? 120 : 100;
           const pillH = isActive ? 38 : 32;
 
-          // Determine pill state colors
           const isCompleteGreen = allDone && isGreen;
           const bgColor = isCompleteGreen
             ? "rgba(34,197,94,0.15)"
-            : isDone
-            ? "rgba(249,115,22,0.1)"
-            : isActive
-            ? "rgba(249,115,22,0.15)"
+            : isDone ? "rgba(249,115,22,0.1)"
+            : isActive ? "rgba(249,115,22,0.15)"
             : "rgba(255,255,255,0.02)";
           const borderColor = isCompleteGreen
             ? "rgba(34,197,94,0.5)"
-            : isDone
-            ? "rgba(249,115,22,0.3)"
-            : isActive
-            ? "rgba(249,115,22,0.6)"
+            : isDone ? "rgba(249,115,22,0.3)"
+            : isActive ? "rgba(249,115,22,0.6)"
             : "rgba(255,255,255,0.06)";
           const textColor = isCompleteGreen
             ? "#22c55e"
-            : isDone
-            ? "#fb923c"
-            : isActive
-            ? "#fff"
+            : isDone ? "#fb923c"
+            : isActive ? "#fff"
             : "#4b5563";
           const glowShadow = isActive
             ? "0 0 20px rgba(249,115,22,0.3), 0 0 40px rgba(249,115,22,0.1)"
-            : isCompleteGreen
-            ? "0 0 15px rgba(34,197,94,0.2)"
+            : isCompleteGreen ? "0 0 15px rgba(34,197,94,0.2)"
             : "none";
 
           return (
@@ -223,45 +240,28 @@ export default function PillGenerationView({
               style={{
                 left: `calc(50% + ${x}px - ${pillW / 2}px)`,
                 top: `calc(50% + ${y}px - ${pillH / 2}px)`,
-                width: pillW,
-                height: pillH,
+                width: pillW, height: pillH,
                 zIndex: isActive ? 20 : 5,
                 transition: "all 0.6s cubic-bezier(0.34,1.56,0.64,1)",
               }}
             >
-              {/* Active pulse */}
               {isActive && (
                 <div className="absolute inset-[-4px] rounded-full opacity-50" style={{ border: "1px solid rgba(249,115,22,0.3)", animation: "ping 2s cubic-bezier(0,0,0.2,1) infinite" }} />
               )}
-
-              {/* Green flash on cascade */}
               {allDone && greenIndex === i && (
                 <div className="absolute inset-[-6px] rounded-full" style={{ background: "rgba(34,197,94,0.4)", animation: "greenFlash 0.5s ease-out forwards" }} />
               )}
 
-              {/* Pill shape */}
               <div
                 className="w-full h-full rounded-full flex items-center gap-2 px-3 overflow-hidden"
-                style={{
-                  background: bgColor,
-                  border: `1.5px solid ${borderColor}`,
-                  boxShadow: glowShadow,
-                  transition: "all 0.5s ease",
-                }}
+                style={{ background: bgColor, border: `1.5px solid ${borderColor}`, boxShadow: glowShadow, transition: "all 0.5s ease" }}
               >
-                {/* Fill animation for active pill */}
                 {isActive && (
                   <div
                     className="absolute inset-0 rounded-full pointer-events-none"
-                    style={{
-                      background: "linear-gradient(90deg, rgba(249,115,22,0.2), rgba(249,115,22,0.05))",
-                      transformOrigin: "left",
-                      animation: "pillFill 3s ease-in-out infinite",
-                    }}
+                    style={{ background: "linear-gradient(90deg, rgba(249,115,22,0.2), rgba(249,115,22,0.05))", transformOrigin: "left", animation: "pillFill 3s ease-in-out infinite" }}
                   />
                 )}
-
-                {/* Icon / check */}
                 <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center relative z-10" style={{ color: textColor }}>
                   {isDone || isCompleteGreen ? (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
@@ -276,12 +276,7 @@ export default function PillGenerationView({
                     <span className="text-[9px] font-black">{i + 1}</span>
                   )}
                 </span>
-
-                {/* Agent name */}
-                <span
-                  className="text-[10px] font-bold truncate relative z-10 transition-colors duration-300"
-                  style={{ color: textColor }}
-                >
+                <span className="text-[10px] font-bold truncate relative z-10 transition-colors duration-300" style={{ color: textColor }}>
                   {step.agent}
                 </span>
               </div>
@@ -289,24 +284,40 @@ export default function PillGenerationView({
           );
         })}
 
-        {/* ── Center screen (arrondi) ── */}
+        {/* ── Center console — rectangle arrondi avec glassmorphism ── */}
         <div
-          className="absolute z-30 flex flex-col items-center justify-center text-center overflow-hidden"
+          className="absolute z-30 flex flex-col overflow-hidden"
           style={{
-            width: orbitRadius * 1.3,
-            height: orbitRadius * 1.3,
-            borderRadius: "50%",
-            background: "radial-gradient(ellipse at center, rgba(10,10,10,0.95) 0%, rgba(5,5,5,0.98) 100%)",
-            border: `2px solid ${allDone ? "rgba(34,197,94,0.25)" : "rgba(249,115,22,0.15)"}`,
+            width: orbitRadius * 1.5,
+            height: orbitRadius * 1.1,
+            borderRadius: 20,
+            background: "linear-gradient(180deg, rgba(12,12,12,0.97) 0%, rgba(6,6,6,0.99) 100%)",
+            border: `1.5px solid ${allDone ? "rgba(34,197,94,0.3)" : "rgba(249,115,22,0.12)"}`,
             boxShadow: allDone
-              ? "inset 0 0 60px rgba(34,197,94,0.05), 0 0 40px rgba(34,197,94,0.08)"
-              : "inset 0 0 60px rgba(249,115,22,0.03), 0 0 30px rgba(249,115,22,0.05)",
+              ? "inset 0 1px 0 rgba(34,197,94,0.1), 0 0 60px rgba(34,197,94,0.08), 0 25px 50px rgba(0,0,0,0.5)"
+              : "inset 0 1px 0 rgba(255,255,255,0.04), 0 0 40px rgba(249,115,22,0.05), 0 25px 50px rgba(0,0,0,0.5)",
             transition: "all 0.8s ease",
+            backdropFilter: "blur(20px)",
           }}
         >
+          {/* Top bar — mini title bar */}
+          <div className="flex items-center gap-2 px-4 py-2 flex-shrink-0" style={{ borderBottom: `1px solid ${allDone ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.04)"}` }}>
+            <div className="flex gap-1.5">
+              <div className="w-2 h-2 rounded-full" style={{ background: allDone ? "#22c55e" : "#f97316", boxShadow: `0 0 6px ${allDone ? "rgba(34,197,94,0.5)" : "rgba(249,115,22,0.5)"}` }} />
+              <div className="w-2 h-2 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }} />
+              <div className="w-2 h-2 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }} />
+            </div>
+            <span className="text-[9px] font-mono text-gray-600 ml-auto tracking-wider uppercase">
+              {allDone ? "Terminé" : `agent/${steps[clampedStep]?.id}`}
+            </span>
+            <span className="text-[9px] font-mono tabular-nums" style={{ color: allDone ? "#22c55e" : "rgba(249,115,22,0.5)" }}>
+              {Math.min(currentStep + 1, steps.length)}/{steps.length}
+            </span>
+          </div>
+
           {/* Scanlines overlay */}
-          <div className="absolute inset-0 pointer-events-none rounded-full opacity-[0.03]" style={{
-            backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 3px)",
+          <div className="absolute inset-0 pointer-events-none opacity-[0.02]" style={{
+            backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.15) 2px, rgba(255,255,255,0.15) 3px)",
           }} />
 
           {/* Final burst particles */}
@@ -319,10 +330,8 @@ export default function PillGenerationView({
                     key={i}
                     className="absolute rounded-full"
                     style={{
-                      width: p.size,
-                      height: p.size,
-                      left: "50%",
-                      top: "50%",
+                      width: p.size, height: p.size,
+                      left: "50%", top: "50%",
                       background: "#22c55e",
                       boxShadow: "0 0 6px rgba(34,197,94,0.6)",
                       animation: `particleBurst 1s ease-out ${p.delay}s forwards`,
@@ -335,59 +344,110 @@ export default function PillGenerationView({
             </div>
           )}
 
-          {allDone ? (
-            /* ── Final success state ── */
-            <div className="flex flex-col items-center gap-2 px-6" style={{ animation: "scaleIn 0.5s cubic-bezier(0.16,1,0.3,1)" }}>
-              <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)", border: "2px solid rgba(34,197,94,0.3)" }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7" style={{ strokeDasharray: 30, strokeDashoffset: 30, animation: "drawCheck 0.5s ease-out 0.3s forwards" }}>
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </div>
-              <p className="text-green-400 font-black text-sm">
-                {status === "publishing" ? "Publication..." : "Article prêt"}
-              </p>
-              <p className="text-gray-600 text-[10px]">
-                {status === "publishing" ? "Envoi vers votre CMS" : "Tous les agents ont terminé"}
-              </p>
-            </div>
-          ) : (
-            /* ── Active generation — details inside screen ── */
-            <div className="flex flex-col items-center gap-2 px-5 w-full max-h-full overflow-hidden">
-              {/* Step counter */}
-              <div className="text-2xl font-black tabular-nums" style={{ color: "#f97316" }}>
-                {Math.min(currentStep + 1, steps.length)}<span className="text-gray-700 text-lg font-bold">/{steps.length}</span>
-              </div>
+          {/* Console content area */}
+          <div className="flex-1 flex flex-col justify-center px-5 py-3 relative overflow-hidden">
 
-              {/* Agent name */}
-              <p className="text-white font-bold text-xs" key={`agent-${clampedStep}`} style={{ animation: "fadeIn 0.4s ease" }}>
-                {steps[clampedStep]?.agent}
-              </p>
-              <p className="text-gray-600 text-[9px] mb-1" key={`sub-${clampedStep}`} style={{ animation: "fadeIn 0.4s ease 0.1s both" }}>
-                {steps[clampedStep]?.label}
-              </p>
-
-              {/* Typewriter detail */}
-              {typedText && (
-                <div className="max-w-[85%]" key={`typed-${clampedStep}-${activeVisibleCount}`}>
-                  <p className="text-[10px] font-mono text-orange-300/70 leading-relaxed text-center">
-                    {typedText}
-                    <span className="inline-block w-1 h-3 bg-orange-400/80 ml-0.5 rounded-sm" style={{ verticalAlign: "text-bottom", animation: "blink 1s step-end infinite" }} />
-                  </p>
+            {allDone ? (
+              /* ── Final success state ── */
+              <div className="flex flex-col items-center gap-3" style={{ animation: "scaleIn 0.5s cubic-bezier(0.16,1,0.3,1)" }}>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)", border: "2px solid rgba(34,197,94,0.3)" }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6" style={{ strokeDasharray: 30, strokeDashoffset: 30, animation: "drawCheck 0.5s ease-out 0.3s forwards" }}>
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
                 </div>
-              )}
+                <p className="text-green-400 font-black text-sm">
+                  {status === "publishing" ? "Publication..." : "Article prêt"}
+                </p>
+                <p className="text-gray-600 text-[10px]">
+                  {status === "publishing" ? "Envoi vers votre CMS" : "Tous les agents ont terminé"}
+                </p>
+              </div>
+            ) : (
+              /* ── Active generation — animated phases ── */
+              <div className="flex flex-col w-full h-full relative">
 
-              {/* Previous details (faded) */}
-              {activeVisibleCount > 1 && (
-                <div className="flex flex-col items-center gap-0.5 mt-1 max-w-[80%]">
-                  {activeDetails.slice(Math.max(0, activeVisibleCount - 3), activeVisibleCount - 1).map((d, j) => (
-                    <p key={j} className="text-[8px] font-mono text-gray-700 truncate text-center w-full">
-                      ✓ {d}
+                {/* Phase 1: Big step number — zoom in + glow */}
+                {consolePhase === "number" && (
+                  <div className="absolute inset-0 flex items-center justify-center" key={`num-${clampedStep}`} style={{ animation: "numberZoomIn 0.6s cubic-bezier(0.16,1,0.3,1)" }}>
+                    <span className="font-black tabular-nums" style={{ fontSize: 56, color: "#f97316", textShadow: "0 0 40px rgba(249,115,22,0.4), 0 0 80px rgba(249,115,22,0.15)", lineHeight: 1 }}>
+                      {currentStep + 1}
+                    </span>
+                    <span className="font-bold text-gray-700 ml-1" style={{ fontSize: 28 }}>/{steps.length}</span>
+                  </div>
+                )}
+
+                {/* Phase 2: Label — slides in from below replacing number */}
+                {consolePhase === "label" && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1" key={`label-${clampedStep}`} style={{ animation: "labelSlideIn 0.5s cubic-bezier(0.16,1,0.3,1)" }}>
+                    <p className="font-black text-white text-lg tracking-tight text-center leading-tight">
+                      {steps[clampedStep]?.label}
                     </p>
-                  ))}
-                </div>
-              )}
+                    <p className="text-[10px] text-orange-400/50 font-mono uppercase tracking-widest">
+                      Étape {currentStep + 1}/{steps.length}
+                    </p>
+                  </div>
+                )}
+
+                {/* Phase 3: Details terminal — typewriter stream */}
+                {consolePhase === "details" && (
+                  <div className="flex flex-col h-full justify-end gap-0" key={`details-${clampedStep}`} style={{ animation: "terminalFadeIn 0.4s ease-out" }}>
+                    {/* Step label — small, stays at top */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#f97316", boxShadow: "0 0 6px rgba(249,115,22,0.5)", animation: "glow 2s ease-in-out infinite" }} />
+                      <span className="text-[10px] font-bold text-orange-400/70 uppercase tracking-wider truncate">
+                        {steps[clampedStep]?.label}
+                      </span>
+                    </div>
+
+                    {/* Detail lines — scrolled to bottom */}
+                    <div className="flex flex-col gap-1 overflow-hidden flex-1 justify-end">
+                      {activeDetails.slice(0, Math.max(0, activeVisibleCount - 1)).map((d, j) => (
+                        <div key={j} className="flex items-start gap-2" style={{ animation: "lineSlideUp 0.3s ease-out" }}>
+                          <span className="flex-shrink-0 mt-0.5 text-[9px]" style={{ color: "rgba(34,197,94,0.5)" }}>✓</span>
+                          <span className="text-[10px] font-mono leading-relaxed text-gray-600 truncate">{d}</span>
+                        </div>
+                      ))}
+
+                      {/* Current line — typewriter with cursor */}
+                      {typedText && (
+                        <div className="flex items-start gap-2" style={{ animation: "lineSlideUp 0.3s ease-out" }}>
+                          <span className="flex-shrink-0 mt-0.5 text-[9px]" style={{ color: "#fb923c" }}>▸</span>
+                          <span className="text-[11px] font-mono leading-relaxed text-white/80">
+                            {typedText}
+                            <span
+                              className="inline-block w-[6px] h-[14px] ml-0.5 rounded-[1px]"
+                              style={{
+                                background: "linear-gradient(180deg, #f97316, #ef4444)",
+                                verticalAlign: "text-bottom",
+                                animation: "cursorBlink 1s step-end infinite",
+                                boxShadow: "0 0 8px rgba(249,115,22,0.6)",
+                              }}
+                            />
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Bottom bar — progress micro-bar */}
+          <div className="flex-shrink-0 px-4 pb-3 pt-1">
+            <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+              <div
+                className="h-full rounded-full transition-all duration-1000 ease-out"
+                style={{
+                  width: `${pct}%`,
+                  background: allDone
+                    ? "linear-gradient(90deg, #22c55e, #16a34a)"
+                    : "linear-gradient(90deg, #f97316, #ef4444)",
+                  boxShadow: allDone ? "0 0 8px rgba(34,197,94,0.5)" : "0 0 8px rgba(249,115,22,0.5)",
+                }}
+              />
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -429,12 +489,9 @@ export default function PillGenerationView({
         @keyframes drawCheck {
           to { stroke-dashoffset: 0; }
         }
-        @keyframes blink {
+        @keyframes cursorBlink {
+          0%, 100% { opacity: 1; }
           50% { opacity: 0; }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
         }
         @keyframes scaleIn {
           from { opacity: 0; transform: scale(0.8); }
@@ -442,6 +499,27 @@ export default function PillGenerationView({
         }
         @keyframes ping {
           75%, 100% { transform: scale(1.5); opacity: 0; }
+        }
+        @keyframes numberZoomIn {
+          0% { opacity: 0; transform: scale(0.3); filter: blur(8px); }
+          60% { opacity: 1; transform: scale(1.1); filter: blur(0); }
+          100% { opacity: 1; transform: scale(1); filter: blur(0); }
+        }
+        @keyframes labelSlideIn {
+          0% { opacity: 0; transform: translateY(20px); filter: blur(4px); }
+          100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+        @keyframes terminalFadeIn {
+          0% { opacity: 0; transform: translateY(6px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes lineSlideUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes glow {
+          0%, 100% { box-shadow: 0 0 6px rgba(249,115,22,0.5); }
+          50% { box-shadow: 0 0 12px rgba(249,115,22,0.8); }
         }
       `}</style>
     </div>
