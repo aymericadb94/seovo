@@ -281,10 +281,12 @@ export async function POST(request: Request) {
     }
 
     // ── Notification Google (soumission sitemap) ──
-    try {
-      await notifyGoogleAfterPublish(supabase, user.id, url);
-    } catch (err) {
-      logger.warn("Google sitemap notification failed", { context: "publish", userId: user.id, error: err });
+    if (url) {
+      try {
+        await notifyGoogleAfterPublish(supabase, user.id, url);
+      } catch (err) {
+        logger.warn("Google sitemap notification failed", { context: "publish", userId: user.id, error: err });
+      }
     }
 
     // ── Email notification ──

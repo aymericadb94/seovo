@@ -1313,9 +1313,10 @@ RETOURNE JSON brut uniquement :
   }
 
   // Fallback — enrichir les queries brutes de l'agent Content
+  const coverQuery = content.pexels_query || input.keyword;
   return {
     cover: {
-      prompt: `Professional editorial photography: ${content.pexels_query}. Clean composition, soft natural lighting, shallow depth of field. Modern and premium feel. No text, no watermarks, no logos.`,
+      prompt: `Professional editorial photography: ${coverQuery}. Clean composition, soft natural lighting, shallow depth of field. Modern and premium feel. No text, no watermarks, no logos.`,
       alt: content.cover_alt_text || `${input.keyword} — illustration`,
       size: "1792x1024",
       style: "natural",

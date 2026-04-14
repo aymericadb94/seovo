@@ -520,8 +520,8 @@ export default function Dashboard() {
       const json = await res.json();
       if (json.results) {
         const map: Record<string, { indexed: boolean | null; verdict: string; coverage: string; last_crawl?: string | null; crawled_as?: string | null; robots_txt_state?: string | null }> = {};
-        for (const r of json.results) map[r.url] = r;
-        setIndexationResults(map);
+        for (const r of json.results) map[r.url] = { indexed: r.indexed, verdict: r.verdict, coverage: r.coverage, last_crawl: r.last_crawl ?? null, crawled_as: r.crawled_as ?? null, robots_txt_state: r.robots_txt_state ?? null };
+        setIndexationResults(prev => ({ ...prev, ...map }));
       }
     } catch { /* silently fail */ }
     setIndexationLoading(false);
@@ -2281,8 +2281,8 @@ export default function Dashboard() {
                           <div className="text-center">
                             <div className="relative w-14 h-14 mx-auto mb-2">
                               <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
-                                <circle cx="18" cy="18" r="15.9" fill="none" stroke={pct >= 80 ? "#22c55e" : pct >= 50 ? "#f59e0b" : "#ef4444"} strokeWidth="3" strokeDasharray={`${pct} ${100 - pct}`} strokeLinecap="round" />
+                                <circle cx="18" cy="18" r="15.9155" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+                                <circle cx="18" cy="18" r="15.9155" fill="none" stroke={pct >= 80 ? "#22c55e" : pct >= 50 ? "#f59e0b" : "#ef4444"} strokeWidth="3" strokeDasharray={`${pct} ${100 - pct}`} strokeLinecap="round" />
                               </svg>
                               <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-black">{pct}%</span>
                             </div>

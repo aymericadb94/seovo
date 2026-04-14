@@ -53,15 +53,21 @@ export async function POST(request: Request) {
     // Utiliser la lib centralisée (batches de 5, données enrichies)
     const allResults = await inspectUrls(token, site.gsc_site_url, urls);
 
-    // Persist results to DB so they survive page refreshes
-    const resultsMap: Record<string, IndexationStatus> = {};
-    for (const r of allResults) resultsMap[r.url] = r;
+    // Merge with existing cache (don't overwrite auto-check results)
+    const { data: existingSite } = await supabase
+      .from("sites")
+      .select("indexation_cache")
+      .eq("user_id", user.id)
+      .single();
+    const existingCache = (existingSite?.indexation_cache as { results?: Record<string, IndexationStatus> } | null)?.results ?? {};
+    const mergedResults: Record<string, IndexationStatus> = { ...existingCache };
+    for (const r of allResults) mergedResults[r.url] = r;
 
     await supabase
       .from("sites")
       .update({
         indexation_cache: {
-          results: resultsMap,
+          results: mergedResults,
           updated_at: new Date().toISOString(),
         },
       })
