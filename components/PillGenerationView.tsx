@@ -174,7 +174,7 @@ export default function PillGenerationView({
         </div>
 
         {/* ── Step pills ── */}
-        <div className="relative z-10 flex items-center gap-2 px-5 py-2.5 flex-shrink-0 overflow-x-auto" style={{ borderBottom: "1px solid rgba(255,255,255,0.02)" }}>
+        <div className="relative z-10 flex items-center gap-1.5 px-4 py-2.5 flex-shrink-0 flex-wrap" style={{ borderBottom: "1px solid rgba(255,255,255,0.02)" }}>
           {steps.map((step, i) => {
             const isDone = i < currentStep;
             const isActive = i === clampedStep && !allDone;
