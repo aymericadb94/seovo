@@ -312,10 +312,11 @@ export async function GET(request: Request) {
             // ── Injection d'images inline via DALL-E (prompts Muscade) ──
             const sectionImages = muscadeImage?.sections ?? [];
             const fallbackQueries = pipeline.content.section_image_queries ?? [];
-            const imgQueries = sectionImages.length > 0
+            const useMuscadeSections = sectionImages.length > 0;
+            const imgQueries = useMuscadeSections
               ? sectionImages.map(s => s.prompt)
               : fallbackQueries;
-            const imgAlts = sectionImages.length > 0
+            const imgAlts = useMuscadeSections
               ? sectionImages.map(s => s.alt)
               : fallbackQueries;
 
@@ -326,7 +327,7 @@ export async function GET(request: Request) {
                   const img = await generateImage(imgQueries[i], {
                     size: "1024x1024",
                     style: "natural",
-                    rawPrompt: isMuscade,
+                    rawPrompt: useMuscadeSections,
                   });
                   if (img) imageResults.push({ url: img.url, alt: imgAlts[i] || img.alt });
                 }

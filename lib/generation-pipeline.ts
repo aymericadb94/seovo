@@ -1,15 +1,16 @@
 /**
  * Pipeline de génération Rankpill v3
  *
- * 8 agents séquentiels, chacun enrichit le contexte pour le suivant :
+ * 9 agents séquentiels, chacun enrichit le contexte pour le suivant :
  *   1. Intent    — Analyse d'intention de recherche
  *   2. SERP      — Analyse concurrentielle SERP
  *   3. Diff      — Stratégie d'angle différenciant
  *   4. Structure  — Structure de page dynamique
  *   5. Content   — Rédaction SEO complète
- *   6. Linking   — Maillage interne
- *   7. Risk      — Audit de risques SEO
- *   8. CTR       — Optimisation title + meta
+ *   6. Muscade   — Direction artistique (prompts DALL-E)
+ *   7. Linking   — Maillage interne
+ *   8. Risk      — Audit de risques SEO
+ *   9. CTR       — Optimisation title + meta
  *
  * Chaque agent reçoit le contexte Rankpill (GSC, cocon, roadmap, pages, cluster).
  */
@@ -1224,6 +1225,7 @@ async function runImageAgent(
   intent: IntentOutput, diff: DiffOutput, content: ContentOutput,
 ): Promise<ImageOutput> {
   const sectionSummary = content.sections.slice(0, 6).map((s, i) => `${i + 1}. "${s.title}"`).join(", ");
+  const sectionImageQueries = content.section_image_queries ?? [];
 
   const result = await aiCall(
     { task: "content_formatting" }, // Haiku — tâche utilitaire
@@ -1258,7 +1260,7 @@ ${sectionSummary}
 
 QUERIES BRUTES DE L'AGENT CONTENT (à améliorer radicalement) :
 - Cover : "${content.pexels_query}"
-- Sections : ${content.section_image_queries.map(q => `"${q}"`).join(", ") || "aucune"}
+- Sections : ${sectionImageQueries.map(q => `"${q}"`).join(", ") || "aucune"}
 
 CHOISIS UN STYLE VISUEL COHÉRENT pour tout l'article :
 - ${diff.tone_of_voice === "expert" || diff.tone_of_voice === "data-driven" ? "Photographie éditoriale ou rendu 3D clean" : ""}
@@ -1299,7 +1301,16 @@ RETOURNE JSON brut uniquement :
   );
 
   const parsed = parseAiJson<ImageOutput>(result.text);
-  if (parsed?.cover?.prompt && parsed?.visual_style) return parsed;
+  if (parsed?.cover?.prompt && parsed?.visual_style) {
+    // Garantir que sections est toujours un tableau valide
+    if (!Array.isArray(parsed.sections)) parsed.sections = [];
+    // Normaliser cover.size et cover.style avec des valeurs sûres
+    const validSizes = ["1792x1024", "1024x1024", "1024x1792"] as const;
+    const validStyles = ["natural", "vivid"] as const;
+    if (!validSizes.includes(parsed.cover.size as typeof validSizes[number])) parsed.cover.size = "1792x1024";
+    if (!validStyles.includes(parsed.cover.style as typeof validStyles[number])) parsed.cover.style = "natural";
+    return parsed;
+  }
 
   // Fallback — enrichir les queries brutes de l'agent Content
   return {
@@ -1309,7 +1320,7 @@ RETOURNE JSON brut uniquement :
       size: "1792x1024",
       style: "natural",
     },
-    sections: content.section_image_queries.slice(0, 3).map((q, i) => ({
+    sections: sectionImageQueries.slice(0, 3).map((q, i) => ({
       prompt: `Professional blog illustration: ${q}. Clean, modern style, well-composed. No text, no watermarks, no logos.`,
       alt: q,
       placement: content.sections[i]?.title ?? "",
@@ -1963,7 +1974,7 @@ export async function runGenerationPipeline(
   onProgress?.(6, "image", [
     `Analyse du contenu et du ton "${diff.tone_of_voice}" pour définir le style visuel`,
     `Création des prompts DALL-E pour la cover (${content.pexels_query})`,
-    ...(content.section_image_queries.length > 0 ? [`${content.section_image_queries.length} images de section à illustrer`] : []),
+    ...((content.section_image_queries ?? []).length > 0 ? [`${(content.section_image_queries ?? []).length} images de section à illustrer`] : []),
     `Adaptation au secteur "${input.industry}" et à l'audience ${intent.user_stage}`,
   ]);
   const image = await runImageAgent(input, intent, diff, content);

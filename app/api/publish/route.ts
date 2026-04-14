@@ -126,10 +126,10 @@ export async function POST(request: Request) {
       return Response.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const { title, content: rawContent, meta_description = "", keyword = "", cover_image_query = null, cover_alt_text = null, cover_image_size = null, cover_image_style = null, section_image_queries = [], section_image_alts = [] } = await request.json();
+    const { title, content: rawContent, meta_description = "", keyword = "", cover_image_query = null, cover_alt_text = null, cover_image_size = null, cover_image_style = null, section_image_queries = [], section_image_alts = [], is_muscade = false } = await request.json();
 
-    // Detect if prompts come from Muscade (longer, more detailed prompts)
-    const isMuscadePrompt = (section_image_queries as string[]).some((q: string) => q.length > 60);
+    // Muscade envoie des prompts DALL-E complets — ne pas les wrapper
+    const isMuscadePrompt = is_muscade as boolean;
 
     // Inject inline images into content
     let content = rawContent as string;
@@ -173,10 +173,12 @@ export async function POST(request: Request) {
     // Générer la cover image via DALL-E (prompt Muscade ou query basique)
     if (cover_image_query) {
       try {
+        const validSizes = ["1024x1024", "1792x1024", "1024x1792"];
+        const validStyles = ["natural", "vivid"];
         const genImg = await generateImage(cover_image_query, {
-          size: cover_image_size || "1792x1024",
-          style: cover_image_style || "natural",
-          rawPrompt: (cover_image_query as string).length > 60, // Muscade = prompt long
+          size: (validSizes.includes(cover_image_size) ? cover_image_size : "1792x1024") as "1024x1024" | "1792x1024" | "1024x1792",
+          style: (validStyles.includes(cover_image_style) ? cover_image_style : "natural") as "natural" | "vivid",
+          rawPrompt: isMuscadePrompt,
         });
         if (genImg) coverImageUrl = genImg.url;
       } catch (imgErr) {

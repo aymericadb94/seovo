@@ -55,6 +55,7 @@ type GeneratedArticle = {
   cover_image_style?: string | null;
   section_image_queries?: string[] | null;
   section_image_alts?: string[] | null;
+  is_muscade?: boolean;
   structured?: StructuredData | null;
 };
 
@@ -292,6 +293,7 @@ export default function GeneratePage() {
       cover_image_style?: string | null;
       section_image_queries?: string[];
       section_image_alts?: string[];
+      is_muscade?: boolean;
       structured?: {
         hero: StructuredData["hero"];
         quick_answer: string;
@@ -474,6 +476,7 @@ export default function GeneratePage() {
       cover_image_style: apiResult.cover_image_style ?? null,
       section_image_queries: apiResult.section_image_queries ?? null,
       section_image_alts: apiResult.section_image_alts ?? null,
+      is_muscade: apiResult.is_muscade ?? false,
       structured,
     };
 
@@ -525,6 +528,7 @@ export default function GeneratePage() {
           cover_image_style: article.cover_image_style ?? null,
           section_image_queries: article.section_image_queries ?? [],
           section_image_alts: article.section_image_alts ?? [],
+          is_muscade: article.is_muscade ?? false,
         }),
       });
 

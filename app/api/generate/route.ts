@@ -92,6 +92,7 @@ function formatResult(result: PipelineResult) {
     cover_image_style: result.image.cover.style,
     section_image_queries: result.image.sections.map(s => s.prompt),
     section_image_alts: result.image.sections.map(s => s.alt),
+    is_muscade: true,
     structured: {
       hero: result.content.hero,
       quick_answer: result.content.quick_answer,
