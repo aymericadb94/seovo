@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { publishToWix } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
-import { generateImage, generateImages } from "@/lib/image-gen";
+import { generateImage } from "@/lib/image-gen";
 import { injectImagesIntoHtml } from "@/lib/pexels";
 import { shopifyFetch } from "@/lib/shopify";
 import { addRetroactiveLinks } from "@/lib/internal-linking-engine";
@@ -126,18 +126,29 @@ export async function POST(request: Request) {
       return Response.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const { title, content: rawContent, meta_description = "", keyword = "", cover_image_query = null, cover_alt_text = null, section_image_queries = [] } = await request.json();
+    const { title, content: rawContent, meta_description = "", keyword = "", cover_image_query = null, cover_alt_text = null, cover_image_size = null, cover_image_style = null, section_image_queries = [], section_image_alts = [] } = await request.json();
+
+    // Detect if prompts come from Muscade (longer, more detailed prompts)
+    const isMuscadePrompt = (section_image_queries as string[]).some((q: string) => q.length > 60);
 
     // Inject inline images into content
     let content = rawContent as string;
     const imgQueries = (section_image_queries as string[]) ?? [];
+    const imgAlts = (section_image_alts as string[]) ?? [];
     if (imgQueries.length > 0) {
       try {
-        const images = await generateImages(imgQueries, 3);
-        const imgArray = [...images.values()].map(img => ({ url: img.url, alt: img.alt }));
-        if (imgArray.length > 0) {
-          content = injectImagesIntoHtml(content, imgArray, 3);
-          console.log(`[publish] ${imgArray.length} inline images DALL-E injected`);
+        const imageResults: { url: string; alt: string }[] = [];
+        for (let i = 0; i < Math.min(imgQueries.length, 3); i++) {
+          const img = await generateImage(imgQueries[i], {
+            size: "1024x1024",
+            style: "natural",
+            rawPrompt: isMuscadePrompt,
+          });
+          if (img) imageResults.push({ url: img.url, alt: imgAlts[i] || img.alt });
+        }
+        if (imageResults.length > 0) {
+          content = injectImagesIntoHtml(content, imageResults, 3);
+          console.log(`[publish] ${imageResults.length} inline images DALL-E injected (Muscade: ${isMuscadePrompt})`);
         }
       } catch (err) {
         console.error("[publish] inline image generation failed (non-fatal):", err);
@@ -159,10 +170,14 @@ export async function POST(request: Request) {
     let url = "";
     let coverImageUrl: string | null = null;
 
-    // Générer la cover image via DALL-E
+    // Générer la cover image via DALL-E (prompt Muscade ou query basique)
     if (cover_image_query) {
       try {
-        const genImg = await generateImage(cover_image_query);
+        const genImg = await generateImage(cover_image_query, {
+          size: cover_image_size || "1792x1024",
+          style: cover_image_style || "natural",
+          rawPrompt: (cover_image_query as string).length > 60, // Muscade = prompt long
+        });
         if (genImg) coverImageUrl = genImg.url;
       } catch (imgErr) {
         console.error("[publish] cover image generation failed (non-fatal):", imgErr);

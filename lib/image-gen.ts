@@ -15,7 +15,7 @@ export type GeneratedImage = {
  */
 export async function generateImage(
   query: string,
-  options: { size?: "1024x1024" | "1792x1024" | "1024x1792"; style?: "natural" | "vivid" } = {},
+  options: { size?: "1024x1024" | "1792x1024" | "1024x1792"; style?: "natural" | "vivid"; rawPrompt?: boolean } = {},
 ): Promise<GeneratedImage | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
@@ -23,7 +23,12 @@ export async function generateImage(
     return pexelsFallback(query);
   }
 
-  const { size = "1792x1024", style = "natural" } = options;
+  const { size = "1792x1024", style = "natural", rawPrompt = false } = options;
+
+  // Si rawPrompt=true, le query est déjà un prompt DALL-E complet (venant de Muscade)
+  const prompt = rawPrompt
+    ? query
+    : `Professional blog illustration: ${query}. Clean, modern, editorial style. No text or watermarks.`;
 
   try {
     const res = await fetch("https://api.openai.com/v1/images/generations", {
@@ -34,7 +39,7 @@ export async function generateImage(
       },
       body: JSON.stringify({
         model: "dall-e-3",
-        prompt: `Professional blog illustration: ${query}. Clean, modern, editorial style. No text or watermarks.`,
+        prompt,
         n: 1,
         size,
         style,

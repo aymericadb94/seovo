@@ -246,6 +246,7 @@ export default function PillGenerationView({
                   }}>
                     {step.id === "intent" ? "Intention"
                       : step.id === "serp" ? "SERP"
+                      : step.id === "image" ? "Images"
                       : step.id === "diff" ? "Diff"
                       : step.id === "structure" ? "Structure"
                       : step.id === "content" ? "Rédaction"

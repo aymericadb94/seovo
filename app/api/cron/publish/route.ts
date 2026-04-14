@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { sendArticlePublishedEmail } from "@/lib/email";
 import { publishToWix } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
-import { generateImage, generateImages } from "@/lib/image-gen";
+import { generateImage } from "@/lib/image-gen";
 import { injectImagesIntoHtml } from "@/lib/pexels";
 import { emitEvent, createPublicationEvent, createMilestoneEvent } from "@/lib/seo-events";
 import { recordAction } from "@/lib/seo-feedback";
@@ -302,19 +302,37 @@ export async function GET(request: Request) {
             logger.info(`[cron] Pipeline done for "${keyword}" in ${pipelineDuration}s — risk: ${pipeline.risk.risk_score}/100 (${pipeline.risk.risk_level})`);
 
             const { title, meta_description, html: generatedHtml } = pipeline;
-            const cover_image_query = pipeline.content.pexels_query;
-            const cover_alt_text = pipeline.content.cover_alt_text;
+            // Muscade fournit des prompts DALL-E enrichis
+            const muscadeImage = pipeline.image;
+            const cover_image_query = muscadeImage?.cover?.prompt ?? pipeline.content.pexels_query;
+            const cover_alt_text = muscadeImage?.cover?.alt ?? pipeline.content.cover_alt_text;
+            const isMuscade = !!muscadeImage?.cover?.prompt;
             let content = generatedHtml;
 
-            // ── Injection d'images inline via DALL-E ──
-            const sectionImgQueries = pipeline.content.section_image_queries ?? [];
-            if (sectionImgQueries.length > 0) {
+            // ── Injection d'images inline via DALL-E (prompts Muscade) ──
+            const sectionImages = muscadeImage?.sections ?? [];
+            const fallbackQueries = pipeline.content.section_image_queries ?? [];
+            const imgQueries = sectionImages.length > 0
+              ? sectionImages.map(s => s.prompt)
+              : fallbackQueries;
+            const imgAlts = sectionImages.length > 0
+              ? sectionImages.map(s => s.alt)
+              : fallbackQueries;
+
+            if (imgQueries.length > 0) {
               try {
-                const images = await generateImages(sectionImgQueries, 3);
-                const imgArray = [...images.values()].map(img => ({ url: img.url, alt: img.alt }));
-                if (imgArray.length > 0) {
-                  content = injectImagesIntoHtml(content, imgArray, 3);
-                  logger.info(`[cron] ${imgArray.length} inline images DALL-E injected into "${title}"`);
+                const imageResults: { url: string; alt: string }[] = [];
+                for (let i = 0; i < Math.min(imgQueries.length, 3); i++) {
+                  const img = await generateImage(imgQueries[i], {
+                    size: "1024x1024",
+                    style: "natural",
+                    rawPrompt: isMuscade,
+                  });
+                  if (img) imageResults.push({ url: img.url, alt: imgAlts[i] || img.alt });
+                }
+                if (imageResults.length > 0) {
+                  content = injectImagesIntoHtml(content, imageResults, 3);
+                  logger.info(`[cron] ${imageResults.length} inline images DALL-E injected into "${title}" (Muscade: ${isMuscade})`);
                 }
               } catch (imgErr) {
                 logger.warn("Inline image generation failed (non-fatal)", { context: "cron/publish", error: imgErr });
@@ -324,10 +342,14 @@ export async function GET(request: Request) {
             let publishedUrl = "";
             let coverImageUrl: string | null = null;
 
-            // Générer la cover image via DALL-E
+            // Générer la cover image via DALL-E (prompt Muscade)
             if (cover_image_query) {
               try {
-                const genImg = await generateImage(cover_image_query);
+                const genImg = await generateImage(cover_image_query, {
+                  size: muscadeImage?.cover?.size ?? "1792x1024",
+                  style: muscadeImage?.cover?.style ?? "natural",
+                  rawPrompt: isMuscade,
+                });
                 if (genImg) coverImageUrl = genImg.url;
               } catch { /* non-fatal */ }
             }

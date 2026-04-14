@@ -193,12 +193,28 @@ export type CtrOutput = {
   confidence_score: number;
 };
 
+export type ImageOutput = {
+  cover: {
+    prompt: string;
+    alt: string;
+    size: "1792x1024" | "1024x1024" | "1024x1792";
+    style: "natural" | "vivid";
+  };
+  sections: {
+    prompt: string;
+    alt: string;
+    placement: string;
+  }[];
+  visual_style: string;
+};
+
 export type PipelineResult = {
   intent: IntentOutput;
   serp: SerpOutput;
   diff: DiffOutput;
   structure: StructureOutput;
   content: ContentOutput;
+  image: ImageOutput;
   linking: LinkingOutput;
   risk: RiskOutput;
   ctr: CtrOutput;
@@ -1201,7 +1217,108 @@ JSON : { "hero": { "title": "H1", "subtitle": "...", "promise": "...", "cta": nu
   return parsed;
 }
 
-// ── Agent 6 : Linking ────────────────────────────────────────────────────────
+// ── Agent 6 : Muscade (Images) ──────────────────────────────────────────────
+
+async function runImageAgent(
+  input: PipelineInput,
+  intent: IntentOutput, diff: DiffOutput, content: ContentOutput,
+): Promise<ImageOutput> {
+  const sectionSummary = content.sections.slice(0, 6).map((s, i) => `${i + 1}. "${s.title}"`).join(", ");
+
+  const result = await aiCall(
+    { task: "content_formatting" }, // Haiku — tâche utilitaire
+    {
+      system: `Tu es Muscade, directeur artistique spécialisé en génération d'images IA pour le web. Tu crées des prompts DALL-E 3 ultra précis qui produisent des visuels professionnels, cohérents avec le contenu et le secteur.
+
+Tu maîtrises :
+- Les styles visuels : photographie éditoriale, illustration flat design, infographie, photo stock premium, rendu 3D minimaliste
+- La composition : règle des tiers, espace négatif, focal point, profondeur de champ
+- L'adaptation au secteur : mode → lookbook, tech → clean/minimal, food → warm/appetizing, B2B → corporate/modern
+- Les contraintes DALL-E 3 : pas de texte lisible, pas de logos, pas de visages reconnaissables, pas de marques
+
+RÈGLES ABSOLUES pour tes prompts :
+- Toujours en anglais
+- Commencer par le style visuel (ex: "Editorial photography:", "Flat illustration:", "Minimalist 3D render:")
+- Décrire la scène concrètement (objets, couleurs, ambiance, éclairage)
+- Préciser la composition (vue, angle, cadrage)
+- Terminer par "No text, no watermarks, no logos"
+- Chaque prompt doit être unique et spécifique à la section`,
+      messages: [{
+        role: "user",
+        content: `Crée les directives visuelles pour un article sur "${input.keyword}" (business: "${input.business_name}", secteur: ${input.industry}).
+
+CONTEXTE ÉDITORIAL :
+- Intent : ${intent.intent} (user stage: ${intent.user_stage})
+- Ton : ${diff.tone_of_voice}
+- Angle : ${diff.angle}
+- Format : ${diff.content_strategy.recommended_format}
+
+SECTIONS DE L'ARTICLE :
+${sectionSummary}
+
+QUERIES BRUTES DE L'AGENT CONTENT (à améliorer radicalement) :
+- Cover : "${content.pexels_query}"
+- Sections : ${content.section_image_queries.map(q => `"${q}"`).join(", ") || "aucune"}
+
+CHOISIS UN STYLE VISUEL COHÉRENT pour tout l'article :
+- ${diff.tone_of_voice === "expert" || diff.tone_of_voice === "data-driven" ? "Photographie éditoriale ou rendu 3D clean" : ""}
+- ${diff.tone_of_voice === "accessible" || diff.tone_of_voice === "didactique" ? "Illustration flat design colorée ou photographie lifestyle" : ""}
+- ${diff.tone_of_voice === "provocateur" ? "Photographie contrastée, angles dramatiques, éclairage cinématographique" : ""}
+- Le style doit être cohérent entre cover et sections
+
+COVER IMAGE :
+- Format paysage 1792x1024 (bannière blog)
+- Doit capturer l'essence de l'article en une image
+- Pas de texte visible
+- Alt text SEO descriptif incluant "${input.keyword}"
+
+SECTION IMAGES (2-3 max, les plus visuelles) :
+- Pas besoin d'illustrer toutes les sections — choisis celles qui bénéficient le plus d'un visuel
+- Chaque image doit apporter de la valeur (pas de remplissage)
+- Format carré 1024x1024
+
+RETOURNE JSON brut uniquement :
+{
+  "cover": {
+    "prompt": "prompt DALL-E 3 détaillé en anglais pour la cover (60-120 mots)",
+    "alt": "alt text SEO 8-12 mots incluant le keyword",
+    "size": "1792x1024",
+    "style": "natural"
+  },
+  "sections": [
+    {
+      "prompt": "prompt DALL-E 3 détaillé en anglais pour cette section (40-80 mots)",
+      "alt": "alt text SEO descriptif",
+      "placement": "titre H2 de la section ciblée"
+    }
+  ],
+  "visual_style": "style visuel choisi (ex: editorial photography, flat illustration, minimalist 3D)"
+}`,
+      }],
+    }
+  );
+
+  const parsed = parseAiJson<ImageOutput>(result.text);
+  if (parsed?.cover?.prompt && parsed?.visual_style) return parsed;
+
+  // Fallback — enrichir les queries brutes de l'agent Content
+  return {
+    cover: {
+      prompt: `Professional editorial photography: ${content.pexels_query}. Clean composition, soft natural lighting, shallow depth of field. Modern and premium feel. No text, no watermarks, no logos.`,
+      alt: content.cover_alt_text || `${input.keyword} — illustration`,
+      size: "1792x1024",
+      style: "natural",
+    },
+    sections: content.section_image_queries.slice(0, 3).map((q, i) => ({
+      prompt: `Professional blog illustration: ${q}. Clean, modern style, well-composed. No text, no watermarks, no logos.`,
+      alt: q,
+      placement: content.sections[i]?.title ?? "",
+    })),
+    visual_style: "editorial photography",
+  };
+}
+
+// ── Agent 7 : Linking ────────────────────────────────────────────────────────
 
 async function runLinkingAgent(
   input: PipelineInput, ctx: RankpillContext,
@@ -1842,8 +1959,17 @@ export async function runGenerationPipeline(
   ]);
   const content = await runContentAgent(input, ctx, intent, diff, structure);
 
-  // Agent 6: Linking
-  onProgress?.(6, "linking", [
+  // Agent 6: Muscade (Images)
+  onProgress?.(6, "image", [
+    `Analyse du contenu et du ton "${diff.tone_of_voice}" pour définir le style visuel`,
+    `Création des prompts DALL-E pour la cover (${content.pexels_query})`,
+    ...(content.section_image_queries.length > 0 ? [`${content.section_image_queries.length} images de section à illustrer`] : []),
+    `Adaptation au secteur "${input.industry}" et à l'audience ${intent.user_stage}`,
+  ]);
+  const image = await runImageAgent(input, intent, diff, content);
+
+  // Agent 7: Linking
+  onProgress?.(7, "linking", [
     ...(pagesCount > 0 ? [
       `${pagesCount} pages existantes analysées pour le maillage`,
       ...(cocoonCluster ? [`Priorité aux liens du cluster "${cocoonCluster}"`] : []),
@@ -1858,8 +1984,8 @@ export async function runGenerationPipeline(
   // Assemble HTML
   const html = assembleHtml(content, linking);
 
-  // Agent 7: Risk
-  onProgress?.(7, "risk", [
+  // Agent 8: Risk
+  onProgress?.(8, "risk", [
     `Vérification de la densité mot-clé (seuil < 2%)`,
     ...(pagesCount > 0 ? [`Analyse de cannibalisation vs ${pagesCount} pages existantes`] : []),
     `Détection des signaux de contenu IA`,
@@ -1867,8 +1993,8 @@ export async function runGenerationPipeline(
   ]);
   const risk = await runRiskAgent(input, ctx, html, intent, diff, structure, linking);
 
-  // Agent 8: CTR
-  onProgress?.(8, "ctr", [
+  // Agent 9: CTR
+  onProgress?.(9, "ctr", [
     ...(gscKw ? [`CTR actuel GSC : ${gscKw.ctr}% — optimisation ciblée`] : [`Pas de CTR GSC — optimisation from scratch`]),
     `Création du title SEO (50-60 caractères)`,
     `Rédaction meta description (150-160 caractères)`,
@@ -1923,6 +2049,7 @@ export async function runGenerationPipeline(
     diff,
     structure,
     content,
+    image,
     linking,
     risk,
     ctr,

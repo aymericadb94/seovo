@@ -51,7 +51,10 @@ type GeneratedArticle = {
   meta_description: string;
   cover_image_query?: string | null;
   cover_alt_text?: string | null;
+  cover_image_size?: string | null;
+  cover_image_style?: string | null;
   section_image_queries?: string[] | null;
+  section_image_alts?: string[] | null;
   structured?: StructuredData | null;
 };
 
@@ -109,6 +112,17 @@ const STEPS = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
         <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/>
+      </svg>
+    ),
+  },
+  {
+    id: "image",
+    agent: "Muscade",
+    label: "Direction artistique",
+    sub: "Prompts visuels adaptés au contenu et au secteur",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
       </svg>
     ),
   },
@@ -262,7 +276,7 @@ export default function GeneratePage() {
   // Agent step name → STEPS index mapping
   const AGENT_TO_STEP: Record<string, number> = {
     intent: 0, serp: 1, diff: 2, structure: 3,
-    content: 4, linking: 5, risk: 6, ctr: 7,
+    content: 4, image: 5, linking: 6, risk: 7, ctr: 8,
   };
 
   async function runGeneration() {
@@ -274,7 +288,10 @@ export default function GeneratePage() {
       meta_description: string;
       cover_image_query?: string | null;
       cover_alt_text?: string | null;
+      cover_image_size?: string | null;
+      cover_image_style?: string | null;
       section_image_queries?: string[];
+      section_image_alts?: string[];
       structured?: {
         hero: StructuredData["hero"];
         quick_answer: string;
@@ -453,7 +470,10 @@ export default function GeneratePage() {
       meta_description: apiResult.meta_description,
       cover_image_query: apiResult.cover_image_query ?? null,
       cover_alt_text: apiResult.cover_alt_text ?? null,
+      cover_image_size: apiResult.cover_image_size ?? null,
+      cover_image_style: apiResult.cover_image_style ?? null,
       section_image_queries: apiResult.section_image_queries ?? null,
+      section_image_alts: apiResult.section_image_alts ?? null,
       structured,
     };
 
@@ -501,7 +521,10 @@ export default function GeneratePage() {
           keyword: activeKeyword,
           cover_image_query: article.cover_image_query ?? null,
           cover_alt_text: article.cover_alt_text ?? null,
+          cover_image_size: article.cover_image_size ?? null,
+          cover_image_style: article.cover_image_style ?? null,
           section_image_queries: article.section_image_queries ?? [],
+          section_image_alts: article.section_image_alts ?? [],
         }),
       });
 
