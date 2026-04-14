@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 
 type Step = {
   id: string;
@@ -34,42 +34,33 @@ export default function PillGenerationView({
 }: Props) {
   const clampedStep = Math.min(currentStep, steps.length - 1);
   const pct = allDone ? 100 : Math.round((currentStep / steps.length) * 100);
-  const orbitRadius = 170;
-  const cx = orbitRadius + 80;
-  const cy = orbitRadius + 80;
-  const viewBox = `0 0 ${cx * 2} ${cy * 2}`;
 
   // Active step details
   const activeDetails = stepDetails[clampedStep] ?? [];
   const activeVisibleCount = visibleDetails[clampedStep] ?? (allDone ? activeDetails.length : 0);
 
   // ── Console animation phases ──
-  // Phase 1: step number zoom-in → Phase 2: label morphs in → Phase 3: details typewriter
   const [consolePhase, setConsolePhase] = useState<"number" | "label" | "details">("number");
   const [prevStep, setPrevStep] = useState(clampedStep);
 
   useEffect(() => {
     if (allDone) return;
-
-    // New step detected
     if (clampedStep !== prevStep) {
       setPrevStep(clampedStep);
       setConsolePhase("number");
-
-      const t1 = setTimeout(() => setConsolePhase("label"), 800);
-      const t2 = setTimeout(() => setConsolePhase("details"), 1800);
+      const t1 = setTimeout(() => setConsolePhase("label"), 700);
+      const t2 = setTimeout(() => setConsolePhase("details"), 1600);
       return () => { clearTimeout(t1); clearTimeout(t2); };
     }
   }, [clampedStep, prevStep, allDone]);
 
-  // On mount, start with phase sequence for step 0
   const initialized = useRef(false);
   useEffect(() => {
     if (initialized.current || allDone) return;
     initialized.current = true;
     setConsolePhase("number");
-    const t1 = setTimeout(() => setConsolePhase("label"), 800);
-    const t2 = setTimeout(() => setConsolePhase("details"), 1800);
+    const t1 = setTimeout(() => setConsolePhase("label"), 700);
+    const t2 = setTimeout(() => setConsolePhase("details"), 1600);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [allDone]);
 
@@ -82,13 +73,13 @@ export default function PillGenerationView({
     if (allDone && !cascadeStarted.current) {
       cascadeStarted.current = true;
       for (let i = 0; i < steps.length; i++) {
-        setTimeout(() => setGreenIndex(i), i * 120);
+        setTimeout(() => setGreenIndex(i), i * 150);
       }
-      setTimeout(() => setShowFinalBurst(true), steps.length * 120 + 200);
+      setTimeout(() => setShowFinalBurst(true), steps.length * 150 + 300);
     }
   }, [allDone, steps.length]);
 
-  // Typewriter for current detail line
+  // Typewriter
   const [typedText, setTypedText] = useState("");
   const lastDetailRef = useRef("");
 
@@ -106,223 +97,219 @@ export default function PillGenerationView({
         idx++;
         setTypedText(lastDetail.slice(0, idx));
         if (idx >= lastDetail.length) clearInterval(interval);
-      }, 15);
+      }, 18);
       return () => clearInterval(interval);
     }
   }, [clampedStep, stepDetails, visibleDetails, allDone, consolePhase]);
 
-  // Particles for final burst
+  // Particles
   const particles = useRef(
-    Array.from({ length: 24 }, (_, i) => ({
-      angle: (i / 24) * 360,
-      distance: 80 + Math.random() * 60,
-      size: 2 + Math.random() * 4,
-      delay: Math.random() * 0.3,
+    Array.from({ length: 32 }, (_, i) => ({
+      angle: (i / 32) * 360,
+      distance: 100 + Math.random() * 120,
+      size: 2 + Math.random() * 5,
+      delay: Math.random() * 0.4,
+    }))
+  );
+
+  // Matrix rain characters for background
+  const matrixCols = useRef(
+    Array.from({ length: 20 }, () => ({
+      x: Math.random() * 100,
+      speed: 0.5 + Math.random() * 1.5,
+      chars: Array.from({ length: 8 }, () =>
+        String.fromCharCode(0x30A0 + Math.random() * 96)
+      ),
+      delay: Math.random() * 5,
     }))
   );
 
   return (
-    <div className="relative flex flex-col items-center" style={{ minHeight: "calc(100vh - 200px)" }}>
+    <div className="relative flex flex-col" style={{ minHeight: "calc(100vh - 180px)" }}>
 
-      {/* Ambient glow */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full transition-all duration-1000"
-          style={{ background: `radial-gradient(circle, ${allDone ? "rgba(34,197,94,0.1)" : "rgba(249,115,22,0.08)"} 0%, transparent 60%)` }}
-        />
-      </div>
+      {/* ── Full-width console ── */}
+      <div
+        className="relative flex-1 flex flex-col overflow-hidden"
+        style={{
+          borderRadius: 16,
+          background: "linear-gradient(180deg, rgba(10,10,10,0.98) 0%, rgba(4,4,4,0.99) 100%)",
+          border: `1px solid ${allDone ? "rgba(34,197,94,0.25)" : "rgba(249,115,22,0.1)"}`,
+          boxShadow: allDone
+            ? "0 0 80px rgba(34,197,94,0.08), 0 4px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(34,197,94,0.08)"
+            : "0 0 60px rgba(249,115,22,0.04), 0 4px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03)",
+          transition: "all 1s ease",
+          minHeight: 500,
+        }}
+      >
+        {/* Scanlines */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.015] rounded-2xl overflow-hidden" style={{
+          backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.2) 2px, rgba(255,255,255,0.2) 3px)",
+        }} />
 
-      {/* Header */}
-      <div className="relative z-10 flex items-center justify-between w-full mb-4">
-        <div className="flex items-center gap-3">
-          <div className="relative w-8 h-8 flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: allDone ? "rgba(34,197,94,0.3)" : "rgba(249,115,22,0.2)", animationDuration: "2s" }} />
-            <div className="w-4 h-4 rounded-full transition-colors duration-500" style={{ background: allDone ? "linear-gradient(135deg, #22c55e, #16a34a)" : "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: `0 0 12px ${allDone ? "rgba(34,197,94,0.5)" : "rgba(249,115,22,0.5)"}` }} />
-          </div>
-          <div>
-            <h2 className="text-white font-black text-sm tracking-tight">
-              {allDone ? "Finalisation" : status === "publishing" ? "Publication" : "Génération"} en cours
-            </h2>
-            <p className="text-gray-600 text-[11px]">
-              <span className="text-orange-400 font-bold">{keyword}</span> · {language}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-          <span className="text-orange-400/60 text-[10px]">{pct}%</span>
-          <span className="text-gray-600">|</span>
-          <span className="text-orange-400 font-black text-xs tabular-nums">{Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")}</span>
-        </div>
-      </div>
-
-      {/* ── Orbital pill ring ── */}
-      <div className="relative z-10 flex items-center justify-center" style={{ width: cx * 2, height: cy * 2, maxWidth: "100%" }}>
-
-        {/* SVG orbit track + progress arc */}
-        <svg className="absolute inset-0 w-full h-full" viewBox={viewBox}>
-          <circle cx={cx} cy={cy} r={orbitRadius} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-          <circle
-            cx={cx} cy={cy} r={orbitRadius}
-            fill="none" stroke={allDone ? "url(#pillGradGreen)" : "url(#pillGradOrange)"} strokeWidth="2"
-            strokeLinecap="round"
-            strokeDasharray={`${2 * Math.PI * orbitRadius}`}
-            strokeDashoffset={`${2 * Math.PI * orbitRadius * (1 - pct / 100)}`}
-            style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(0.34,1.56,0.64,1)", transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}
-          />
-          {/* Beam from active pill to center */}
-          {!allDone && (() => {
-            const angle = (clampedStep / steps.length) * 360 - 90;
-            const rad = (angle * Math.PI) / 180;
-            const px = cx + Math.cos(rad) * orbitRadius;
-            const py = cy + Math.sin(rad) * orbitRadius;
-            return (
-              <line
-                x1={px} y1={py} x2={cx} y2={cy}
-                stroke="url(#beamGrad)" strokeWidth="1"
-                style={{ transition: "all 0.8s cubic-bezier(0.34,1.56,0.64,1)" }}
-              />
-            );
-          })()}
-          <defs>
-            <linearGradient id="pillGradOrange" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#f97316" />
-              <stop offset="100%" stopColor="#ef4444" />
-            </linearGradient>
-            <linearGradient id="pillGradGreen" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#22c55e" />
-              <stop offset="100%" stopColor="#16a34a" />
-            </linearGradient>
-            <linearGradient id="beamGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="rgba(249,115,22,0.4)" />
-              <stop offset="100%" stopColor="rgba(249,115,22,0)" />
-            </linearGradient>
-          </defs>
-        </svg>
-
-        {/* Pill nodes */}
-        {steps.map((step, i) => {
-          const isDone = i < currentStep;
-          const isActive = i === clampedStep && !allDone;
-          const isGreen = greenIndex >= i;
-          const angle = (i / steps.length) * 360 - 90;
-          const rad = (angle * Math.PI) / 180;
-          const x = Math.cos(rad) * orbitRadius;
-          const y = Math.sin(rad) * orbitRadius;
-
-          const pillW = isActive ? 120 : 100;
-          const pillH = isActive ? 38 : 32;
-
-          const isCompleteGreen = allDone && isGreen;
-          const bgColor = isCompleteGreen
-            ? "rgba(34,197,94,0.15)"
-            : isDone ? "rgba(249,115,22,0.1)"
-            : isActive ? "rgba(249,115,22,0.15)"
-            : "rgba(255,255,255,0.02)";
-          const borderColor = isCompleteGreen
-            ? "rgba(34,197,94,0.5)"
-            : isDone ? "rgba(249,115,22,0.3)"
-            : isActive ? "rgba(249,115,22,0.6)"
-            : "rgba(255,255,255,0.06)";
-          const textColor = isCompleteGreen
-            ? "#22c55e"
-            : isDone ? "#fb923c"
-            : isActive ? "#fff"
-            : "#4b5563";
-          const glowShadow = isActive
-            ? "0 0 20px rgba(249,115,22,0.3), 0 0 40px rgba(249,115,22,0.1)"
-            : isCompleteGreen ? "0 0 15px rgba(34,197,94,0.2)"
-            : "none";
-
-          return (
+        {/* Matrix rain background */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl opacity-[0.04]">
+          {matrixCols.current.map((col, i) => (
             <div
-              key={step.id}
-              className="absolute flex items-center justify-center"
+              key={i}
+              className="absolute text-[10px] font-mono leading-tight"
               style={{
-                left: `calc(50% + ${x}px - ${pillW / 2}px)`,
-                top: `calc(50% + ${y}px - ${pillH / 2}px)`,
-                width: pillW, height: pillH,
-                zIndex: isActive ? 20 : 5,
-                transition: "all 0.6s cubic-bezier(0.34,1.56,0.64,1)",
+                left: `${col.x}%`,
+                top: -20,
+                color: allDone ? "#22c55e" : "#f97316",
+                animation: `matrixFall ${8 / col.speed}s linear ${col.delay}s infinite`,
+                writingMode: "vertical-rl",
               }}
             >
-              {isActive && (
-                <div className="absolute inset-[-4px] rounded-full opacity-50" style={{ border: "1px solid rgba(249,115,22,0.3)", animation: "ping 2s cubic-bezier(0,0,0.2,1) infinite" }} />
-              )}
-              {allDone && greenIndex === i && (
-                <div className="absolute inset-[-6px] rounded-full" style={{ background: "rgba(34,197,94,0.4)", animation: "greenFlash 0.5s ease-out forwards" }} />
-              )}
+              {col.chars.join("")}
+            </div>
+          ))}
+        </div>
 
+        {/* Ambient corner glows */}
+        <div className="absolute top-0 left-0 w-48 h-48 pointer-events-none rounded-tl-2xl overflow-hidden">
+          <div className="w-full h-full" style={{
+            background: `radial-gradient(circle at 0% 0%, ${allDone ? "rgba(34,197,94,0.06)" : "rgba(249,115,22,0.04)"} 0%, transparent 70%)`,
+            transition: "all 1s ease",
+          }} />
+        </div>
+        <div className="absolute bottom-0 right-0 w-48 h-48 pointer-events-none rounded-br-2xl overflow-hidden">
+          <div className="w-full h-full" style={{
+            background: `radial-gradient(circle at 100% 100%, ${allDone ? "rgba(34,197,94,0.04)" : "rgba(239,68,68,0.03)"} 0%, transparent 70%)`,
+            transition: "all 1s ease",
+          }} />
+        </div>
+
+        {/* ── Top bar ── */}
+        <div className="relative z-10 flex items-center px-5 py-3 flex-shrink-0" style={{ borderBottom: `1px solid ${allDone ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.04)"}` }}>
+          {/* Traffic lights */}
+          <div className="flex gap-2 mr-4">
+            <div className="w-3 h-3 rounded-full transition-all duration-500" style={{
+              background: allDone ? "#22c55e" : "#f97316",
+              boxShadow: `0 0 8px ${allDone ? "rgba(34,197,94,0.5)" : "rgba(249,115,22,0.5)"}`,
+              animation: "trafficPulse 2s ease-in-out infinite",
+            }} />
+            <div className="w-3 h-3 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }} />
+            <div className="w-3 h-3 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }} />
+          </div>
+
+          {/* Keyword + language */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[11px] font-bold truncate transition-colors duration-500" style={{ color: allDone ? "#22c55e" : "#fb923c" }}>
+              {keyword}
+            </span>
+            <span className="text-gray-700 text-[10px]">·</span>
+            <span className="text-gray-600 text-[10px]">{language}</span>
+          </div>
+
+          {/* Timer + percentage */}
+          <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+            <span className="text-[10px] font-mono tabular-nums transition-colors duration-500" style={{ color: allDone ? "rgba(34,197,94,0.5)" : "rgba(249,115,22,0.4)" }}>
+              {pct}%
+            </span>
+            <div className="h-3 w-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+            <span className="font-black text-xs tabular-nums transition-colors duration-500" style={{ color: allDone ? "#22c55e" : "#f97316" }}>
+              {Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")}
+            </span>
+          </div>
+        </div>
+
+        {/* ── Step pills bar ── */}
+        <div className="relative z-10 flex items-center gap-2 px-5 py-3 flex-shrink-0" style={{ borderBottom: `1px solid rgba(255,255,255,0.02)` }}>
+          {steps.map((step, i) => {
+            const isDone = i < currentStep;
+            const isActive = i === clampedStep && !allDone;
+            const isCompleteGreen = allDone && greenIndex >= i;
+
+            return (
               <div
-                className="w-full h-full rounded-full flex items-center gap-2 px-3 overflow-hidden"
-                style={{ background: bgColor, border: `1.5px solid ${borderColor}`, boxShadow: glowShadow, transition: "all 0.5s ease" }}
+                key={step.id}
+                className="relative flex items-center gap-1.5 overflow-hidden flex-shrink-0"
+                style={{
+                  height: 30,
+                  paddingLeft: 8,
+                  paddingRight: isActive ? 14 : 10,
+                  borderRadius: 15,
+                  background: isCompleteGreen
+                    ? "rgba(34,197,94,0.12)"
+                    : isActive
+                    ? "rgba(249,115,22,0.1)"
+                    : isDone
+                    ? "rgba(249,115,22,0.05)"
+                    : "rgba(255,255,255,0.02)",
+                  border: `1px solid ${isCompleteGreen
+                    ? "rgba(34,197,94,0.35)"
+                    : isActive
+                    ? "rgba(249,115,22,0.4)"
+                    : isDone
+                    ? "rgba(249,115,22,0.15)"
+                    : "rgba(255,255,255,0.04)"
+                  }`,
+                  boxShadow: isActive
+                    ? "0 0 20px rgba(249,115,22,0.15)"
+                    : isCompleteGreen
+                    ? "0 0 12px rgba(34,197,94,0.1)"
+                    : "none",
+                  transition: "all 0.5s cubic-bezier(0.34,1.56,0.64,1)",
+                }}
               >
+                {/* Active fill sweep */}
                 {isActive && (
-                  <div
-                    className="absolute inset-0 rounded-full pointer-events-none"
-                    style={{ background: "linear-gradient(90deg, rgba(249,115,22,0.2), rgba(249,115,22,0.05))", transformOrigin: "left", animation: "pillFill 3s ease-in-out infinite" }}
-                  />
+                  <div className="absolute inset-0 rounded-full pointer-events-none" style={{
+                    background: "linear-gradient(90deg, rgba(249,115,22,0.15), transparent)",
+                    animation: "pillSweep 2.5s ease-in-out infinite",
+                  }} />
                 )}
-                <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center relative z-10" style={{ color: textColor }}>
+
+                {/* Green flash */}
+                {allDone && greenIndex === i && (
+                  <div className="absolute inset-0 rounded-full pointer-events-none" style={{
+                    background: "rgba(34,197,94,0.4)",
+                    animation: "pillFlash 0.4s ease-out forwards",
+                  }} />
+                )}
+
+                {/* Icon */}
+                <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center relative z-10">
                   {isDone || isCompleteGreen ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3" style={{
+                      stroke: isCompleteGreen ? "#22c55e" : "#fb923c",
+                      ...(isDone && !allDone ? { strokeDasharray: 30, strokeDashoffset: 0, animation: "none" } : {}),
+                    }}>
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   ) : isActive ? (
-                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.15)" strokeWidth="2" />
-                      <path d="M12 3a9 9 0 019 9" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="9" stroke="rgba(249,115,22,0.15)" strokeWidth="2" />
+                      <path d="M12 3a9 9 0 019 9" stroke="#fb923c" strokeWidth="2.5" strokeLinecap="round" />
                     </svg>
                   ) : (
-                    <span className="text-[9px] font-black">{i + 1}</span>
+                    <span className="text-[8px] font-black text-gray-600">{i + 1}</span>
                   )}
                 </span>
-                <span className="text-[10px] font-bold truncate relative z-10 transition-colors duration-300" style={{ color: textColor }}>
-                  {step.agent}
-                </span>
+
+                {/* Label — only show on active + done */}
+                {(isActive || isDone || isCompleteGreen) && (
+                  <span
+                    className="text-[10px] font-bold truncate relative z-10 transition-all duration-300"
+                    style={{
+                      color: isCompleteGreen ? "#22c55e" : isActive ? "#fff" : "#fb923c",
+                      maxWidth: isActive ? 80 : 60,
+                    }}
+                  >
+                    {step.label.split(" ")[0]}
+                  </span>
+                )}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
 
-        {/* ── Center console — rectangle arrondi avec glassmorphism ── */}
-        <div
-          className="absolute z-30 flex flex-col overflow-hidden"
-          style={{
-            width: orbitRadius * 1.5,
-            height: orbitRadius * 1.1,
-            borderRadius: 20,
-            background: "linear-gradient(180deg, rgba(12,12,12,0.97) 0%, rgba(6,6,6,0.99) 100%)",
-            border: `1.5px solid ${allDone ? "rgba(34,197,94,0.3)" : "rgba(249,115,22,0.12)"}`,
-            boxShadow: allDone
-              ? "inset 0 1px 0 rgba(34,197,94,0.1), 0 0 60px rgba(34,197,94,0.08), 0 25px 50px rgba(0,0,0,0.5)"
-              : "inset 0 1px 0 rgba(255,255,255,0.04), 0 0 40px rgba(249,115,22,0.05), 0 25px 50px rgba(0,0,0,0.5)",
-            transition: "all 0.8s ease",
-            backdropFilter: "blur(20px)",
-          }}
-        >
-          {/* Top bar — mini title bar */}
-          <div className="flex items-center gap-2 px-4 py-2 flex-shrink-0" style={{ borderBottom: `1px solid ${allDone ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.04)"}` }}>
-            <div className="flex gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ background: allDone ? "#22c55e" : "#f97316", boxShadow: `0 0 6px ${allDone ? "rgba(34,197,94,0.5)" : "rgba(249,115,22,0.5)"}` }} />
-              <div className="w-2 h-2 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }} />
-              <div className="w-2 h-2 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }} />
-            </div>
-            <span className="text-[9px] font-mono text-gray-600 ml-auto tracking-wider uppercase">
-              {allDone ? "Terminé" : `agent/${steps[clampedStep]?.id}`}
-            </span>
-            <span className="text-[9px] font-mono tabular-nums" style={{ color: allDone ? "#22c55e" : "rgba(249,115,22,0.5)" }}>
-              {Math.min(currentStep + 1, steps.length)}/{steps.length}
-            </span>
-          </div>
-
-          {/* Scanlines overlay */}
-          <div className="absolute inset-0 pointer-events-none opacity-[0.02]" style={{
-            backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.15) 2px, rgba(255,255,255,0.15) 3px)",
-          }} />
+        {/* ── Main content area ── */}
+        <div className="relative z-10 flex-1 flex flex-col justify-center items-center px-6 py-6 overflow-hidden">
 
           {/* Final burst particles */}
           {showFinalBurst && (
-            <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
               {particles.current.map((p, i) => {
                 const rad = (p.angle * Math.PI) / 180;
                 return (
@@ -331,10 +318,9 @@ export default function PillGenerationView({
                     className="absolute rounded-full"
                     style={{
                       width: p.size, height: p.size,
-                      left: "50%", top: "50%",
                       background: "#22c55e",
-                      boxShadow: "0 0 6px rgba(34,197,94,0.6)",
-                      animation: `particleBurst 1s ease-out ${p.delay}s forwards`,
+                      boxShadow: "0 0 8px rgba(34,197,94,0.7)",
+                      animation: `particleBurst 1.2s ease-out ${p.delay}s forwards`,
                       ["--tx" as string]: `${Math.cos(rad) * p.distance}px`,
                       ["--ty" as string]: `${Math.sin(rad) * p.distance}px`,
                     }}
@@ -344,182 +330,280 @@ export default function PillGenerationView({
             </div>
           )}
 
-          {/* Console content area */}
-          <div className="flex-1 flex flex-col justify-center px-5 py-3 relative overflow-hidden">
-
-            {allDone ? (
-              /* ── Final success state ── */
-              <div className="flex flex-col items-center gap-3" style={{ animation: "scaleIn 0.5s cubic-bezier(0.16,1,0.3,1)" }}>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)", border: "2px solid rgba(34,197,94,0.3)" }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6" style={{ strokeDasharray: 30, strokeDashoffset: 30, animation: "drawCheck 0.5s ease-out 0.3s forwards" }}>
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                </div>
-                <p className="text-green-400 font-black text-sm">
-                  {status === "publishing" ? "Publication..." : "Article prêt"}
-                </p>
-                <p className="text-gray-600 text-[10px]">
-                  {status === "publishing" ? "Envoi vers votre CMS" : "Tous les agents ont terminé"}
-                </p>
+          {allDone ? (
+            /* ── Success ── */
+            <div className="flex flex-col items-center gap-4" style={{ animation: "successReveal 0.8s cubic-bezier(0.16,1,0.3,1)" }}>
+              <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{
+                background: "rgba(34,197,94,0.1)",
+                border: "2px solid rgba(34,197,94,0.3)",
+                boxShadow: "0 0 40px rgba(34,197,94,0.15)",
+              }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10" style={{
+                  strokeDasharray: 30, strokeDashoffset: 30,
+                  animation: "drawCheck 0.6s ease-out 0.4s forwards",
+                }}>
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
               </div>
-            ) : (
-              /* ── Active generation — animated phases ── */
-              <div className="flex flex-col w-full h-full relative">
+              <p className="text-green-400 font-black text-lg">
+                {status === "publishing" ? "Publication en cours..." : "Article prêt"}
+              </p>
+              <p className="text-gray-600 text-sm">
+                {status === "publishing" ? "Envoi vers votre CMS" : "Tous les agents ont terminé"}
+              </p>
+            </div>
+          ) : (
+            /* ── Active generation ── */
+            <div className="w-full max-w-lg flex flex-col items-center relative" style={{ minHeight: 240 }}>
 
-                {/* Phase 1: Big step number — zoom in + glow */}
-                {consolePhase === "number" && (
-                  <div className="absolute inset-0 flex items-center justify-center" key={`num-${clampedStep}`} style={{ animation: "numberZoomIn 0.6s cubic-bezier(0.16,1,0.3,1)" }}>
-                    <span className="font-black tabular-nums" style={{ fontSize: 56, color: "#f97316", textShadow: "0 0 40px rgba(249,115,22,0.4), 0 0 80px rgba(249,115,22,0.15)", lineHeight: 1 }}>
+              {/* Phase 1: Number */}
+              {consolePhase === "number" && (
+                <div
+                  className="absolute inset-0 flex items-center justify-center"
+                  key={`num-${clampedStep}`}
+                  style={{ animation: "numberExplode 0.7s cubic-bezier(0.16,1,0.3,1)" }}
+                >
+                  {/* Ripple rings behind number */}
+                  <div className="absolute w-32 h-32 rounded-full" style={{
+                    border: "1px solid rgba(249,115,22,0.2)",
+                    animation: "rippleOut 0.8s ease-out forwards",
+                  }} />
+                  <div className="absolute w-32 h-32 rounded-full" style={{
+                    border: "1px solid rgba(249,115,22,0.15)",
+                    animation: "rippleOut 0.8s ease-out 0.15s forwards",
+                  }} />
+                  <div className="absolute w-32 h-32 rounded-full" style={{
+                    border: "1px solid rgba(249,115,22,0.1)",
+                    animation: "rippleOut 0.8s ease-out 0.3s forwards",
+                  }} />
+                  <div className="flex items-baseline">
+                    <span className="font-black tabular-nums" style={{
+                      fontSize: 80,
+                      color: "#f97316",
+                      textShadow: "0 0 60px rgba(249,115,22,0.5), 0 0 120px rgba(249,115,22,0.2)",
+                      lineHeight: 1,
+                    }}>
                       {currentStep + 1}
                     </span>
-                    <span className="font-bold text-gray-700 ml-1" style={{ fontSize: 28 }}>/{steps.length}</span>
+                    <span className="font-bold text-gray-700 ml-1" style={{ fontSize: 36 }}>/{steps.length}</span>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Phase 2: Label — slides in from below replacing number */}
-                {consolePhase === "label" && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1" key={`label-${clampedStep}`} style={{ animation: "labelSlideIn 0.5s cubic-bezier(0.16,1,0.3,1)" }}>
-                    <p className="font-black text-white text-lg tracking-tight text-center leading-tight">
+              {/* Phase 2: Label */}
+              {consolePhase === "label" && (
+                <div
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-3"
+                  key={`label-${clampedStep}`}
+                  style={{ animation: "labelReveal 0.6s cubic-bezier(0.16,1,0.3,1)" }}
+                >
+                  {/* Decorative line */}
+                  <div className="w-12 h-px" style={{
+                    background: "linear-gradient(90deg, transparent, #f97316, transparent)",
+                    animation: "lineExpand 0.5s ease-out 0.1s both",
+                  }} />
+                  <h3 className="font-black text-white text-2xl tracking-tight text-center leading-tight max-w-sm">
+                    {steps[clampedStep]?.label}
+                  </h3>
+                  <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-orange-400/40">
+                    Étape {currentStep + 1} sur {steps.length}
+                  </p>
+                  {/* Decorative line */}
+                  <div className="w-12 h-px" style={{
+                    background: "linear-gradient(90deg, transparent, #f97316, transparent)",
+                    animation: "lineExpand 0.5s ease-out 0.2s both",
+                  }} />
+                </div>
+              )}
+
+              {/* Phase 3: Details terminal */}
+              {consolePhase === "details" && (
+                <div
+                  className="w-full flex flex-col"
+                  key={`details-${clampedStep}`}
+                  style={{ animation: "terminalSlideIn 0.5s cubic-bezier(0.16,1,0.3,1)" }}
+                >
+                  {/* Mini step label */}
+                  <div className="flex items-center gap-2.5 mb-4">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{
+                      background: "#f97316",
+                      boxShadow: "0 0 8px rgba(249,115,22,0.6)",
+                      animation: "dotPulse 2s ease-in-out infinite",
+                    }} />
+                    <span className="text-xs font-bold text-orange-400/80 uppercase tracking-wider">
                       {steps[clampedStep]?.label}
-                    </p>
-                    <p className="text-[10px] text-orange-400/50 font-mono uppercase tracking-widest">
-                      Étape {currentStep + 1}/{steps.length}
-                    </p>
+                    </span>
+                    <div className="flex-1 h-px" style={{ background: "linear-gradient(90deg, rgba(249,115,22,0.15), transparent)" }} />
+                    <span className="text-[10px] font-mono text-gray-700">
+                      {currentStep + 1}/{steps.length}
+                    </span>
                   </div>
-                )}
 
-                {/* Phase 3: Details terminal — typewriter stream */}
-                {consolePhase === "details" && (
-                  <div className="flex flex-col h-full justify-end gap-0" key={`details-${clampedStep}`} style={{ animation: "terminalFadeIn 0.4s ease-out" }}>
-                    {/* Step label — small, stays at top */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#f97316", boxShadow: "0 0 6px rgba(249,115,22,0.5)", animation: "glow 2s ease-in-out infinite" }} />
-                      <span className="text-[10px] font-bold text-orange-400/70 uppercase tracking-wider truncate">
-                        {steps[clampedStep]?.label}
-                      </span>
-                    </div>
-
-                    {/* Detail lines — scrolled to bottom */}
-                    <div className="flex flex-col gap-1 overflow-hidden flex-1 justify-end">
-                      {activeDetails.slice(0, Math.max(0, activeVisibleCount - 1)).map((d, j) => (
-                        <div key={j} className="flex items-start gap-2" style={{ animation: "lineSlideUp 0.3s ease-out" }}>
-                          <span className="flex-shrink-0 mt-0.5 text-[9px]" style={{ color: "rgba(34,197,94,0.5)" }}>✓</span>
-                          <span className="text-[10px] font-mono leading-relaxed text-gray-600 truncate">{d}</span>
+                  {/* Detail lines */}
+                  <div className="flex flex-col gap-2.5 pl-1">
+                    {activeDetails.slice(0, Math.max(0, activeVisibleCount - 1)).map((d, j) => (
+                      <div
+                        key={`${clampedStep}-${j}`}
+                        className="flex items-start gap-3"
+                        style={{ animation: `lineReveal 0.4s ease-out ${j * 0.05}s both` }}
+                      >
+                        <div className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5" style={{
+                          background: "rgba(34,197,94,0.1)",
+                          border: "1px solid rgba(34,197,94,0.2)",
+                        }}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
                         </div>
-                      ))}
+                        <span className="text-sm font-mono leading-relaxed text-gray-500">{d}</span>
+                      </div>
+                    ))}
 
-                      {/* Current line — typewriter with cursor */}
-                      {typedText && (
-                        <div className="flex items-start gap-2" style={{ animation: "lineSlideUp 0.3s ease-out" }}>
-                          <span className="flex-shrink-0 mt-0.5 text-[9px]" style={{ color: "#fb923c" }}>▸</span>
-                          <span className="text-[11px] font-mono leading-relaxed text-white/80">
-                            {typedText}
-                            <span
-                              className="inline-block w-[6px] h-[14px] ml-0.5 rounded-[1px]"
-                              style={{
-                                background: "linear-gradient(180deg, #f97316, #ef4444)",
-                                verticalAlign: "text-bottom",
-                                animation: "cursorBlink 1s step-end infinite",
-                                boxShadow: "0 0 8px rgba(249,115,22,0.6)",
-                              }}
-                            />
-                          </span>
+                    {/* Current line — typewriter */}
+                    {typedText && (
+                      <div
+                        className="flex items-start gap-3"
+                        style={{ animation: "lineReveal 0.3s ease-out" }}
+                      >
+                        <div className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5" style={{
+                          background: "rgba(249,115,22,0.1)",
+                          border: "1px solid rgba(249,115,22,0.3)",
+                          animation: "activeDotPulse 1.5s ease-in-out infinite",
+                        }}>
+                          <span className="text-[8px] font-black text-orange-400">▸</span>
                         </div>
-                      )}
-                    </div>
+                        <span className="text-sm font-mono leading-relaxed text-white/90">
+                          {typedText}
+                          <span
+                            className="inline-block w-[7px] h-[16px] ml-0.5 rounded-[1px]"
+                            style={{
+                              background: "linear-gradient(180deg, #f97316, #ef4444)",
+                              verticalAlign: "text-bottom",
+                              animation: "cursorBlink 1s step-end infinite",
+                              boxShadow: "0 0 10px rgba(249,115,22,0.7)",
+                            }}
+                          />
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Bottom bar — progress micro-bar */}
-          <div className="flex-shrink-0 px-4 pb-3 pt-1">
-            <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
-              <div
-                className="h-full rounded-full transition-all duration-1000 ease-out"
-                style={{
-                  width: `${pct}%`,
-                  background: allDone
-                    ? "linear-gradient(90deg, #22c55e, #16a34a)"
-                    : "linear-gradient(90deg, #f97316, #ef4444)",
-                  boxShadow: allDone ? "0 0 8px rgba(34,197,94,0.5)" : "0 0 8px rgba(249,115,22,0.5)",
-                }}
-              />
+                </div>
+              )}
             </div>
+          )}
+        </div>
+
+        {/* ── Bottom bar ── */}
+        <div className="relative z-10 flex items-center gap-3 px-5 py-3 flex-shrink-0" style={{ borderTop: `1px solid rgba(255,255,255,0.03)` }}>
+          {/* Status dot */}
+          <div className="w-2 h-2 rounded-full flex-shrink-0 transition-colors duration-500" style={{
+            background: allDone ? "#22c55e" : "#f97316",
+            boxShadow: `0 0 6px ${allDone ? "rgba(34,197,94,0.5)" : "rgba(249,115,22,0.5)"}`,
+            animation: "dotPulse 2s ease-in-out infinite",
+          }} />
+
+          {/* Status text */}
+          <span className="text-[10px] font-mono text-gray-600 flex-1">
+            {allDone
+              ? "Tous les agents ont terminé"
+              : status === "publishing"
+              ? "Publication en cours..."
+              : `Agent ${steps[clampedStep]?.id} en cours d'exécution...`
+            }
+          </span>
+
+          {/* Progress bar */}
+          <div className="w-32 h-1.5 rounded-full overflow-hidden flex-shrink-0" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <div
+              className="h-full rounded-full transition-all duration-1000 ease-out"
+              style={{
+                width: `${pct}%`,
+                background: allDone
+                  ? "linear-gradient(90deg, #22c55e, #16a34a)"
+                  : "linear-gradient(90deg, #f97316, #ef4444)",
+                boxShadow: allDone ? "0 0 8px rgba(34,197,94,0.5)" : "0 0 8px rgba(249,115,22,0.5)",
+              }}
+            />
           </div>
         </div>
       </div>
 
-      {/* Bottom progress pills */}
-      <div className="relative z-10 flex items-center gap-1.5 mt-4">
-        {steps.map((_, i) => {
-          const isCompleteGreen = allDone && greenIndex >= i;
-          return (
-            <div
-              key={i}
-              className="rounded-full transition-all duration-500"
-              style={{
-                width: i === clampedStep && !allDone ? 24 : 8,
-                height: 8,
-                borderRadius: 4,
-                background: isCompleteGreen ? "#22c55e" : i < currentStep ? "#f97316" : i === clampedStep && !allDone ? "linear-gradient(90deg, #f97316, #ef4444)" : "rgba(255,255,255,0.06)",
-                boxShadow: i === clampedStep && !allDone ? "0 0 8px rgba(249,115,22,0.5)" : isCompleteGreen ? "0 0 6px rgba(34,197,94,0.3)" : "none",
-              }}
-            />
-          );
-        })}
-      </div>
-
       {/* CSS Animations */}
       <style jsx>{`
-        @keyframes pillFill {
-          0% { clip-path: inset(0 100% 0 0); opacity: 1; }
-          50% { clip-path: inset(0 0 0 0); opacity: 1; }
-          100% { clip-path: inset(0 0 0 100%); opacity: 0; }
+        @keyframes pillSweep {
+          0% { clip-path: inset(0 100% 0 0); }
+          50% { clip-path: inset(0 0 0 0); }
+          100% { clip-path: inset(0 0 0 100%); }
         }
-        @keyframes greenFlash {
-          0% { opacity: 0.8; transform: scale(1); }
-          100% { opacity: 0; transform: scale(1.8); }
+        @keyframes pillFlash {
+          0% { opacity: 0.6; }
+          100% { opacity: 0; }
         }
-        @keyframes particleBurst {
-          0% { transform: translate(-50%, -50%) translate(0, 0) scale(1); opacity: 1; }
-          100% { transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        @keyframes numberExplode {
+          0% { opacity: 0; transform: scale(0.2) rotate(-10deg); filter: blur(12px); }
+          50% { opacity: 1; transform: scale(1.08) rotate(0deg); filter: blur(0); }
+          100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
         }
-        @keyframes drawCheck {
-          to { stroke-dashoffset: 0; }
+        @keyframes rippleOut {
+          0% { transform: scale(0.3); opacity: 1; }
+          100% { transform: scale(2.5); opacity: 0; }
+        }
+        @keyframes labelReveal {
+          0% { opacity: 0; transform: translateY(30px) scale(0.95); filter: blur(6px); }
+          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+        @keyframes lineExpand {
+          0% { width: 0; opacity: 0; }
+          100% { width: 48px; opacity: 1; }
+        }
+        @keyframes terminalSlideIn {
+          0% { opacity: 0; transform: translateY(16px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes lineReveal {
+          0% { opacity: 0; transform: translateX(-12px); }
+          100% { opacity: 1; transform: translateX(0); }
         }
         @keyframes cursorBlink {
           0%, 100% { opacity: 1; }
           50% { opacity: 0; }
         }
+        @keyframes dotPulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 6px currentColor; }
+          50% { opacity: 0.5; box-shadow: 0 0 12px currentColor; }
+        }
+        @keyframes activeDotPulse {
+          0%, 100% { box-shadow: 0 0 4px rgba(249,115,22,0.3); }
+          50% { box-shadow: 0 0 12px rgba(249,115,22,0.6); }
+        }
+        @keyframes trafficPulse {
+          0%, 100% { box-shadow: 0 0 6px currentColor; }
+          50% { box-shadow: 0 0 14px currentColor; }
+        }
+        @keyframes particleBurst {
+          0% { transform: translate(0, 0) scale(1); opacity: 1; }
+          100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+        @keyframes drawCheck {
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes successReveal {
+          0% { opacity: 0; transform: scale(0.7); filter: blur(8px); }
+          100% { opacity: 1; transform: scale(1); filter: blur(0); }
+        }
         @keyframes scaleIn {
           from { opacity: 0; transform: scale(0.8); }
           to { opacity: 1; transform: scale(1); }
         }
-        @keyframes ping {
-          75%, 100% { transform: scale(1.5); opacity: 0; }
+        @keyframes matrixFall {
+          0% { transform: translateY(-100%); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(calc(100vh)); opacity: 0; }
         }
-        @keyframes numberZoomIn {
-          0% { opacity: 0; transform: scale(0.3); filter: blur(8px); }
-          60% { opacity: 1; transform: scale(1.1); filter: blur(0); }
-          100% { opacity: 1; transform: scale(1); filter: blur(0); }
-        }
-        @keyframes labelSlideIn {
-          0% { opacity: 0; transform: translateY(20px); filter: blur(4px); }
-          100% { opacity: 1; transform: translateY(0); filter: blur(0); }
-        }
-        @keyframes terminalFadeIn {
-          0% { opacity: 0; transform: translateY(6px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes lineSlideUp {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes glow {
-          0%, 100% { box-shadow: 0 0 6px rgba(249,115,22,0.5); }
-          50% { box-shadow: 0 0 12px rgba(249,115,22,0.8); }
+        @keyframes greenFlash {
+          0% { opacity: 0.8; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.8); }
         }
       `}</style>
     </div>
