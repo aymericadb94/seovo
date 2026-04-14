@@ -27,7 +27,6 @@ type FormData = {
   target_customer: string;
   geography: "local" | "national" | "international" | "";
   geography_detail: string;
-  editorial_tone: "expert" | "accessible" | "humoristique" | "inspirant" | "professionnel" | "";
   strengths: string;
   differentiators: string;
   keywords: string;
@@ -380,7 +379,6 @@ export default function OnboardingPage() {
     custom_api_url: "", custom_api_key: "",
     objective: "", main_offer: "", target_customer: "",
     geography: "", geography_detail: "",
-    editorial_tone: "",
     strengths: "", differentiators: "",
     keywords: "", competitors: "", constraints: "",
     gsc_site_url: "",
@@ -503,7 +501,6 @@ export default function OnboardingPage() {
         form.main_offer.trim() &&
         form.target_customer.trim() &&
         form.geography &&
-        form.editorial_tone &&
         form.strengths.trim() &&
         form.keywords.trim()
       );
@@ -525,7 +522,6 @@ export default function OnboardingPage() {
       target_customer: form.target_customer,
       geography: form.geography,
       geography_detail: form.geography_detail,
-      editorial_tone: form.editorial_tone,
       strengths: form.strengths,
       differentiators: form.differentiators,
       competitors: form.competitors ? form.competitors.split(",").map(c => c.trim()).filter(Boolean) : [],
@@ -1101,37 +1097,6 @@ export default function OnboardingPage() {
                       className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition-all animate-[fadeInUp_0.2s_ease-out_both]"
                     />
                   )}
-                </div>
-
-                {/* ── Ton éditorial ── */}
-                <div>
-                  <SectionLabel>Ton éditorial</SectionLabel>
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      { val: "expert", label: "Expert", desc: "Précis, technique, autorité" },
-                      { val: "accessible", label: "Accessible", desc: "Clair, pédagogique, sans jargon" },
-                      { val: "inspirant", label: "Inspirant", desc: "Storytelling, émotionnel, vision" },
-                      { val: "professionnel", label: "Professionnel", desc: "Neutre, sérieux, B2B" },
-                      { val: "humoristique", label: "Décalé", desc: "Ton léger, proximité, créatif" },
-                    ] as const).map(({ val, label, desc }) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => update("editorial_tone", val)}
-                        title={desc}
-                        className={`relative px-4 py-2 rounded-xl border text-sm font-bold transition-all duration-200 overflow-hidden ${
-                          form.editorial_tone === val
-                            ? "bg-violet-500/15 border-violet-500/50 text-violet-300 shadow-[0_0_12px_rgba(139,92,246,0.15)]"
-                            : "bg-white/[0.03] border-white/[0.08] text-gray-400 hover:border-violet-500/30 hover:text-white"
-                        }`}
-                      >
-                        {form.editorial_tone === val && (
-                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[sweep_2.5s_ease-in-out_infinite]" />
-                        )}
-                        {label}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 {/* ── Mots-clés ── */}

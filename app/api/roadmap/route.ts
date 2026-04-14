@@ -234,7 +234,6 @@ INTENTION STRATÉGIQUE (onboarding) :
 - Offre prioritaire : ${seoCtx.main_offer ?? "non renseigné"}
 - Cible client : ${seoCtx.target_customer ?? "non renseigné"}
 - Zone géographique : ${seoCtx.geography ?? "national"}${seoCtx.geography_detail ? ` — ${seoCtx.geography_detail}` : ""}
-- Ton éditorial : ${seoCtx.editorial_tone ?? "professionnel"}
 - Concurrents : ${Array.isArray(seoCtx.competitors) ? (seoCtx.competitors as string[]).join(", ") || "non renseignés" : "non renseignés"}
 - Contraintes : ${seoCtx.constraints ?? "aucune"}
 ` : "";
