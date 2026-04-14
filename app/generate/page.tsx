@@ -611,7 +611,7 @@ export default function GeneratePage() {
               {smartKeywords.length > 0 && (
                 <div className="flex flex-col gap-2 mb-4">
                   {smartKeywords.slice(0, 5).map((kw, i) => {
-                    const badge = SOURCE_BADGES[kw.source];
+                    const badge = SOURCE_BADGES[kw.source] ?? { label: kw.source ?? "—", color: "#6b7280", bg: "rgba(107,114,128,0.12)" };
                     const isSelected = keyword === kw.keyword && !customKeyword.trim();
                     const bars = scoreBars(kw.score);
                     const sColor = scoreColor(kw.score);
@@ -724,7 +724,7 @@ export default function GeneratePage() {
                         {smartKeywords.slice(5)
                           .filter(k => kwFilter === "all" || k.source === kwFilter)
                           .map((kw) => {
-                            const badge = SOURCE_BADGES[kw.source];
+                            const badge = SOURCE_BADGES[kw.source] ?? { label: kw.source ?? "—", color: "#6b7280", bg: "rgba(107,114,128,0.12)" };
                             const isSelected = keyword === kw.keyword && !customKeyword.trim();
                             return (
                               <button
