@@ -113,7 +113,7 @@ type FilterMode = "all" | "cluster" | "important" | "weak" | "opportunities";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function LinkingGraph() {
+export default function LinkingGraph({ onAnalysisComplete }: { onAnalysisComplete?: () => void } = {}) {
   const [data, setData] = useState<LinkingData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,8 +192,10 @@ export default function LinkingGraph() {
       const json = await res.json();
       if (json.result?.data) {
         setData(json.result.data as LinkingData);
+        onAnalysisComplete?.();
       } else if (json.result) {
         setData(json.result as LinkingData);
+        onAnalysisComplete?.();
       }
     } catch {
       setError("Impossible de charger les données de maillage");
@@ -212,6 +214,7 @@ export default function LinkingGraph() {
         setError(json.error);
       } else if (json.result) {
         setData(json.result as LinkingData);
+        onAnalysisComplete?.();
       }
     } catch {
       setError("Erreur lors de l'analyse");

@@ -253,10 +253,12 @@ export default function Dashboard() {
   const [projectionsLoading, setProjectionsLoading] = useState(false);
 
   // ── Tutorial helpers ───────────────────────────────────────────────────────
+  // Steps: 0=Score, 1=Cocon, 2=Roadmap, 3=Potentiel, 4=Maillage, 5=FIN
   function advanceTutorial(step: number) {
     setTutorialStep(step);
     localStorage.setItem("rankpill_onboarding", String(step));
-    if (step === 4) setShowCompletionPopup(true);
+    if (step === 4) setActiveTab("linking");
+    if (step === 5) setShowCompletionPopup(true);
   }
 
   // ── Data loaders ───────────────────────────────────────────────────────────
@@ -277,8 +279,7 @@ export default function Dashboard() {
         setProjections(json.projections);
         setTutorialStep(prev => {
           if (prev === 3) {
-            localStorage.setItem("rankpill_onboarding", "4");
-            setShowCompletionPopup(true);
+            advanceTutorial(4); // → onglet Maillage
             return 4;
           }
           return prev;
@@ -405,7 +406,7 @@ export default function Dashboard() {
     // Si tutorialStep a déjà été défini (ex: par le modal close → 0), ne pas écraser
     if (tutorialStep !== null) return;
     const saved = localStorage.getItem("rankpill_onboarding");
-    const step = saved !== null ? Math.min(parseInt(saved, 10), 4) : 4;
+    const step = saved !== null ? Math.min(parseInt(saved, 10), 5) : 5;
     setTutorialStep(step);
     setScoreBubbleStep(0);
   }, [data?.site?.seo_analysis_done, tutorialStep]);
@@ -652,17 +653,17 @@ export default function Dashboard() {
                 </span>
               </p>
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
-                Votre tableau de bord est maintenant opérationnel.<br />
-                Continuez d&apos;explorer tous les outils, et publiez votre première page dès maintenant !
+                Cocon sémantique, roadmap, potentiel SEO et maillage interne sont configurés.<br />
+                Votre site est prêt — publiez votre première page dès maintenant !
               </p>
 
               <button
-                onClick={() => setShowCompletionPopup(false)}
+                onClick={() => { setShowCompletionPopup(false); setActiveTab("overview"); }}
                 className="relative w-full overflow-hidden py-4 rounded-xl font-black text-white text-sm uppercase tracking-wide transition-all group"
                 style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", boxShadow: "0 8px 32px rgba(249,115,22,0.35)" }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-700" />
-                <span className="relative">Explorer mon dashboard →</span>
+                <span className="relative">Générer ma première page →</span>
               </button>
             </div>
           </div>
@@ -777,7 +778,7 @@ export default function Dashboard() {
         <div className="border-t border-white/[0.04]">
           <div className="max-w-screen-xl mx-auto px-6 flex items-center gap-1 py-0">
             {(["overview", "performance", "linking", "publications", "keywords", "calendar"] as const).map((tab) => {
-              const isLocked = (tutorialStep ?? 0) < 4 && tab !== "overview";
+              const isLocked = (tutorialStep ?? 0) < 5 && tab !== "overview" && !(tab === "linking" && (tutorialStep ?? 0) >= 4);
               const labels: Record<string, string> = { overview: "Vue d'ensemble", performance: "Performance", linking: "Maillage", publications: "Publications", keywords: "Mots-clés", calendar: "Calendrier" };
               return (
                 <button
@@ -802,7 +803,7 @@ export default function Dashboard() {
       <div className="max-w-screen-xl mx-auto px-6 py-8">
 
         {/* Bandeau GSC non connecté */}
-        {!loading && data?.site && !data.site.gsc_connected && (tutorialStep ?? 0) >= 4 && (
+        {!loading && data?.site && !data.site.gsc_connected && (tutorialStep ?? 0) >= 5 && (
           <div className="mb-6 flex items-center justify-between gap-4 bg-[#0d0d0d] border border-white/[0.08] rounded-2xl px-5 py-4 animate-fade-in">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center flex-shrink-0">
@@ -1148,7 +1149,7 @@ export default function Dashboard() {
                       <div className="relative mb-5 p-4 rounded-xl animate-[modalPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_0.2s_both]" style={{ background: "rgba(249,115,22,0.07)", border: "1px solid rgba(249,115,22,0.32)" }}>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-orange-400 text-xs font-black uppercase tracking-wider">🕸️ Cocon Sémantique</span>
-                          <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 2 / 4</span>
+                          <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 2 / 5</span>
                         </div>
                         <p className="text-white/70 text-xs leading-relaxed mb-3">
                           Nous structurons votre SEO en <span className="text-white font-bold">cocon sémantique intelligent</span>. Les clusters, pages piliers et le maillage interne sont générés automatiquement à partir de vos données.
@@ -1450,7 +1451,7 @@ export default function Dashboard() {
                             <div className="mb-5 p-4 rounded-xl animate-[modalPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_0.2s_both]" style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.32)" }}>
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-violet-400 text-xs font-black uppercase tracking-wider">🗺️ Roadmap SEO</span>
-                                <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 3 / 4</span>
+                                <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 3 / 5</span>
                               </div>
                               <p className="text-white/70 text-xs leading-relaxed mb-3">
                                 Générez votre plan éditorial sur <span className="text-white font-bold">20 articles</span>, structurés selon votre cocon sémantique. RankPill les publiera automatiquement.
@@ -1688,7 +1689,7 @@ export default function Dashboard() {
                               <div className="mb-5 p-4 rounded-xl animate-[modalPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_0.2s_both]" style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.32)" }}>
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="text-green-400 text-xs font-black uppercase tracking-wider">📊 Potentiel SEO</span>
-                                  <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 4 / 4</span>
+                                  <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 4 / 5</span>
                                 </div>
                                 <p className="text-white/70 text-xs leading-relaxed mb-3">
                                   Voici où vous pouvez <span className="text-white font-bold">gagner du trafic rapidement</span>. Calculez les opportunités détectées dans votre cocon sémantique et votre roadmap.
@@ -1699,7 +1700,7 @@ export default function Dashboard() {
                                     className="w-full py-2.5 rounded-lg text-xs font-black text-white transition-all hover:opacity-90"
                                     style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", boxShadow: "0 4px 20px rgba(34,197,94,0.3)" }}
                                   >
-                                    Accéder au dashboard complet →
+                                    Analyser mon maillage interne →
                                   </button>
                                 ) : (
                                   <div className="flex items-center gap-2 text-green-400/70 text-xs">
@@ -2097,7 +2098,25 @@ export default function Dashboard() {
             ════════════════════════════════════════════════════════════ */}
             {activeTab === "linking" && (
               <div className="animate-fade-in-up">
-                <LinkingGraph />
+                {/* ── Bulle tutoriel maillage (étape 4) ── */}
+                {tutorialStep === 4 && (
+                  <div className="mb-6 p-5 rounded-xl animate-[modalPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_0.2s_both]" style={{ background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.32)" }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-purple-400 text-xs font-black uppercase tracking-wider">🔗 Maillage interne</span>
+                      <span className="text-gray-600 text-[10px] font-bold uppercase tracking-wide">Étape 5 / 5</span>
+                    </div>
+                    <p className="text-white/70 text-xs leading-relaxed mb-3">
+                      Dernière étape ! Analysez votre <span className="text-white font-bold">maillage interne</span> pour que vos futurs articles soient automatiquement liés entre eux. Cette analyse est <span className="text-white font-bold">indispensable avant de générer votre premier article</span>.
+                    </p>
+                    <div className="flex items-center gap-2 text-purple-400/70 text-xs">
+                      <span className="text-base animate-bounce">↓</span>
+                      <span>Lancez l&apos;analyse ci-dessous pour terminer la configuration</span>
+                    </div>
+                  </div>
+                )}
+                <LinkingGraph onAnalysisComplete={() => {
+                  if ((tutorialStep ?? 0) === 4) advanceTutorial(5);
+                }} />
               </div>
             )}
 
