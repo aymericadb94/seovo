@@ -367,10 +367,13 @@ export default function GeneratePage() {
         }
       }
     } catch (streamErr) {
-      // If it's a real error from the pipeline, rethrow
-      if (streamErr instanceof Error && streamErr.message !== "Failed to fetch") {
+      // Network-level errors → fall through to non-streaming fallback
+      const msg = streamErr instanceof Error ? streamErr.message.toLowerCase() : "";
+      const isNetworkError = msg.includes("fetch") || msg.includes("network") || msg.includes("aborted") || msg.includes("timeout");
+      if (!isNetworkError) {
         throw streamErr;
       }
+      console.warn("[generate] SSE stream failed with network error, trying fallback:", msg);
     }
 
     // Fallback: non-streaming call only if stream returned nothing at all
