@@ -307,7 +307,7 @@ function wixHeaders(apiKey: string, siteId: string) {
 
 // ─── Image cover via Pexels ───────────────────────────────────────────────────
 
-import { fetchPexelsImage } from "@/lib/pexels";
+import { generateImage } from "@/lib/image-gen";
 
 async function importImageToWix(
   apiKey: string,
@@ -428,11 +428,11 @@ export async function publishToWix(
   // Image de couverture (optionnelle)
   let mediaData: Record<string, unknown> | undefined;
   if (imageQuery) {
-    console.log(`[wix/cover] recherche Pexels: "${imageQuery}"`);
-    const pexelsImg = await fetchPexelsImage(imageQuery);
-    if (pexelsImg) {
+    console.log(`[wix/cover] génération DALL-E: "${imageQuery}"`);
+    const genImg = await generateImage(imageQuery);
+    if (genImg) {
       console.log("[wix/cover] import vers Wix Media...");
-      const wixImg = await importImageToWix(apiKey, siteId, pexelsImg.url, imageAlt || title);
+      const wixImg = await importImageToWix(apiKey, siteId, genImg.url, imageAlt || title);
       if (wixImg) {
         console.log(`[wix/cover] image importée: id=${wixImg.id}, url=${wixImg.url}`);
         // Wix Blog v3 expects media.wixMedia.image as an object { id, url, height, width }

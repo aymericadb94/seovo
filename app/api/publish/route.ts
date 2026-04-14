@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { publishToWix } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
-import { fetchPexelsImage, fetchPexelsImages, injectImagesIntoHtml } from "@/lib/pexels";
+import { generateImage, generateImages } from "@/lib/image-gen";
+import { injectImagesIntoHtml } from "@/lib/pexels";
 import { shopifyFetch } from "@/lib/shopify";
 import { addRetroactiveLinks } from "@/lib/internal-linking-engine";
 import { emitEvent, createPublicationEvent, createMilestoneEvent } from "@/lib/seo-events";
@@ -132,14 +133,14 @@ export async function POST(request: Request) {
     const imgQueries = (section_image_queries as string[]) ?? [];
     if (imgQueries.length > 0) {
       try {
-        const images = await fetchPexelsImages(imgQueries, 3);
+        const images = await generateImages(imgQueries, 3);
         const imgArray = [...images.values()].map(img => ({ url: img.url, alt: img.alt }));
         if (imgArray.length > 0) {
           content = injectImagesIntoHtml(content, imgArray, 3);
-          console.log(`[publish] ${imgArray.length} inline images injected`);
+          console.log(`[publish] ${imgArray.length} inline images DALL-E injected`);
         }
       } catch (err) {
-        console.error("[publish] inline image injection failed (non-fatal):", err);
+        console.error("[publish] inline image generation failed (non-fatal):", err);
       }
     }
 
@@ -158,13 +159,13 @@ export async function POST(request: Request) {
     let url = "";
     let coverImageUrl: string | null = null;
 
-    // Fetch cover image from Pexels (shared across all CMS)
+    // Générer la cover image via DALL-E
     if (cover_image_query) {
       try {
-        const pexelsImg = await fetchPexelsImage(cover_image_query);
-        if (pexelsImg) coverImageUrl = pexelsImg.url;
+        const genImg = await generateImage(cover_image_query);
+        if (genImg) coverImageUrl = genImg.url;
       } catch (imgErr) {
-        console.error("[publish] cover image fetch failed (non-fatal):", imgErr);
+        console.error("[publish] cover image generation failed (non-fatal):", imgErr);
       }
     }
 

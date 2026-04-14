@@ -2,7 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { sendArticlePublishedEmail } from "@/lib/email";
 import { publishToWix } from "@/lib/wix";
 import { publishToCustomApi } from "@/lib/custom";
-import { fetchPexelsImage, fetchPexelsImages, injectImagesIntoHtml } from "@/lib/pexels";
+import { generateImage, generateImages } from "@/lib/image-gen";
+import { injectImagesIntoHtml } from "@/lib/pexels";
 import { emitEvent, createPublicationEvent, createMilestoneEvent } from "@/lib/seo-events";
 import { recordAction } from "@/lib/seo-feedback";
 import { shopifyFetch } from "@/lib/shopify";
@@ -305,29 +306,29 @@ export async function GET(request: Request) {
             const cover_alt_text = pipeline.content.cover_alt_text;
             let content = generatedHtml;
 
-            // ── Injection d'images inline via Pexels ──
+            // ── Injection d'images inline via DALL-E ──
             const sectionImgQueries = pipeline.content.section_image_queries ?? [];
             if (sectionImgQueries.length > 0) {
               try {
-                const images = await fetchPexelsImages(sectionImgQueries, 3);
+                const images = await generateImages(sectionImgQueries, 3);
                 const imgArray = [...images.values()].map(img => ({ url: img.url, alt: img.alt }));
                 if (imgArray.length > 0) {
                   content = injectImagesIntoHtml(content, imgArray, 3);
-                  logger.info(`[cron] ${imgArray.length} inline images injected into "${title}"`);
+                  logger.info(`[cron] ${imgArray.length} inline images DALL-E injected into "${title}"`);
                 }
               } catch (imgErr) {
-                logger.warn("Inline image injection failed (non-fatal)", { context: "cron/publish", error: imgErr });
+                logger.warn("Inline image generation failed (non-fatal)", { context: "cron/publish", error: imgErr });
               }
             }
 
             let publishedUrl = "";
             let coverImageUrl: string | null = null;
 
-            // Fetch cover image from Pexels (shared across all CMS)
+            // Générer la cover image via DALL-E
             if (cover_image_query) {
               try {
-                const pexelsImg = await fetchPexelsImage(cover_image_query);
-                if (pexelsImg) coverImageUrl = pexelsImg.url;
+                const genImg = await generateImage(cover_image_query);
+                if (genImg) coverImageUrl = genImg.url;
               } catch { /* non-fatal */ }
             }
 
