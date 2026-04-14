@@ -292,23 +292,30 @@ export default function GeneratePage() {
     let streamMaxStep = -1;
 
     try {
-      const genRes = await fetch("/api/generate?stream=1", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          keyword: activeKeyword,
-          businessName: site?.business_name ?? "",
-          industry: site?.industry ?? "",
-          language,
-        }),
-      });
+      let genRes: Response;
+      try {
+        genRes = await fetch("/api/generate?stream=1", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            keyword: activeKeyword,
+            businessName: site?.business_name ?? "",
+            industry: site?.industry ?? "",
+            language,
+          }),
+        });
+      } catch (fetchErr) {
+        console.error("[generate] SSE fetch failed:", fetchErr);
+        // Network-level failure — skip to non-streaming fallback
+        genRes = null as unknown as Response;
+      }
 
-      if (!genRes.ok) {
+      if (genRes && !genRes.ok) {
         const data = await genRes.json();
         throw new Error(data.error || "Erreur lors de la génération");
       }
 
-      const reader = genRes.body?.getReader();
+      const reader = genRes?.body?.getReader();
       const decoder = new TextDecoder();
 
       if (reader) {
