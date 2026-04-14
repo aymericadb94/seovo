@@ -5,6 +5,7 @@ import { generateImage } from "@/lib/image-gen";
 import { injectImagesIntoHtml } from "@/lib/pexels";
 import { shopifyFetch } from "@/lib/shopify";
 import { addRetroactiveLinks } from "@/lib/internal-linking-engine";
+import { notifyGoogleAfterPublish } from "@/lib/gsc-indexing";
 import { emitEvent, createPublicationEvent, createMilestoneEvent } from "@/lib/seo-events";
 import { recordAction } from "@/lib/seo-feedback";
 import { sendArticlePublishedEmail } from "@/lib/email";
@@ -277,6 +278,13 @@ export async function POST(request: Request) {
       if (milestoneEvent) await emitEvent(supabase, user.id, milestoneEvent);
     } catch (err) {
       logger.warn("SEO event recording failed", { context: "publish", userId: user.id, error: err });
+    }
+
+    // ── Notification Google (soumission sitemap) ──
+    try {
+      await notifyGoogleAfterPublish(supabase, user.id, url);
+    } catch (err) {
+      logger.warn("Google sitemap notification failed", { context: "publish", userId: user.id, error: err });
     }
 
     // ── Email notification ──

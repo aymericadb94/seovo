@@ -9,6 +9,7 @@ import { recordAction } from "@/lib/seo-feedback";
 import { shopifyFetch } from "@/lib/shopify";
 import { logger } from "@/lib/logger";
 import { addRetroactiveLinks } from "@/lib/internal-linking-engine";
+import { notifyGoogleAfterPublish, autoCheckRecentIndexation } from "@/lib/gsc-indexing";
 import type { CmsCredentials } from "@/lib/cms-update";
 import { runGenerationPipeline } from "@/lib/generation-pipeline";
 
@@ -450,6 +451,15 @@ export async function GET(request: Request) {
               logger.warn("SEO event recording failed", { context: "cron/publish", userId: site.user_id, error: err });
             }
 
+            // ── Notification Google (soumission sitemap) ──
+            if (publishedUrl) {
+              try {
+                await notifyGoogleAfterPublish(supabase, site.user_id, publishedUrl);
+              } catch (err) {
+                logger.warn("Google sitemap notification failed", { context: "cron/publish", userId: site.user_id, error: err });
+              }
+            }
+
             // Email
             try {
               const { data: userData } = await supabase.auth.admin.getUserById(site.user_id);
@@ -464,6 +474,16 @@ export async function GET(request: Request) {
             results.push({ site: site.site_url, cms: site.cms, status: "ok", title, url: publishedUrl, keyword });
             await new Promise((r) => setTimeout(r, 1000));
           }
+        }
+
+        // ── Auto-check indexation des publications récentes ──
+        try {
+          const idxCheck = await autoCheckRecentIndexation(supabase, site.user_id);
+          if (idxCheck.checked > 0) {
+            logger.info(`[cron] Indexation check for ${site.site_url}: ${idxCheck.checked} checked, ${idxCheck.newly_indexed} newly indexed`);
+          }
+        } catch (err) {
+          logger.warn("Auto indexation check failed", { context: "cron/publish", userId: site.user_id, error: err });
         }
 
       } catch (err: unknown) {

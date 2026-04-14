@@ -81,8 +81,10 @@ export default function Dashboard() {
   const [showOptimizeConfirm, setShowOptimizeConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "performance" | "linking" | "publications" | "keywords" | "calendar">("overview");
   const [showSeoModal, setShowSeoModal] = useState<boolean | null>(null);
-  const [indexationResults, setIndexationResults] = useState<Record<string, { indexed: boolean | null; verdict: string; coverage: string }>>({});
+  const [indexationResults, setIndexationResults] = useState<Record<string, { indexed: boolean | null; verdict: string; coverage: string; last_crawl?: string | null; crawled_as?: string | null; robots_txt_state?: string | null }>>({});
   const [indexationLoading, setIndexationLoading] = useState(false);
+  const [sitemapLoading, setSitemapLoading] = useState(false);
+  const [sitemapResult, setSitemapResult] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [pubFilter, setPubFilter] = useState<"all" | "articles" | "pages" | "indexed" | "not_indexed">("all");
@@ -517,12 +519,30 @@ export default function Dashboard() {
       });
       const json = await res.json();
       if (json.results) {
-        const map: Record<string, { indexed: boolean | null; verdict: string; coverage: string }> = {};
+        const map: Record<string, { indexed: boolean | null; verdict: string; coverage: string; last_crawl?: string | null; crawled_as?: string | null; robots_txt_state?: string | null }> = {};
         for (const r of json.results) map[r.url] = r;
         setIndexationResults(map);
       }
     } catch { /* silently fail */ }
     setIndexationLoading(false);
+  }
+
+  async function submitSitemap() {
+    setSitemapLoading(true);
+    setSitemapResult(null);
+    try {
+      const res = await fetch("/api/gsc/sitemap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const json = await res.json();
+      if (json.success) {
+        setSitemapResult("Sitemap soumis a Google");
+      } else {
+        setSitemapResult(json.error || "Echec de la soumission");
+      }
+    } catch {
+      setSitemapResult("Erreur reseau");
+    }
+    setSitemapLoading(false);
+    setTimeout(() => setSitemapResult(null), 5000);
   }
 
   const kpis = data?.kpis;
@@ -2206,17 +2226,23 @@ export default function Dashboard() {
                       {syncResult && <span className="text-xs text-blue-400">{syncResult}</span>}
                       {cleanupResult && <span className={`text-xs ${cleanupResult.startsWith("Erreur") ? "text-red-400" : "text-green-400"}`}>{cleanupResult}</span>}
                       {data.site?.gsc_connected && data.site?.gsc_site_url && (
-                        <div className="relative group/tip">
-                          <button onClick={checkIndexation} disabled={indexationLoading} className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 transition-all disabled:opacity-40">
-                            {indexationLoading ? (<><span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" /> Vérification...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Vérifier l&apos;indexation</>)}
+                        <>
+                          <button onClick={submitSitemap} disabled={sitemapLoading} className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-green-500/40 text-gray-400 hover:text-green-400 transition-all disabled:opacity-40">
+                            {sitemapLoading ? (<><span className="w-3 h-3 rounded-full border-2 border-green-400 border-t-transparent animate-spin" /> Soumission...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Soumettre le sitemap</>)}
                           </button>
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 px-4 py-3 bg-gray-900 border border-white/10 rounded-xl shadow-2xl opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity duration-200 z-50">
-                            <p className="text-white text-xs font-bold mb-1">Qu&apos;est-ce que l&apos;indexation ?</p>
-                            <p className="text-gray-400 text-[11px] leading-relaxed">L&apos;indexation, c&apos;est quand Google ajoute votre page dans sa base de donn&eacute;es. Une page index&eacute;e peut appara&icirc;tre dans les r&eacute;sultats de recherche. Une page non index&eacute;e est invisible sur Google.</p>
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-gray-900 border-r border-b border-white/10 rotate-45 -mt-[5px]" />
+                          <div className="relative group/tip">
+                            <button onClick={checkIndexation} disabled={indexationLoading} className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 transition-all disabled:opacity-40">
+                              {indexationLoading ? (<><span className="w-3 h-3 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" /> Verification...</>) : (<><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Verifier l&apos;indexation</>)}
+                            </button>
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 px-4 py-3 bg-gray-900 border border-white/10 rounded-xl shadow-2xl opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity duration-200 z-50">
+                              <p className="text-white text-xs font-bold mb-1">Qu&apos;est-ce que l&apos;indexation ?</p>
+                              <p className="text-gray-400 text-[11px] leading-relaxed">L&apos;indexation, c&apos;est quand Google ajoute votre page dans sa base de donnees. Une page indexee peut apparaitre dans les resultats de recherche. Une page non indexee est invisible sur Google.</p>
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-gray-900 border-r border-b border-white/10 rotate-45 -mt-[5px]" />
+                            </div>
                           </div>
-                        </div>
+                        </>
                       )}
+                      {sitemapResult && <span className={`text-xs ${sitemapResult.includes("Echec") || sitemapResult.includes("Erreur") ? "text-red-400" : "text-green-400"}`}>{sitemapResult}</span>}
                       <Link href="/generate" className="group relative overflow-hidden flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 hover:border-orange-500/50 text-orange-400 hover:text-orange-300 transition-all">
                         <span className="absolute inset-0 animate-[sweep_3s_ease-in-out_infinite]" style={{ background: "linear-gradient(90deg, transparent, rgba(249,115,22,0.15), transparent)" }} />
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 relative"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -2224,6 +2250,76 @@ export default function Dashboard() {
                       </Link>
                     </div>
                   </div>
+
+                  {/* Panneau Stats Indexation */}
+                  {Object.keys(indexationResults).length > 0 && (() => {
+                    const allResults = Object.values(indexationResults);
+                    const totalChecked = allResults.length;
+                    const indexed = allResults.filter(r => r.indexed === true).length;
+                    const notIndexed = allResults.filter(r => r.indexed === false).length;
+                    const unknown = allResults.filter(r => r.indexed === null).length;
+                    const pct = totalChecked > 0 ? Math.round((indexed / totalChecked) * 100) : 0;
+
+                    // Delai moyen d'indexation (pages avec last_crawl et published_at)
+                    const crawlDelays: number[] = [];
+                    for (const pub of cmsPages) {
+                      const idx = pub.url ? indexationResults[pub.url] : null;
+                      if (idx?.indexed && idx.last_crawl && pub.published_at) {
+                        const pubDate = new Date(pub.published_at).getTime();
+                        const crawlDate = new Date(idx.last_crawl).getTime();
+                        if (crawlDate > pubDate) {
+                          crawlDelays.push(Math.round((crawlDate - pubDate) / (1000 * 60 * 60)));
+                        }
+                      }
+                    }
+                    const avgDelay = crawlDelays.length > 0 ? Math.round(crawlDelays.reduce((a, b) => a + b, 0) / crawlDelays.length) : null;
+
+                    return (
+                      <div className="px-6 py-4 border-b border-white/[0.06] bg-white/[0.01]">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                          {/* Taux d'indexation */}
+                          <div className="text-center">
+                            <div className="relative w-14 h-14 mx-auto mb-2">
+                              <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+                                <circle cx="18" cy="18" r="15.9" fill="none" stroke={pct >= 80 ? "#22c55e" : pct >= 50 ? "#f59e0b" : "#ef4444"} strokeWidth="3" strokeDasharray={`${pct} ${100 - pct}`} strokeLinecap="round" />
+                              </svg>
+                              <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-black">{pct}%</span>
+                            </div>
+                            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Taux d&apos;indexation</p>
+                          </div>
+                          {/* Indexees */}
+                          <div className="text-center">
+                            <p className="text-2xl font-black text-green-400 mb-1">{indexed}</p>
+                            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Indexees</p>
+                            {totalChecked > 0 && <p className="text-gray-600 text-[9px] mt-0.5">sur {totalChecked} verifiees</p>}
+                          </div>
+                          {/* Non indexees */}
+                          <div className="text-center">
+                            <p className="text-2xl font-black text-red-400 mb-1">{notIndexed}</p>
+                            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Non indexees</p>
+                            {unknown > 0 && <p className="text-gray-600 text-[9px] mt-0.5">{unknown} en attente</p>}
+                          </div>
+                          {/* Delai moyen */}
+                          <div className="text-center">
+                            <p className="text-2xl font-black text-blue-400 mb-1">{avgDelay !== null ? (avgDelay < 24 ? `${avgDelay}h` : `${Math.round(avgDelay / 24)}j`) : "—"}</p>
+                            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Delai moyen</p>
+                            <p className="text-gray-600 text-[9px] mt-0.5">{avgDelay !== null ? "publication → crawl" : "pas encore de donnees"}</p>
+                          </div>
+                        </div>
+                        {/* Alertes */}
+                        {notIndexed > 0 && (
+                          <div className="mt-3 flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <p className="text-red-400/80 text-[11px] leading-relaxed">
+                              <strong>{notIndexed} page{notIndexed > 1 ? "s" : ""} non indexee{notIndexed > 1 ? "s" : ""}</strong> — Google ne les affiche pas dans ses resultats.
+                              {data?.site?.gsc_connected ? " Cliquez sur \"Soumettre le sitemap\" pour notifier Google." : " Connectez Google Search Console pour notifier Google."}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Filtres */}
                   <div className="flex items-center gap-2 px-6 py-3 border-b border-white/[0.06]">
@@ -2378,6 +2474,21 @@ export default function Dashboard() {
                                       {new Date(pub.published_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
                                     </span>
                                   </div>
+                                  {/* Details indexation enrichis */}
+                                  {idx && (
+                                    <div className="mt-2 pt-2 border-t border-white/[0.04] flex items-center gap-3 flex-wrap">
+                                      {idx.last_crawl && (
+                                        <span className="text-gray-500 text-[9px]" title="Dernier crawl Google">
+                                          Crawl : {new Date(idx.last_crawl).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                        </span>
+                                      )}
+                                      {idx.coverage && idx.coverage !== "\u2014" && (
+                                        <span className={`text-[9px] font-medium ${idx.indexed ? "text-green-500/60" : "text-red-500/60"}`}>
+                                          {idx.coverage}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             );

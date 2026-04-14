@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getValidAccessToken } from "@/lib/google";
+import { inspectUrls, type IndexationStatus } from "@/lib/gsc-indexing";
 
 export const maxDuration = 120;
 
@@ -16,8 +17,15 @@ export async function GET() {
       .eq("user_id", user.id)
       .single();
 
-    const cache = site?.indexation_cache as { results?: Record<string, { indexed: boolean | null; verdict: string; coverage: string }>; updated_at?: string } | null;
-    return Response.json({ results: cache?.results ?? null, updated_at: cache?.updated_at ?? null });
+    const cache = site?.indexation_cache as {
+      results?: Record<string, IndexationStatus>;
+      updated_at?: string;
+    } | null;
+
+    return Response.json({
+      results: cache?.results ?? null,
+      updated_at: cache?.updated_at ?? null,
+    });
   } catch {
     return Response.json({ results: null });
   }
@@ -42,54 +50,21 @@ export async function POST(request: Request) {
     const token = await getValidAccessToken(user.id);
     if (!token) return Response.json({ error: "Google non connecté" }, { status: 403 });
 
-    // Process ALL URLs in batches of 5 to respect rate limits
-    const BATCH_SIZE = 5;
-    const allResults: { url: string; indexed: boolean | null; verdict: string; coverage: string }[] = [];
-
-    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
-      const batch = urls.slice(i, i + BATCH_SIZE);
-
-      const batchResults = await Promise.all(
-        batch.map(async (url) => {
-          try {
-            const res = await fetch("https://searchconsole.googleapis.com/v1/urlInspection/index:inspect", {
-              method: "POST",
-              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-              body: JSON.stringify({ inspectionUrl: url, siteUrl: site.gsc_site_url }),
-            });
-            if (!res.ok) return { url, indexed: null, verdict: "UNKNOWN", coverage: "—" };
-            const data = await res.json() as {
-              inspectionResult?: {
-                indexStatusResult?: { verdict: string; coverageState: string };
-              };
-            };
-            const verdict = data.inspectionResult?.indexStatusResult?.verdict ?? "UNKNOWN";
-            return {
-              url,
-              indexed: verdict === "PASS",
-              verdict,
-              coverage: data.inspectionResult?.indexStatusResult?.coverageState ?? "—",
-            };
-          } catch {
-            return { url, indexed: null, verdict: "UNKNOWN", coverage: "—" };
-          }
-        })
-      );
-
-      allResults.push(...batchResults);
-
-      // Small delay between batches to avoid rate limiting
-      if (i + BATCH_SIZE < urls.length) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-    }
+    // Utiliser la lib centralisée (batches de 5, données enrichies)
+    const allResults = await inspectUrls(token, site.gsc_site_url, urls);
 
     // Persist results to DB so they survive page refreshes
-    const resultsMap: Record<string, { indexed: boolean | null; verdict: string; coverage: string }> = {};
-    for (const r of allResults) resultsMap[r.url] = { indexed: r.indexed, verdict: r.verdict, coverage: r.coverage };
+    const resultsMap: Record<string, IndexationStatus> = {};
+    for (const r of allResults) resultsMap[r.url] = r;
+
     await supabase
       .from("sites")
-      .update({ indexation_cache: { results: resultsMap, updated_at: new Date().toISOString() } })
+      .update({
+        indexation_cache: {
+          results: resultsMap,
+          updated_at: new Date().toISOString(),
+        },
+      })
       .eq("user_id", user.id);
 
     return Response.json({ results: allResults });
