@@ -1148,7 +1148,7 @@ MOTS-CLÉS À INTÉGRER NATURELLEMENT :
 - Longue traîne (utiliser comme H2/H3 ou dans le contenu) : ${intent.keyword_variations.long_tail.join(", ")}
 - Questions utilisateurs (alimentent la FAQ) : ${intent.keyword_variations.related_questions.join(", ")}
 ${gscTerms.length > 0 ? `\nTERMES GSC À RENFORCER (déjà positionnés — intègre-les naturellement pour consolider) :\n${gscTerms.join(", ")}` : ""}
-${linkablePages.length > 0 ? `\nPAGES EXISTANTES (mentionne naturellement ces sujets pour préparer le maillage interne) :\n${linkablePages.join("\n")}` : ""}
+${linkablePages.length > 0 ? `\nPAGES EXISTANTES (mentionne naturellement ces sujets pour préparer le maillage interne) :\n${linkablePages.join("\n")}` : "\nMAILLAGE INTERNE : AUCUNE page existante sur ce site. N'insère AUCUN lien <a href> interne. Aucun. Zéro. Pas de \"consultez notre guide\", pas de \"voir aussi\". Le contenu doit être 100% autonome."}
 
 CLUSTER : ${ctx.cluster ?? "non défini"}
 RÔLE COCON : ${diff.cocoon_positioning.role}
@@ -2052,7 +2052,30 @@ export async function runGenerationPipeline(
     : html;
 
   // P8 — Validation finale : supprimer les liens internes vers des pages inexistantes
-  if (ctx.existing_pages.length > 0) {
+  if (ctx.existing_pages.length === 0) {
+    // Aucune page existante → supprimer TOUS les liens internes (hallucinations IA)
+    // On garde uniquement les liens externes (http vers d'autres domaines)
+    let siteDomain = "";
+    try {
+      const { data: siteData } = await supabase.from("sites").select("site_url").eq("user_id", userId).single();
+      if (siteData?.site_url) siteDomain = new URL(siteData.site_url).hostname;
+    } catch { /* */ }
+
+    finalHtml = finalHtml.replace(/<a\s+href="([^"]+)"[^>]*>(.*?)<\/a>/gi, (fullMatch, href: string, anchor: string) => {
+      try {
+        const linkDomain = new URL(href).hostname;
+        // Lien externe (autre domaine) → garder
+        if (siteDomain && linkDomain !== siteDomain) return fullMatch;
+      } catch {
+        // Lien relatif → c'est un lien interne halluciné → supprimer
+        console.warn(`[pipeline/html] Lien interne halluciné supprimé (0 pages existantes) : ${href}`);
+        return anchor;
+      }
+      // Lien interne (même domaine) → supprimer
+      console.warn(`[pipeline/html] Lien interne halluciné supprimé (0 pages existantes) : ${href}`);
+      return anchor;
+    });
+  } else {
     const validUrls = new Set(ctx.existing_pages.map(p => p.url.replace(/\/$/, "").toLowerCase()));
     const validSlugs = new Set(
       ctx.existing_pages
