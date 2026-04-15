@@ -786,23 +786,34 @@ export default function OnboardingPage() {
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">{t.onboarding.cms}</label>
                   <div className="grid grid-cols-2 gap-3">
-                    {(["wordpress", "shopify", "wix", "custom"] as const).map((cms, idx) => (
-                      <button key={cms} type="button" onClick={() => update("cms", cms)}
-                        style={{ animationDelay: `${idx * 60}ms` }}
-                        className={`relative py-4 rounded-xl border font-bold text-sm uppercase tracking-wide transition-all duration-200 overflow-hidden group animate-[fadeInUp_0.3s_ease-out_both] flex flex-col items-center gap-2 ${
-                          form.cms === cms
-                            ? "bg-orange-500/10 border-orange-500/40 text-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.12)]"
-                            : "bg-white/[0.03] border-white/[0.08] text-gray-400 hover:border-orange-500/30 hover:text-white"
-                        }`}>
-                        {form.cms === cms && (
-                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[sweep_2.5s_ease-in-out_infinite]" />
-                        )}
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                          style={{ background: "radial-gradient(circle at 50% 50%, rgba(249,115,22,0.06) 0%, transparent 70%)" }} />
-                        {cms === "wordpress" ? <WPIcon className="w-5 h-5" /> : cms === "shopify" ? <ShopifyIcon className="w-5 h-5" /> : cms === "wix" ? <WixIcon className="w-5 h-5" /> : <CustomIcon className="w-5 h-5" />}
-                        {cms === "wordpress" ? "WordPress" : cms === "shopify" ? "Shopify" : cms === "wix" ? "Wix" : "Custom API"}
-                      </button>
-                    ))}
+                    {(["wordpress", "shopify", "wix", "custom"] as const).map((cms, idx) => {
+                      const isDisabled = cms !== "wix";
+                      return (
+                        <button key={cms} type="button" onClick={() => !isDisabled && update("cms", cms)}
+                          style={{ animationDelay: `${idx * 60}ms` }}
+                          disabled={isDisabled}
+                          className={`relative py-4 rounded-xl border font-bold text-sm uppercase tracking-wide transition-all duration-200 overflow-hidden group animate-[fadeInUp_0.3s_ease-out_both] flex flex-col items-center gap-2 ${
+                            isDisabled
+                              ? "bg-white/[0.02] border-white/[0.05] text-gray-600 cursor-not-allowed opacity-50"
+                              : form.cms === cms
+                                ? "bg-orange-500/10 border-orange-500/40 text-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.12)]"
+                                : "bg-white/[0.03] border-white/[0.08] text-gray-400 hover:border-orange-500/30 hover:text-white"
+                          }`}>
+                          {form.cms === cms && !isDisabled && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[sweep_2.5s_ease-in-out_infinite]" />
+                          )}
+                          {!isDisabled && (
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                              style={{ background: "radial-gradient(circle at 50% 50%, rgba(249,115,22,0.06) 0%, transparent 70%)" }} />
+                          )}
+                          {cms === "wordpress" ? <WPIcon className="w-5 h-5" /> : cms === "shopify" ? <ShopifyIcon className="w-5 h-5" /> : cms === "wix" ? <WixIcon className="w-5 h-5" /> : <CustomIcon className="w-5 h-5" />}
+                          <span>{cms === "wordpress" ? "WordPress" : cms === "shopify" ? "Shopify" : cms === "wix" ? "Wix" : "Custom API"}</span>
+                          {isDisabled && (
+                            <span className="text-[10px] text-gray-500 font-medium tracking-widest -mt-1">SOON</span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
