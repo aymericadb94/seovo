@@ -39,6 +39,11 @@ export async function POST(request: Request) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
+          // Keepalive: send SSE comment every 15s to prevent proxy/browser timeout
+          const keepalive = setInterval(() => {
+            try { controller.enqueue(encoder.encode(": keepalive\n\n")); } catch { /* stream closed */ }
+          }, 15_000);
+
           try {
             const result = await runGenerationPipeline(
               supabase,
@@ -58,6 +63,7 @@ export async function POST(request: Request) {
             console.error("[generate/stream] Pipeline error:", err);
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", error: msg })}\n\n`));
           } finally {
+            clearInterval(keepalive);
             controller.close();
           }
         },

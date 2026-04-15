@@ -420,16 +420,10 @@ export default function GeneratePage() {
       console.warn("[generate] SSE stream failed with network error, trying fallback:", msg);
     }
 
-    // Fallback: non-streaming call only if stream returned nothing at all
-    // (i.e. SSE never connected). If stream progressed past step 2, it was
-    // a late timeout — retrying the full pipeline would just timeout again.
+    // Fallback: non-streaming call if stream returned no final result.
+    // The pipeline is idempotent — safe to retry from scratch.
     if (!apiResult) {
-      if (streamMaxStep >= 2) {
-        // Stream progressed far — retrying the full pipeline would just timeout again
-        throw new Error("La génération a été interrompue par un timeout serveur. Réessayez — le pipeline reprendra du début.");
-      }
-
-      console.warn("[generate] SSE stream returned no result, falling back to non-streaming API");
+      console.warn(`[generate] SSE stream returned no result (maxStep=${streamMaxStep}), falling back to non-streaming API`);
 
       // Simulate step progression during non-streaming call
       const progressInterval = setInterval(() => {
