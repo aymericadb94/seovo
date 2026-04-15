@@ -192,10 +192,10 @@ export default function LinkingGraph({ onAnalysisComplete }: { onAnalysisComplet
       const json = await res.json();
       if (json.result?.data) {
         setData(json.result.data as LinkingData);
-        onAnalysisComplete?.();
+        if (onAnalysisComplete) setTimeout(onAnalysisComplete, 5000);
       } else if (json.result) {
         setData(json.result as LinkingData);
-        onAnalysisComplete?.();
+        if (onAnalysisComplete) setTimeout(onAnalysisComplete, 5000);
       }
     } catch {
       setError("Impossible de charger les données de maillage");
@@ -214,7 +214,7 @@ export default function LinkingGraph({ onAnalysisComplete }: { onAnalysisComplet
         setError(json.error);
       } else if (json.result) {
         setData(json.result as LinkingData);
-        onAnalysisComplete?.();
+        if (onAnalysisComplete) setTimeout(onAnalysisComplete, 5000);
       }
     } catch {
       setError("Erreur lors de l'analyse");
