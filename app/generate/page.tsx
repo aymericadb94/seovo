@@ -339,6 +339,37 @@ export default function GeneratePage() {
 
       if (reader) {
         let buffer = "";
+        let lastStepTime = Date.now();
+        const MIN_STEP_DURATION = 1200; // ms — chaque étape reste visible au moins 1.2s
+        const pendingEvents: Array<{
+          type: string;
+          step?: number;
+          agent?: string;
+          details?: string[];
+          result?: ApiResult;
+          error?: string;
+        }> = [];
+
+        async function applyStepChange(idx: number, details?: string[]) {
+          const elapsed = Date.now() - lastStepTime;
+          if (elapsed < MIN_STEP_DURATION) {
+            await new Promise(r => setTimeout(r, MIN_STEP_DURATION - elapsed));
+          }
+          setStepOutcomes(prev => {
+            const next = { ...prev };
+            for (let i = 0; i < idx; i++) {
+              if (!next[i]) next[i] = "success";
+            }
+            return next;
+          });
+          if (details) {
+            setStepDetails(prev => ({ ...prev, [idx]: details }));
+          }
+          setCurrentStep(idx);
+          streamMaxStep = Math.max(streamMaxStep, idx);
+          lastStepTime = Date.now();
+        }
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -347,14 +378,7 @@ export default function GeneratePage() {
           buffer = lines.pop() ?? "";
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
-            let event: {
-              type: string;
-              step?: number;
-              agent?: string;
-              details?: string[];
-              result?: ApiResult;
-              error?: string;
-            };
+            let event: typeof pendingEvents[number];
             try {
               event = JSON.parse(line.slice(6));
             } catch {
@@ -363,21 +387,15 @@ export default function GeneratePage() {
             if (event.type === "progress" && event.agent) {
               const idx = AGENT_TO_STEP[event.agent];
               if (idx !== undefined) {
-                setStepOutcomes(prev => {
-                  const next = { ...prev };
-                  for (let i = 0; i < idx; i++) {
-                    if (!next[i]) next[i] = "success";
-                  }
-                  return next;
-                });
-                if (event.details) {
-                  setStepDetails(prev => ({ ...prev, [idx]: event.details! }));
-                }
-                setCurrentStep(idx);
-                streamMaxStep = Math.max(streamMaxStep, idx);
+                await applyStepChange(idx, event.details);
               }
             } else if (event.type === "done" && event.result) {
               apiResult = event.result;
+              // Ensure last step is visible before completing
+              const elapsed = Date.now() - lastStepTime;
+              if (elapsed < MIN_STEP_DURATION) {
+                await new Promise(r => setTimeout(r, MIN_STEP_DURATION - elapsed));
+              }
               setStepOutcomes(prev => {
                 const next = { ...prev };
                 for (let i = 0; i < STEPS.length; i++) {
