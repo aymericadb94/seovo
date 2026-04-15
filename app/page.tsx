@@ -54,31 +54,31 @@ const testimonials = [
 const plans = [
   {
     name: "Starter", price: "49", descKey: "Pour les indépendants et petites boutiques",
-    features: ["1 site connecté", "1 article / jour", "10 mots-clés max", "WordPress ou Shopify", "Dashboard basique", "Support email"],
-    featuresEn: ["1 connected site", "1 article / day", "10 keywords max", "WordPress or Shopify", "Basic dashboard", "Email support"],
-    featuresEs: ["1 sitio conectado", "1 artículo / día", "10 palabras clave máx.", "WordPress o Shopify", "Dashboard básico", "Soporte por email"],
-    featuresDe: ["1 Website verbunden", "1 Artikel / Tag", "Maximal 10 Keywords", "WordPress oder Shopify", "Basis-Dashboard", "E-Mail-Support"],
-    featuresIt: ["1 sito connesso", "1 articolo / giorno", "10 parole chiave max", "WordPress o Shopify", "Dashboard base", "Supporto email"],
+    features: ["1 site connecté", "1 article / jour", "10 mots-clés max", "Wix (Shopify, WP bientôt)", "Dashboard basique", "Support email"],
+    featuresEn: ["1 connected site", "1 article / day", "10 keywords max", "Wix (Shopify, WP coming soon)", "Basic dashboard", "Email support"],
+    featuresEs: ["1 sitio conectado", "1 artículo / día", "10 palabras clave máx.", "Wix (Shopify, WP pronto)", "Dashboard básico", "Soporte por email"],
+    featuresDe: ["1 Website verbunden", "1 Artikel / Tag", "Maximal 10 Keywords", "Wix (Shopify, WP bald)", "Basis-Dashboard", "E-Mail-Support"],
+    featuresIt: ["1 sito connesso", "1 articolo / giorno", "10 parole chiave max", "Wix (Shopify, WP pronto)", "Dashboard base", "Supporto email"],
     cta: { fr: "Démarrer en Beta", en: "Start in Beta", es: "Empezar en Beta", de: "Beta starten", it: "Inizia in Beta" },
     highlighted: false, badge: null, langLimit: 1,
   },
   {
     name: "Premium", price: "149", descKey: "Pour les PME et e-commerçants actifs",
-    features: ["5 sites connectés", "2 articles / jour par site", "30 mots-clés max", "WordPress + Shopify", "Analyse automatique des mots-clés", "Dashboard complet", "Support prioritaire"],
-    featuresEn: ["5 connected sites", "2 articles / day per site", "30 keywords max", "WordPress + Shopify", "Automated keyword analysis", "Full dashboard", "Priority support"],
-    featuresEs: ["5 sitios conectados", "2 artículos / día por sitio", "30 palabras clave máx.", "WordPress + Shopify", "Análisis automático de palabras clave", "Dashboard completo", "Soporte prioritario"],
-    featuresDe: ["5 Websites verbunden", "2 Artikel / Tag pro Website", "Maximal 30 Keywords", "WordPress + Shopify", "Automatische Keyword-Analyse", "Volles Dashboard", "Prioritäts-Support"],
-    featuresIt: ["5 siti connessi", "2 articoli / giorno per sito", "30 parole chiave max", "WordPress + Shopify", "Analisi automatica delle parole chiave", "Dashboard completo", "Supporto prioritario"],
+    features: ["5 sites connectés", "2 articles / jour par site", "30 mots-clés max", "Wix (Shopify, WP bientôt)", "Analyse automatique des mots-clés", "Dashboard complet", "Support prioritaire"],
+    featuresEn: ["5 connected sites", "2 articles / day per site", "30 keywords max", "Wix (Shopify, WP coming soon)", "Automated keyword analysis", "Full dashboard", "Priority support"],
+    featuresEs: ["5 sitios conectados", "2 artículos / día por sitio", "30 palabras clave máx.", "Wix (Shopify, WP pronto)", "Análisis automático de palabras clave", "Dashboard completo", "Soporte prioritario"],
+    featuresDe: ["5 Websites verbunden", "2 Artikel / Tag pro Website", "Maximal 30 Keywords", "Wix (Shopify, WP bald)", "Automatische Keyword-Analyse", "Volles Dashboard", "Prioritäts-Support"],
+    featuresIt: ["5 siti connessi", "2 articoli / giorno per sito", "30 parole chiave max", "Wix (Shopify, WP pronto)", "Analisi automatica delle parole chiave", "Dashboard completo", "Supporto prioritario"],
     cta: { fr: "Démarrer en Beta", en: "Start in Beta", es: "Empezar en Beta", de: "Beta starten", it: "Inizia in Beta" },
     highlighted: true, badge: { fr: "Le plus populaire", en: "Most popular", es: "El más popular", de: "Beliebteste", it: "Il più popolare" }, langLimit: 3,
   },
   {
     name: "Elite", price: "399", descKey: "Pour les agences et grands comptes",
-    features: ["20 sites connectés", "5 articles / jour par site", "Mots-clés illimités", "WordPress + Shopify", "Analyse avancée des mots-clés", "Dashboard complet + analytics", "Account manager dédié"],
-    featuresEn: ["20 connected sites", "5 articles / day per site", "Unlimited keywords", "WordPress + Shopify", "Advanced keyword analysis", "Full dashboard + analytics", "Dedicated account manager"],
-    featuresEs: ["20 sitios conectados", "5 artículos / día por sitio", "Palabras clave ilimitadas", "WordPress + Shopify", "Análisis avanzado de palabras clave", "Dashboard completo + analíticas", "Account manager dedicado"],
-    featuresDe: ["20 Websites verbunden", "5 Artikel / Tag pro Website", "Unbegrenzte Keywords", "WordPress + Shopify", "Erweiterte Keyword-Analyse", "Volles Dashboard + Analytics", "Dedizierter Account Manager"],
-    featuresIt: ["20 siti connessi", "5 articoli / giorno per sito", "Parole chiave illimitate", "WordPress + Shopify", "Analisi avanzata delle parole chiave", "Dashboard completo + analytics", "Account manager dedicato"],
+    features: ["20 sites connectés", "5 articles / jour par site", "Mots-clés illimités", "Wix (Shopify, WP bientôt)", "Analyse avancée des mots-clés", "Dashboard complet + analytics", "Account manager dédié"],
+    featuresEn: ["20 connected sites", "5 articles / day per site", "Unlimited keywords", "Wix (Shopify, WP coming soon)", "Advanced keyword analysis", "Full dashboard + analytics", "Dedicated account manager"],
+    featuresEs: ["20 sitios conectados", "5 artículos / día por sitio", "Palabras clave ilimitadas", "Wix (Shopify, WP pronto)", "Análisis avanzado de palabras clave", "Dashboard completo + analíticas", "Account manager dedicado"],
+    featuresDe: ["20 Websites verbunden", "5 Artikel / Tag pro Website", "Unbegrenzte Keywords", "Wix (Shopify, WP bald)", "Erweiterte Keyword-Analyse", "Volles Dashboard + Analytics", "Dedizierter Account Manager"],
+    featuresIt: ["20 siti connessi", "5 articoli / giorno per sito", "Parole chiave illimitate", "Wix (Shopify, WP pronto)", "Analisi avanzata delle parole chiave", "Dashboard completo + analytics", "Account manager dedicato"],
     cta: { fr: "Nous contacter", en: "Contact us", es: "Contáctanos", de: "Kontakt aufnehmen", it: "Contattaci" },
     highlighted: false, badge: null, langLimit: 5,
   },
@@ -553,7 +553,7 @@ export default function LandingPage() {
               {[
                 "RankPill lit vos données GSC et agit — pas un générateur d'articles",
                 "Positions 5–20 détectées automatiquement · Contenu publié · Trafic capté",
-                "Connecte WordPress, Shopify, Wix ou ton API en 3 minutes",
+                "Compatible Wix · Shopify & WordPress bientôt disponibles",
                 "RankPill comprend votre SEO avant d'écrire le premier mot",
                 "Analyse réelle · Opportunités priorisées · Publication automatique",
                 "Sans rédacteur · Sans agence · Sans effort · Avec de vraies données",
@@ -662,6 +662,40 @@ export default function LandingPage() {
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
             </a>
+          </div>
+
+          {/* Compatible CMS */}
+          <div className="animate-fade-in-up flex flex-col items-center gap-4 mt-10" style={{ animationDelay: "650ms" }}>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-gray-600">Compatible avec</p>
+            <div className="flex items-center gap-4">
+              {/* Wix — actif */}
+              <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl border border-orange-500/30 bg-orange-500/[0.06]">
+                <svg viewBox="0 0 24 24" fill="#f97316" className="w-5 h-5">
+                  <path d="M11.705 5.385c-.408 1.188-1.152 3.35-1.848 5.366L7.71 4.617C7.346 3.52 6.663 3 5.726 3H3.43L7.8 15.43c.364 1.058 1.037 1.565 1.895 1.565.858 0 1.532-.507 1.895-1.565l2.148-6.24 2.148 6.24c.363 1.058 1.037 1.565 1.895 1.565.858 0 1.531-.507 1.895-1.565L24 3h-2.295c-.937 0-1.62.52-1.984 1.617l-2.148 6.134c-.695-2.017-1.44-4.178-1.848-5.366C15.29 1.826 14.285 1 12.997 1c-1.289 0-2.294.826-3.292 4.385z"/>
+                </svg>
+                <span className="text-sm font-black text-orange-400 uppercase tracking-wide">Wix</span>
+              </div>
+              {/* Shopify — bientôt */}
+              <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] opacity-45">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-gray-500">
+                  <path d="M15.337 23.979l7.216-1.561s-2.604-17.613-2.625-17.73c-.018-.117-.12-.194-.234-.194s-2.08-.146-2.08-.146-.826-.811-1.457-1.411v-.038C16.04 1.315 14.87.5 13.526.5c-.038 0-.077 0-.117.004-.194-.253-.426-.361-.657-.361C9.74.143 8.4 4.077 7.97 6.096c-1.15.354-1.97.608-2.08.646C5.08 7.077 5.04 7.12 5.02 7.423L3 22.9l12.337 1.079z"/>
+                </svg>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide leading-none">Shopify</span>
+                  <span className="text-[9px] text-gray-600 font-medium">Bientôt disponible</span>
+                </div>
+              </div>
+              {/* WordPress — bientôt */}
+              <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] opacity-45">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-gray-500">
+                  <path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 1.5c2.33 0 4.463.853 6.1 2.25L4.75 18.1A8.484 8.484 0 0 1 3.5 12c0-4.687 3.813-8.5 8.5-8.5zm0 17c-2.33 0-4.463-.853-6.1-2.25L19.25 5.9A8.484 8.484 0 0 1 20.5 12c0 4.687-3.813 8.5-8.5 8.5z"/>
+                </svg>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide leading-none">WordPress</span>
+                  <span className="text-[9px] text-gray-600 font-medium">Bientôt disponible</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Micro preuve */}
