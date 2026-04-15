@@ -983,16 +983,29 @@ BLOCS DISPONIBLES :
 - cta : appel à l'action (toujours en dernier)
 
 CALIBRAGE (P5) :
-- Nombre de H2 sections : benchmark concurrence ${serp.competitive_benchmark.avg_headings_count} H2 → vise ${serp.competitive_benchmark.avg_headings_count + 1}-${serp.competitive_benchmark.avg_headings_count + 3} H2 pour surpasser
+- Nombre de H2 sections : benchmark concurrence ${serp.competitive_benchmark.avg_headings_count} H2 → vise ${serp.competitive_benchmark.avg_headings_count + 1}-${Math.min(serp.competitive_benchmark.avg_headings_count + 3, 8)} H2 pour surpasser
+- MAXIMUM ABSOLU : 8 H2. Au-delà, le poids SEO est dilué entre trop de sections. Google perd la hiérarchie.
 - Répartition mots par section : ${diff.content_strategy.target_word_count} mots ÷ nombre de sections
+- FUSION OBLIGATOIRE : si deux sections couvrent un sujet proche (ex: "Comparatif" + "Tableau comparatif", "Avantages" + "Points forts"), fusionne-les en un seul H2 riche. Un H2 fusionné avec mot-clé + qualificateurs est plus puissant que deux H2 vagues.
+
+ANTI-DOUBLONS :
+- INTERDIT de créer un bloc "FAQ" ET un bloc "Questions fréquentes" — c'est la même chose. Google pénalise les doublons. UNE SEULE section FAQ, avec un H2 du type "FAQ : vos questions sur [keyword]".
+- INTERDIT de créer des blocs sémantiquement identiques avec des titres différents (ex: "En résumé" + "Ce qu'il faut retenir" = doublon).
+
+COHÉRENCE LOCALE / NATIONAL :
+- Intent détecté : ${intent.intent}
+- Si l'intent N'EST PAS "local", INTERDICTION d'ajouter des sections géolocalisées (ville, région, "près de..."). Injecter du local sur un mot-clé national fait que Google reclasse la page en requête locale → perte de la SERP nationale.
+- Si l'intent EST "local", les sections géolocalisées sont pertinentes et encouragées.
 
 FEATURED SNIPPET (P4) :
 ${intent.featured_snippet_opportunity.likely
   ? `- Format cible : ${intent.featured_snippet_opportunity.format}
-- Si "paragraph" → quick_answer doit contenir une définition/réponse concise (40-60 mots)
-- Si "list" → premier H2 doit être une liste à puces/numérotée
-- Si "table" → inclure un bloc comparison avec tableau structuré`
-  : "- Pas de stratégie snippet spécifique"}
+- Si "paragraph" → quick_answer doit contenir une définition/réponse concise (40-60 mots) commençant par "[keyword] est..." ou "[keyword] désigne..."
+- Si "list" → premier H2 doit être une liste à puces/numérotée avec 5-8 items courts
+- Si "table" → inclure un bloc comparison avec tableau structuré (3-5 lignes, headers clairs)
+- Le bloc "quick_answer" (En bref) EST la machine à featured snippet : 40-60 mots, réponse directe, aucun filler. Google extrait ce bloc tel quel.
+- Le bloc "stats" (Chiffres clés) est un candidat featured snippet secondaire : structurer en liste ou tableau, chaque stat = 1 ligne avec source. Format : "X% des [acteurs] font [chose] (Source, année)"`
+  : "- Pas de stratégie snippet spécifique — le quick_answer reste utile pour le lecteur mais pas optimisé snippet"}
 
 RETOURNE JSON brut uniquement :
 {
@@ -1017,7 +1030,19 @@ RETOURNE JSON brut uniquement :
   );
 
   const parsed = parseAiJson<StructureOutput>(result.text);
-  if (parsed?.blocks && parsed?.sections_plan && parsed.sections_plan.length > 0) return parsed;
+  if (parsed?.blocks && parsed?.sections_plan && parsed.sections_plan.length > 0) {
+    // P9 — Cap H2 à 8 max (dilution SEO au-delà)
+    if (parsed.sections_plan.length > 8) {
+      parsed.sections_plan = parsed.sections_plan.slice(0, 8);
+      parsed.target_sections_count = Math.min(parsed.target_sections_count, 8);
+    }
+    // P9 — Supprimer les blocs FAQ en doublon (garder un seul "faq")
+    const faqIndex = parsed.blocks.indexOf("faq");
+    if (faqIndex !== -1) {
+      parsed.blocks = parsed.blocks.filter((b, i) => b !== "faq" || i === faqIndex);
+    }
+    return parsed;
+  }
 
   // P6 — Fallback intelligent basé sur intent + diff
   const isTransactional = intent.intent === "transactional";
@@ -1136,6 +1161,12 @@ RÈGLES SEO ON-PAGE (P2) :
 - Paragraphes courts : 2-3 phrases max, séparés par des <p>
 - Listes à puces pour les énumérations de 3+ éléments
 - Au moins 1 donnée chiffrée ou exemple concret par section
+
+RÈGLES ANTI-ERREURS STRUCTURE :
+- UNE SEULE FAQ. INTERDIT de créer une section "FAQ" ET une section "Questions fréquentes" — c'est un doublon SEO qui dilue le poids. Toutes les Q/A vont dans le champ "faq" du JSON.
+- Si l'intent n'est PAS "local" (intent détecté : ${intent.intent}), INTERDIT d'injecter des mentions géolocalisées (villes, régions, "près de...") dans le contenu. Cela fait basculer la page vers une SERP locale.
+- Le quick_answer est une MACHINE À FEATURED SNIPPET : 40-60 mots, réponse directe, format ${intent.featured_snippet_opportunity.likely ? intent.featured_snippet_opportunity.format : "paragraph"}. Pas de filler, pas de "il est important de noter".
+- Les stats doivent être structurées pour le snippet : chaque chiffre = 1 élément avec valeur + source. Format : "X% des [acteurs] font [chose] (Source, année)".
 
 RÈGLES DE RÉDACTION :
 - Adopte le ton "${diff.tone_of_voice}" : ${diff.tone_of_voice === "expert" ? "jargon technique assumé, insights pointus, références sectorielles" : diff.tone_of_voice === "accessible" ? "vulgarisation avec analogies, zéro jargon, exemples du quotidien" : diff.tone_of_voice === "provocateur" ? "remise en question, prise de position forte, ton incisif, interpellation directe" : diff.tone_of_voice === "didactique" ? "pas-à-pas numérotés, exemples concrets à chaque étape, pédagogie progressive" : "chiffres vérifiables, comparatifs, preuves, ROI, tableaux de données"}
